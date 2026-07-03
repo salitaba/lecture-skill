@@ -15,7 +15,7 @@ Install dependencies:
 npm install
 ```
 
-Validate the active template:
+Validate the active lecture or collection:
 
 ```bash
 npm run validate
@@ -31,7 +31,8 @@ Open `http://localhost:3000`.
 
 ## Files
 
-- `content/lecture.template.md`: the active render input.
+- `content/lecture.template.md`: the fallback single-lecture render input.
+- `lectures/`: local multi-lecture workspace for collection mode; keep it out of git if you want private course content.
 - `content/raw-lecture.txt`: recommended working path for your own raw lecture notes.
 - `examples/raw-lecture.txt`: golden raw source for MVP evaluation.
 - `examples/golden.template.md`: reviewer reference for the golden workflow.
