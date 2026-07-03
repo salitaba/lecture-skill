@@ -1,0 +1,252 @@
+Feature: Multi-Lecture Support
+
+## Product Summary
+
+Extend the Lecture Site Engine from a single-lecture preview tool into a lightweight multi-lecture site that lets technical educators organize, navigate, and preview a collection of related lectures from one local repository. The current engine renders exactly one lecture from `content/lecture.template.md`. This feature adds the ability to author, validate, and browse multiple lectures as a cohesive learning path.
+
+The primary product outcome is: a technical educator can author two or more lecture templates, preview them as a navigable collection with a landing page and per-lecture routes, and validate the entire collection with one command. The local-first, AI-agent-assisted workflow remains unchanged for individual lectures; this feature adds collection-level awareness without requiring a CMS, database, or hosted deployment.
+
+The primary user remains the technical educator using a local repository and AI coding agent. The secondary user is a reviewer evaluating a set of related lectures for coherence, ordering, and coverage. Students or public visitors may benefit from the multi-lecture browsing experience, but their needs do not expand the authoring workflow scope.
+
+## Problem
+
+Today the engine supports exactly one lecture at a time. An educator preparing a short course, workshop, or multi-part lesson series must either:
+
+- Manually swap `content/lecture.template.md` between lectures and remember which lecture was active.
+- Maintain separate repositories or branches for each lecture.
+- Lose the ability to see the collection as a coherent learning path.
+
+This creates friction when:
+
+- Ordering lectures in a logical learning sequence.
+- Checking that a set of related lectures covers the intended curriculum without gaps or overlap.
+- Previewing how a learner would navigate from one lecture to the next.
+- Validating that all lectures in a collection meet the template schema.
+- Sharing a preview of the full course with a colleague or reviewer without handing them a zip of disconnected files.
+
+The single-lecture engine works well for one lesson. The gap is collection-level organization, navigation, and validation.
+
+## Goals
+
+- Let the author store multiple lecture templates in the repository under a predictable directory structure.
+- Render a landing page that lists all lectures in authored order with title, audience, level, duration, and description.
+- Render each lecture on its own route with the existing lecture page layout, navigation, and component kit.
+- Provide next/previous lecture navigation so a learner or reviewer can move through the collection in order.
+- Validate all lectures in the collection with one command and report per-lecture validation status.
+- Preserve the existing single-lecture workflow: `content/lecture.template.md` remains the default render when no collection is present.
+- Keep the collection structure simple enough for an AI agent to scaffold from a course outline.
+
+## Priority
+
+P0 requirements:
+
+- Predictable directory structure for multiple lecture templates.
+- Landing page listing all lectures in authored order.
+- Per-lecture route rendering with the existing lecture page layout.
+- Next/previous lecture navigation on each lecture page.
+- Collection-level validation command that validates all lectures and reports per-lecture status.
+- Backward compatibility: the engine still renders a single lecture from `content/lecture.template.md` when no collection is present.
+
+P1 requirements:
+
+- Estimated total collection duration on the landing page.
+- Collection-level table of contents or curriculum summary.
+- Visual indicator of which lecture the learner is currently viewing on the landing page.
+- Badge or label for lecture level and audience on the landing page.
+
+P2 requirements:
+
+- Collection metadata file for course-level title, description, and ordering overrides.
+- Progress tracking via local storage so a returning learner sees which lectures they have visited.
+- Search or filter across lectures by keyword, level, or audience.
+
+## Non-Goals
+
+- No CMS, database, hosted publishing, or user authentication.
+- No multi-user authoring or collaboration features.
+- No analytics, learning management system integration, or student progress reporting to an external service.
+- No automatic lecture sequencing or dependency resolution beyond authored order.
+- No slide deck, video, or interactive exercise integration.
+- No theme customization beyond what the existing component kit provides.
+- No PDF export, print layout, or offline bundle for multi-lecture collections.
+- No change to the supported lecture template schema or component types.
+
+## Design Principles
+
+- One lecture is still the default. The collection feature must not complicate the single-lecture workflow.
+- Authoring order is the learning order. The engine should not reorder lectures unless the author explicitly overrides.
+- Validation is collection-aware. One invalid lecture should not block previewing the rest of the collection.
+- Local-first and reliable. Collection features must not require network access, external services, or runtime dependencies.
+- Simple enough for an AI agent. The directory structure and collection metadata should be deterministically scaffoldable from a course outline.
+
+## Recommended Experience Direction
+
+### Directory Structure
+
+Use a `lectures/` directory at the repository root for multi-lecture collections:
+
+```text
+lectures/
+  01-introduction/
+    lecture.template.md
+  02-core-concepts/
+    lecture.template.md
+  03-advanced-topics/
+    lecture.template.md
+```
+
+Each subdirectory contains exactly one `lecture.template.md`. The numeric prefix establishes authored order. The subdirectory name becomes the lecture slug for routing.
+
+The existing `content/lecture.template.md` remains the default single-lecture render input. When the `lectures/` directory exists and contains at least one valid lecture template, the engine switches to collection mode. When `lectures/` is absent or empty, the engine behaves exactly as it does today.
+
+### Landing Page
+
+The landing page replaces the single-lecture render when the engine is in collection mode. It should:
+
+- Show a collection title and short description.
+- List all lectures in authored order with title, description, audience, level, and duration.
+- Link each lecture entry to its per-lecture route.
+- Show the total estimated duration across all lectures.
+- Optionally show a section count or component count per lecture.
+- Remain readable and useful at 390px, 768px, and 1280px viewport widths.
+
+The landing page should feel like a course outline, not a dashboard. It should help a reviewer predict the learning path before opening the first lecture.
+
+### Per-Lecture Routes
+
+Each lecture renders on its own route at `/lectures/<slug>` where `<slug>` is the subdirectory name under `lectures/`. The per-lecture page uses the existing lecture page layout: header, section navigation, overview, objectives, ordered sections, components, and takeaways.
+
+Add next/previous lecture navigation at the bottom of each lecture page. The navigation should show the adjacent lecture titles and link to their routes. The first lecture should show only a "Next" link. The last lecture should show only a "Previous" link. A "Back to course" link on every lecture page returns to the landing page.
+
+### Collection Validation
+
+Extend the validation command to support collection mode. The author runs:
+
+```bash
+npm run validate
+```
+
+In single-lecture mode, this validates `content/lecture.template.md` exactly as today. In collection mode, this validates every `lectures/*/lecture.template.md` and prints a per-lecture summary:
+
+```text
+Collection validation: 3 lectures found
+
+  [PASS] 01-introduction/lecture.template.md
+  [PASS] 02-core-concepts/lecture.template.md
+  [FAIL] 03-advanced-topics/lecture.template.md
+    - Missing required section: ## Key Takeaways
+
+2 of 3 lectures passed validation.
+```
+
+Each lecture validates independently. One failing lecture does not block rendering of passing lectures. The landing page should show a visual indicator for each lecture's validation status. The per-lecture route for a failing lecture should show the existing validation screen with that lecture's errors.
+
+The validation command must still exit nonzero if any lecture in the collection fails validation. This preserves CI and scripting compatibility.
+
+### Backward Compatibility
+
+When `lectures/` is absent or empty, the engine must behave exactly as it does today:
+
+- Render the single lecture from `content/lecture.template.md`.
+- Validate only `content/lecture.template.md`.
+- Show no collection UI, landing page, or per-lecture routing.
+
+When `lectures/` exists but `content/lecture.template.md` is also present, the engine should use collection mode and ignore `content/lecture.template.md` for rendering. The README must document this precedence.
+
+### AI-Agent Workflow
+
+The AI agent can scaffold a multi-lecture collection from a course outline. The agent:
+
+1. Reads the course outline or raw multi-lecture source.
+2. Creates the `lectures/` directory with numbered subdirectories.
+3. Creates one `lecture.template.md` in each subdirectory following the existing template schema.
+4. Runs `npm run validate` to check all lectures.
+5. Revises until all lectures pass validation.
+
+The SKILL.md should be updated to describe the collection workflow without removing the single-lecture workflow instructions.
+
+## Success Metrics / Quality Gates
+
+- An educator can author two or more lectures, preview them as a navigable collection, and move between lectures using next/previous navigation.
+- The landing page shows all lectures in authored order with title, description, audience, level, and duration.
+- A reviewer can predict the learning path from the landing page before opening the first lecture.
+- `npm run validate` reports per-lecture validation status for the entire collection.
+- One invalid lecture does not block rendering or validation of other lectures.
+- The single-lecture workflow remains unchanged when `lectures/` is absent.
+- At 390px, 768px, and 1280px viewport widths, the landing page and per-lecture pages have no body-level horizontal overflow.
+- The collection landing page and per-lecture routes are keyboard navigable with visible focus states.
+- An AI agent can scaffold a multi-lecture collection from a course outline using SKILL.md instructions.
+
+## Functional Requirements
+
+- The `lectures/` directory structure uses numbered subdirectories with a `lecture.template.md` in each.
+- The landing page reads all `lectures/*/lecture.template.md` files and renders them in authored order.
+- Each lecture renders on `/lectures/<slug>` where `<slug>` is the subdirectory name.
+- Per-lecture pages use the existing lecture page layout and component kit.
+- Next/previous navigation appears at the bottom of each per-lecture page.
+- A "Back to course" link returns to the landing page from any per-lecture page.
+- The validation command validates all lectures in collection mode.
+- The validation command exits nonzero if any lecture fails.
+- The landing page shows validation status per lecture.
+- The per-lecture route for a failing lecture shows the validation screen with that lecture's errors.
+- When `lectures/` is absent, the engine renders from `content/lecture.template.md` with no collection UI.
+- All UI for collection-level features must use the existing component kit or minimal additions under `src/components/lecture-kit/`.
+- No new runtime network dependency may be required to preview the collection locally.
+
+## Accessibility Requirements
+
+- The landing page uses semantic heading order and landmark structure.
+- Lecture list items are keyboard navigable with visible focus states.
+- Next/previous navigation is keyboard usable with visible focus states.
+- Color contrast meets WCAG AA for normal text and interactive elements.
+- The landing page and per-lecture pages have no horizontal overflow at required viewport widths.
+- Validation status indicators do not rely on color alone.
+
+## Responsive Requirements
+
+- At 390px, the landing page stacks lecture entries vertically with readable metadata and no clipped text.
+- At 390px, next/previous navigation is usable with finger-friendly tap targets.
+- At 768px and 1280px, the landing page uses appropriate spacing and does not waste horizontal space.
+- Lecture titles, descriptions, and metadata values do not clip or overlap at any required width.
+
+## Implementation Notes
+
+- The collection directory structure should be scanned at render time, not hardcoded.
+- Lecture ordering should derive from the numeric prefix in the subdirectory name.
+- The collection mode detection should be a simple directory existence and content check.
+- Avoid adding a client-side router or state management library for collection navigation.
+- Keep the collection landing page as a server-rendered page.
+- If the landing page needs client-side interactivity (e.g., progress tracking in P2), isolate that behavior in a small component.
+- Update SKILL.md and README to document the collection workflow.
+- Add at least one example multi-lecture collection under `examples/` for testing and documentation.
+- Add collection-level validation test coverage for: empty collection directory, one valid lecture, mixed valid and invalid lectures, and missing subdirectory structure.
+
+## Acceptance Criteria
+
+- When `lectures/` is absent, the engine renders from `content/lecture.template.md` with no collection UI.
+- When `lectures/` contains two or more valid lecture templates, the landing page lists all lectures in authored order with title, description, audience, level, and duration.
+- Each lecture links to a per-lecture route at `/lectures/<slug>`.
+- Per-lecture routes render the full lecture page with header, section navigation, overview, objectives, ordered sections, components, and takeaways.
+- Next/previous lecture navigation appears at the bottom of each per-lecture page with correct adjacent titles.
+- A "Back to course" link on each per-lecture page returns to the landing page.
+- `npm run validate` in collection mode validates all lectures and prints a per-lecture summary.
+- One failing lecture does not block rendering of other lectures.
+- The validation command exits nonzero when any lecture fails.
+- The landing page shows validation status per lecture.
+- The per-lecture route for a failing lecture shows the validation screen with that lecture's errors.
+- The landing page has no horizontal overflow at 390px, 768px, and 1280px viewport widths.
+- Next/previous navigation is keyboard navigable with visible focus states.
+- The AI-agent workflow in SKILL.md supports scaffolding a collection from a course outline.
+- An example multi-lecture collection exists under `examples/` and passes validation.
+
+## Suggested Verification
+
+- Run `npm run validate` with `lectures/` absent and confirm single-lecture behavior.
+- Create a collection with two valid lectures, run `npm run validate`, and confirm per-lecture PASS status.
+- Create a collection with one valid and one invalid lecture, run `npm run validate`, and confirm mixed status.
+- Preview the landing page at 390px, 768px, and 1280px widths.
+- Navigate between lectures using next/previous links.
+- Click "Back to course" from a per-lecture page.
+- Test keyboard navigation through the landing page and per-lecture navigation.
+- Run the existing automated test suite to confirm no regressions.
+- Ask an AI agent to scaffold a three-lecture collection from a short course outline using SKILL.md.

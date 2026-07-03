@@ -1,0 +1,238 @@
+Feature: Improve Lecture Site UX
+
+## Product Summary
+
+Improve the lecture site from a technically correct preview into a more polished, readable, and teaching-friendly learning surface. The current MVP already renders the required lecture structure, validates templates, and provides basic responsive layout. This feature raises the user experience bar for technical educators and reviewers without changing the supported lecture template schema.
+
+The improved UX should make a rendered lecture feel intentionally designed: easy to scan before teaching, comfortable to read during review, clear about progress through the lesson, and helpful when a template fails validation. The work should preserve the local-first authoring workflow and avoid adding CMS, hosting, analytics, authentication, or browser-only authoring features.
+
+The primary users remain technical educators using a local repository and AI coding agent, plus reviewers evaluating generated lecture quality. The primary product job is: a reviewer or educator can quickly inspect, understand, and navigate a generated lecture before teaching or approving it. Students or public visitors may benefit from the improved reading experience, but their needs do not expand the MVP workflow scope.
+
+## Problem
+
+The current interface is useful but visually plain. It presents the lecture in cards with a sticky section list, but it does not yet provide enough reading rhythm, progress context, visual hierarchy, or responsive polish to feel like a high-quality teaching page.
+
+Specific UX gaps:
+
+- The header communicates metadata but does not strongly establish the lecture as a designed learning experience.
+- The section navigation lists only authored sections, so learners cannot jump directly to Overview, Learning Objectives, or Key Takeaways.
+- There is no clear reading progress, current section state, or orientation aid after scrolling.
+- Content cards use similar visual weight, making overview, objectives, sections, components, and takeaways feel less differentiated than their teaching roles require.
+- Mobile navigation works by stacking the section list above content, but long lectures can still require excessive scrolling before the learner reaches lesson content.
+- Validation errors are technically locatable but could be more task-oriented and easier to triage under pressure.
+- The visual system lacks enough typographic hierarchy, spacing rhythm, and component distinction to make generated lectures look polished without custom design work per lecture.
+
+## Goals
+
+- Make the first viewport clearly communicate the lecture title, purpose, audience, duration, level, and learning path.
+- Improve lecture navigation so users can jump to all major required areas: Overview, Learning Objectives, each Section, and Key Takeaways.
+- Add lightweight orientation for long pages through a visible authored-section count and a current-location aid in navigation. If active-section tracking is not implemented, the navigation must still make the full lesson structure clear before the first authored section.
+- Strengthen visual hierarchy for teaching content: overview, objectives, section bodies, callouts, concept cards, step lists, code blocks, and takeaways should each have a recognizable role.
+- Improve responsive behavior for phone-width and tablet-width screens, especially navigation, metadata, code blocks, and dense lists.
+- Improve validation UX so template authors can identify what to fix first and where to fix it.
+- Preserve accessibility basics: semantic structure, keyboard navigation, visible focus, color contrast, reduced motion friendliness, and no horizontal page overflow.
+- Keep the implementation compatible with the existing template contract and component kit ownership boundaries.
+
+## Priority
+
+P0 requirements:
+
+- Header hierarchy and metadata clarity.
+- Navigation for Overview, Learning Objectives, each authored Section, and Key Takeaways.
+- Mobile navigation that does not block timely access to lecture content.
+- No body-level horizontal overflow at required viewport widths.
+- Scannable validation summary and error layout.
+- Existing parser, validator, and rendering behavior remains compatible.
+
+P1 requirements:
+
+- Active-section tracking or reading-progress indicator beyond the required current-location/navigation aid.
+- Additional visual refinement for individual lecture component variants.
+- Extra motion or transition polish, only where it respects reduced-motion preferences.
+
+## Non-Goals
+
+- No change to the lecture template schema.
+- No new supported lecture component types.
+- No interactive authoring editor.
+- No database, CMS, user accounts, or hosted publishing workflow.
+- No analytics or persistent learner progress tracking.
+- No AI generation inside the web app.
+- No decorative redesign that makes the page less readable or harder to maintain.
+
+## Design Principles
+
+- Teaching first: every visual choice should improve comprehension, orientation, or review speed.
+- Dense but calm: the page should feel professional and scannable, not like a marketing landing page.
+- Content over chrome: UI should frame the lecture without competing with it.
+- Local and reliable: improvements should not depend on remote assets, external services, or runtime network access.
+- Accessible by default: keyboard, contrast, text sizing, and responsive behavior are product requirements, not polish.
+
+## Recommended Experience Direction
+
+### Page Structure
+
+Keep the existing high-level route and semantic page flow:
+
+- Header.
+- Navigation and content layout.
+- Overview.
+- Learning Objectives.
+- Ordered lecture sections.
+- Key Takeaways.
+
+Improve the rendered layout so the top of the page acts as a concise lecture dashboard:
+
+- Title and description remain the strongest elements.
+- Audience, duration, and level should be compact, legible badges or metadata items.
+- Add a visible count of authored sections when available, such as "4 sections".
+- Consider a short "Learning path" affordance in the navigation rather than adding large instructional copy.
+
+The first viewport should show the lecture title and enough of the next area to make the page feel immediately usable. Avoid a tall hero that pushes actual content below the fold.
+
+### Navigation
+
+The navigation should include all major destinations:
+
+- Overview.
+- Learning Objectives.
+- Each authored section, with section number.
+- Key Takeaways.
+
+For desktop:
+
+- Keep navigation sticky.
+- Show clear active, hover, and focus states.
+- Make long section titles wrap cleanly without overlapping or clipping.
+- Distinguish required non-section destinations from authored sections without making the list noisy.
+
+For mobile:
+
+- Avoid forcing users to scroll through a long static navigation block before reaching content.
+- Use a compact in-page navigation pattern. The preferred pattern is a collapsed or compact "Learning path" disclosure that appears before the lecture content; a horizontally scrollable anchor list is acceptable only if labels remain readable and keyboard accessible.
+- Ensure targets remain finger-friendly with at least 44px comfortable tap height where practical.
+- A long lecture with at least 10 authored sections must still expose the start of lecture content within the first mobile viewport or immediately after one compact navigation control.
+
+If active-section tracking is added, it must degrade gracefully when JavaScript is unavailable. The lecture should remain fully navigable with normal anchors.
+
+### Reading Experience
+
+Improve the reading rhythm:
+
+- Use a comfortable max line length for prose.
+- Increase distinction between section headings, body text, lists, tables, and components.
+- Use consistent vertical spacing between content blocks.
+- Ensure lists have enough spacing for scanning, especially objectives and takeaways.
+- Keep code blocks horizontally scrollable within their own container.
+- Preserve page-level width constraints so wide code or tables never create horizontal body overflow.
+
+Section cards should not feel like isolated floating panels stacked without hierarchy. Use restrained surfaces, borders, section numbering, and spacing to guide the eye. Avoid nested cards.
+
+### Lecture Components
+
+Each supported component should communicate its role visually:
+
+- `callout`: a short highlighted note, warning, or insight with variant-specific treatment.
+- `concept_card`: a compact definition or framing idea, visually distinct from callouts.
+- `step_list`: an ordered workflow with strong step numbers and readable multi-line wrapping.
+- `code_block`: a focused technical example with language label and robust overflow behavior.
+
+Components should work inside section flow and should not dominate the page. Their styling should remain reusable across lectures and not depend on lecture-specific content.
+
+### Validation Screen
+
+The validation screen should remain blocking, but become easier to act on:
+
+- Lead with a concise summary: number of blocking errors and the active template path.
+- Group or visually prioritize errors by source area when available: frontmatter, headings, section content, components.
+- Every validation error must show the error message, active template path, and best available location or context. When present in validation data, show line, field, heading, section, component, and hint in a scannable layout.
+- Make the remediation hint visually easy to find.
+- Avoid overwhelming the user with raw technical shape unless it directly helps them fix the template.
+- Keep all validation information visible in plain HTML so it can be copied into an AI-agent prompt if needed.
+
+## Success Metrics / Quality Gates
+
+- In the first viewport at desktop width, a reviewer can identify the lecture title, topic or purpose, intended audience, estimated duration, level, and section count without scrolling.
+- A reviewer can predict the lesson structure before reading the first authored section.
+- At 390px, 768px, and 1280px widths, automated or manual viewport checks confirm there is no body-level horizontal overflow.
+- A valid fixture with all supported component types renders without clipped text, overlapping UI, or component styles that depend on lecture-specific content.
+- A long lecture fixture with at least 10 authored sections remains navigable on mobile without a long static navigation block pushing content far below the first viewport.
+- Every validation error displays its message, active template path, and best available location or context; hints are visible when provided by validation data.
+- All navigation links are reachable by keyboard, have visible focus, and work as normal anchors when JavaScript is unavailable.
+
+## Functional Requirements
+
+- The rendered lecture must still read from `content/lecture.template.md`.
+- `npm run validate` behavior must remain unchanged unless validation output is intentionally improved in a backward-compatible way.
+- The web route must still render the blocking validation screen when the active template is invalid.
+- The lecture page must preserve all required semantic headings.
+- Anchor links must work for Overview, Learning Objectives, each authored section, and Key Takeaways.
+- Duplicate authored section titles must still produce unique working anchors.
+- All UI for lecture rendering must remain under `src/components/lecture-kit/` except route composition and global CSS.
+- The implementation must not introduce `dangerouslySetInnerHTML` or raw HTML rendering.
+- No new runtime network dependency may be required to preview the lecture locally.
+
+## Accessibility Requirements
+
+- Use semantic landmarks and heading order that match the lecture structure.
+- Provide visible keyboard focus for all links and controls.
+- Ensure color contrast meets WCAG AA for normal text and essential UI states.
+- Do not rely on color alone to distinguish warning, note, insight, current navigation item, or validation severity.
+- Preserve readable text at browser zoom levels up to 200%.
+- Respect `prefers-reduced-motion` for any scrolling, progress, or transition effects.
+- Ensure the page has no horizontal overflow at common widths including 390px, 768px, and 1280px.
+
+## Responsive Requirements
+
+- At 390px width, the lecture must remain readable without clipped metadata, clipped navigation labels, or body-level horizontal scrolling.
+- At tablet widths, navigation and content should avoid awkward narrow columns.
+- At desktop widths, the sticky navigation should not overlap the header or content.
+- Code blocks and tables must scroll inside their own containers on small screens.
+- Metadata items must wrap or stack cleanly for long audience, duration, or level values.
+
+## Visual Quality Bar
+
+The final UI should feel like a polished education tool, not a raw demo. It should pass these senior-designer checks:
+
+- The most important information is obvious within three seconds: title, what the lecture covers, who it is for, and how long it takes.
+- A reviewer can predict the lesson structure before reading the first section.
+- Navigation helps orientation without distracting from the lecture.
+- Objectives and takeaways feel intentionally framed as learning aids.
+- Supported components are visually distinct and useful, not decorative.
+- Mobile reading feels designed rather than merely stacked.
+- Validation errors feel actionable and calm, not like an unstyled exception page.
+
+## Acceptance Criteria
+
+- A valid active lecture renders with improved header hierarchy, improved metadata presentation, full-page anchor navigation, and visually distinct content areas.
+- The navigation includes Overview, Learning Objectives, every authored section, and Key Takeaways.
+- The page displays a visible authored-section count.
+- The page provides a current-location or lesson-structure aid. If JavaScript is unavailable, normal anchor navigation still works and the lesson structure remains visible.
+- Anchor navigation works with keyboard and pointer input.
+- The page has no body-level horizontal overflow at 390px, 768px, or 1280px viewport widths.
+- Long section titles, long metadata values, long code lines, and Markdown tables do not overlap or clip their containers.
+- The validation screen shows all blocking errors with a clear summary, location/context fields when available, and visible hints when provided by validation data.
+- The validation screen shows the active template path and a best-available location or context for every blocking error.
+- Color contrast is suitable for normal reading text and validation messages.
+- The design uses the existing component kit rather than one-off route-specific UI.
+- Existing parser, validator, and rendering tests still pass.
+- Verification includes fixtures or equivalent examples for duplicate section titles, long metadata values, at least 10 authored sections, long code lines, Markdown tables, all supported component types, and an invalid template.
+
+## Suggested Verification
+
+- Run `npm run validate` against the active template.
+- Run the existing automated test suite.
+- Preview `content/lecture.template.md` locally with `npm run dev`.
+- Preview at 390px, 768px, and 1280px widths.
+- Test keyboard tab order through navigation and validation links/controls.
+- Temporarily use an invalid template fixture to inspect the validation screen.
+- Check a lecture containing all supported component types, long section titles, a long code line, and a table.
+
+## Implementation Notes
+
+- Prefer CSS and small component changes before adding client-side state.
+- If active-section behavior or progress indicators require client code, isolate that behavior in a small component and keep anchor navigation functional without it.
+- Avoid importing large UI libraries for this feature.
+- Use the existing global design tokens or replace them with a small, coherent token set.
+- Keep colors restrained and content-oriented. Avoid decorative gradient-heavy themes, oversized hero treatments, and ornamental backgrounds.
+- If the implementation changes markup around sections or headings, update tests only for intentional behavior changes, not snapshot churn.

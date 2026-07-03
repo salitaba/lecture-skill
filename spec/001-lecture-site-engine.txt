@@ -1,0 +1,509 @@
+Feature: Lecture Site Engine
+
+## Product Summary
+
+Build a reusable lecture site engine that converts structured lecture content into a visual, locally previewable HTML lecture site. The project should also work as a Codex/AI-agent skill so a technical educator can use an AI agent to take raw lecture text, structure it into the supported template schema, and generate a polished lecture page without duplicating UI code.
+
+For MVP, the primary product outcome is: given one raw lecture input, an AI agent following the included skill instructions can create a valid lecture template in the exact supported schema, and a human can preview the resulting lecture page locally with one documented command after dependencies are installed.
+
+The MVP primary user is a technical educator preparing a reusable lesson from raw notes, outlines, or transcript material with help from an AI coding agent. This user is comfortable working in a local repository with Node.js/npm and an AI coding agent. Browser-only authoring for non-technical educators, student note-taking workflows, and general-purpose developer documentation sites are outside the MVP.
+
+The MVP supported AI-agent baseline is Codex operating in a local repository workspace. Other AI coding agents may work if they can read local files, edit the template, and run validation commands, but broad cross-agent compatibility is not a launch requirement.
+
+Before the MVP launch decision, reviewers must choose and record one Codex evaluation baseline for the golden conversion batch: product surface, model identifier when exposed, date, and repository state. All three launch-decision runs must use that same baseline. If the model identifier is not exposed by the product, reviewers must record that it was unavailable and treat the result as a dated launch-decision snapshot rather than evergreen proof of compatibility. A later Codex product or model change requires a new three-run batch before claiming that baseline is still supported.
+
+For acceptance, "an AI agent can create a valid lecture template" means a fresh Codex run using `examples/raw-lecture.txt`, `SKILL.md`, the README, and repository files can produce or update `content/lecture.template.md` so it passes validation without manual schema fixes. During generation, the agent must not inspect or copy `examples/golden.template.md`; that file is reserved for reviewer comparison after the generated template exists. This must be enforced by running the generation step in a workspace where `examples/golden.template.md` is absent, renamed outside the examples directory, or otherwise inaccessible to the agent. Human review may judge lecture quality, but humans should not need to repair required fields, section headings, component syntax, or component payload shape for the golden workflow to pass.
+
+The golden AI-agent workflow may be iterative: the agent may run the documented validation command, inspect validation output, and revise `content/lecture.template.md` until it passes. Acceptance fails when a human must repair schema shape, required fields, section headings, component syntax, or component payloads.
+
+For acceptance, the golden AI-agent workflow must be tested as a three-run launch-decision batch. Each fresh Codex session has access to `examples/raw-lecture.txt`, `SKILL.md`, the README, and repository files, but `examples/golden.template.md` must be absent or inaccessible until after generation is complete. The test prompt must be exactly:
+
+```text
+Follow SKILL.md. Use examples/raw-lecture.txt as the only raw lecture source. Create or update content/lecture.template.md in the supported lecture template schema. Do not read examples/golden.template.md while generating the template. Run the documented validation command and revise the template until validation passes. Preserve source-grounded meaning and avoid unsupported facts.
+```
+
+The pass/fail judgment is based on the resulting repository state, validation result, and human quality checklist, not on byte-identical prose.
+
+Golden AI-agent acceptance is evaluated with one launch-decision batch of three fresh Codex runs using the selected Codex evaluation baseline. Each run may iterate by using validation output, but a human must not edit `content/lecture.template.md` or provide schema repair hints after the prompt is submitted. MVP launch passes this criterion when at least two of the three runs produce validation-passing templates that pass `docs/mvp-review-checklist.md`. If fewer than two runs pass, improve `SKILL.md`, README guidance, validation errors, or template examples, then rerun a new clean three-run batch.
+
+The golden test environment must record the selected Codex evaluation baseline, date, repository commit or working tree state, validation command output, generation workspace setup, whether `examples/golden.template.md` was absent or inaccessible during generation, and whether the starting `content/lecture.template.md` was absent or replaced with a non-golden placeholder. These details must be captured in a first-class review artifact at `docs/golden-conversion-batch.md`. The artifact is not part of the user-facing product, but it makes the MVP acceptance result reproducible enough for reviewers.
+
+MVP lecture quality is judged by whether the generated lecture:
+
+- Has a clear title, audience, level, duration, and short description.
+- Has learning objectives that are measurable and reflected by the lecture sections.
+- Contains 3-6 coherent ordered sections unless the source lecture is clearly shorter.
+- Preserves the source lecture's core claims, examples, and terminology without inventing unsupported facts.
+- Uses visual components only when they improve comprehension, not as decoration.
+- Ends with takeaways that recap the main objectives and practical lessons.
+
+MVP lecture quality is verified by a short human review checklist, not by exact prose matching. The reviewer must confirm that the objectives map to the rendered sections, the generated lecture preserves the source claims without unsupported additions, the section count is appropriate for the source, and the takeaways recap the objectives and practical lessons.
+
+The review checklist must be a first-class artifact at `docs/mvp-review-checklist.md`, and the README must link to it. The checklist must be formatted as concrete pass/fail review items so MVP reviewers can apply it consistently. The checklist artifact must include a place to record reviewer status for each item, such as `[ ] Pass / [ ] Fail` or an equivalent explicit status field.
+
+The checklist must include source-fidelity review items that confirm:
+
+- Every major claim in the generated lecture is supported by `examples/raw-lecture.txt`.
+- Important source examples, terminology, caveats, and practical steps are preserved unless omitted for clear concision.
+- The generated lecture does not add unsupported facts, statistics, tools, external references, or promises.
+- Any uncertainty or incompleteness in the source is preserved in neutral wording rather than resolved by invention.
+- The generated lecture may reorganize and clarify the source, but it must not change the source's meaning.
+
+## MVP Success Metrics
+
+Launch-blocking metrics:
+
+- A technical user can install dependencies, run the documented preview command, and view the active lecture at `http://localhost:3000` within 10 minutes after cloning the repository, assuming Node.js 24 LTS is already installed.
+- At least two of three golden Codex runs produce validation-passing `content/lecture.template.md` files without manual schema fixes.
+- Each launch-counted generated golden lecture passes every item in `docs/mvp-review-checklist.md`.
+- Validation failures for P0 invalid cases are understandable enough that a technical author can locate the relevant field, section, component, or syntax problem without reading parser source code.
+- A reviewer can identify the lecture title, audience, objectives, ordered sections, key takeaways, and at least one useful visual component from the rendered page without reading the raw source.
+
+Learning metrics that inform product confidence but do not block MVP launch:
+
+- A target technical educator can create a review-ready lecture page from raw notes in under 30 minutes after setup and rate the result useful enough to continue editing rather than rebuilding the page layout manually.
+
+Educator usefulness validation is a lightweight MVP quality-bar check, not a launch blocker. Run it with at least one target technical educator who did not implement the project. The educator starts from a cloned repository after dependencies are installed, a working AI coding agent is available, and one non-golden raw lecture source of roughly 500-4,000 words is placed at `content/raw-lecture.txt`. Start the timer when the educator begins asking the agent to follow `SKILL.md`; stop when `content/lecture.template.md` passes `npm run validate` and the educator has reviewed the local preview. The check passes when the elapsed time is under 30 minutes, the educator says the result is useful enough to keep editing, and the educator does not say they would rather rebuild the page layout manually. Record the raw source used, elapsed time, validation result, preview URL reached, and the educator's yes/no usefulness answer in `docs/educator-usefulness-log.md` or a linked quality-bar review note.
+
+## Problem
+
+Users often have long raw lecture text, notes, transcripts, or outlines, but they need a more visual and navigable format for teaching, reviewing, or later sharing. Today the transformation from raw text to a useful lecture page is manual, inconsistent, and hard to reuse.
+
+MVP solves the local authoring and preview problem. Public sharing, hosting, and production deployment are future concerns.
+
+## Target Users
+
+- Primary: technical educators who are comfortable using a local repository, Node.js/npm, and an AI coding agent to turn raw lecture notes, outlines, or transcripts into a locally previewable lesson page.
+- Adjacent but non-primary: creators, students, and developers who may use the engine for similar local lecture or documentation workflows, but whose needs do not drive MVP scope.
+- Secondary: AI agents that need deterministic instructions for converting raw lecture material into a reusable lecture template.
+- Secondary: developers extending the lecture site engine or component kit for future lecture formats.
+
+## Goals
+
+- Convert one structured lecture template file into a rendered lecture website.
+- Provide a reusable component kit for common lecture presentation patterns.
+- Include clear documentation for humans and AI agents on how to prepare lecture content.
+- Support local preview with a single documented command after dependencies are installed.
+- Support template validation with a single documented command that agents and humans can run without using the browser.
+- Keep all shared UI components in one component-kit folder to avoid duplication.
+
+## Delivery Milestones
+
+The implementation may ship internally in stages, but only the final milestone should be called the MVP launch:
+
+- Renderer alpha: a valid hand-authored `content/lecture.template.md` renders locally with the shared component kit.
+- Validation complete: `npm run validate` and the blocking validation screen enforce the P0 schema and component contract with author-locatable errors.
+- AI conversion launch: the P0 validation contract is enforced, the golden Codex three-run batch passes, the MVP review checklist passes, and the README and `SKILL.md` support the documented raw-lecture workflow.
+- Confidence and quality-bar polish: component demo coverage is completed for confidence acceptance; accessibility, visual hierarchy, and educator usefulness checks are completed or explicitly accepted as non-blocking follow-up work according to the acceptance tiers below.
+
+## Non-Goals For MVP
+
+- No multi-user authoring workflow.
+- No database or backend content management system.
+- No hosted production deployment automation beyond documenting how to build and preview locally.
+- No automatic LLM API integration inside the app.
+- No requirement to generate diagrams or images from scratch in MVP.
+
+## Recommended Technical Direction
+
+Use Next.js because the product needs file-based lecture pages, reusable React components, local preview, and a path to static export or deployment later.
+
+The MVP should be able to run as a standard Next.js app and render at least one lecture from a template stored in the repository.
+
+The MVP uses npm. The README must document the exact dependency installation command, the exact preview command, and the expected local URL:
+
+- Install dependencies: `npm install`
+- Preview locally after dependencies are installed: `npm run dev`
+- Validate the active template: `npm run validate`
+- Expected local URL: `http://localhost:3000`
+
+The README must state the expected runtime baseline: Node.js 24 LTS and its bundled npm version.
+
+## Lecture Template Contract
+
+The project must define exactly one supported template schema for MVP. The primary render input path is `content/lecture.template.md`. Example and demo files may use the same schema, but they do not create additional supported formats.
+
+The rigid template schema is an intentional MVP product tradeoff. Exact fields, exact heading names, and one render path prioritize reliable AI-agent generation, clear validation errors, and predictable local preview over flexible authoring. More flexible schemas, aliases, and multi-template routing are future enhancements, not MVP requirements.
+
+Template files use YAML frontmatter plus Markdown body sections with exact heading names. Components are authored as fenced YAML blocks with the language tag `lecture-component`.
+
+Required frontmatter fields:
+
+- `title`: lecture title.
+- `description`: short lecture summary.
+- `audience`: intended learner group.
+- `duration`: estimated lecture duration.
+- `level`: beginner, intermediate, or advanced.
+
+Required content sections:
+
+- `## Overview`: what the learner will understand by the end.
+- `## Learning Objectives`: bullet list of measurable outcomes.
+- `## Section: <section title>`: one or more ordered lecture sections.
+- `## Key Takeaways`: final recap.
+
+Each `## Section: <section title>` block must include:
+
+- Section title in the heading.
+- Body Markdown before, after, or between optional component blocks.
+- At least one meaningful content block. Meaningful content includes a non-empty paragraph, Markdown bullet or numbered list, regular fenced code block, Markdown table, or supported lecture component. Blank whitespace, unsupported lecture components, and headings alone do not make a section valid.
+
+Exact template skeleton:
+
+````markdown
+---
+title: "Lecture title"
+description: "Short lecture summary"
+audience: "Intended learner group"
+duration: "45 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Short overview paragraph.
+
+## Learning Objectives
+
+- Explain one measurable outcome.
+- Apply one measurable skill.
+
+## Section: First Section Title
+
+Section body text.
+
+```lecture-component
+type: callout
+variant: insight
+title: "Important idea"
+body: "Highlighted explanation."
+```
+
+## Key Takeaways
+
+- Final recap item.
+````
+
+Supported MVP component types:
+
+- `callout`: highlighted note, warning, or insight.
+- `concept_card`: compact explanation of one concept.
+- `step_list`: ordered process or workflow.
+- `code_block`: formatted code or command example.
+
+Component payload contract:
+
+- `callout`: requires `type`, `variant`, `title`, `body`. `variant` must be `note`, `warning`, or `insight`.
+- `concept_card`: requires `type`, `title`, `body`.
+- `step_list`: requires `type`, `title`, `steps`. `steps` must be a non-empty YAML list of strings.
+- `code_block`: requires `type`, `language`, `code`.
+
+Deferred component types such as `comparison`, `summary`, `quote`, and `quiz` are not supported in MVP. If they appear in a template, they must be treated as unsupported component types and produce validation errors.
+
+Unsupported component types must produce a validation error instead of being silently ignored.
+
+Schema edge-case decisions:
+
+- Required frontmatter string fields must be present and non-empty after trimming whitespace.
+- Unknown extra frontmatter fields are allowed but ignored by the MVP renderer.
+- Required body sections must appear in this order: `Overview`, `Learning Objectives`, one or more `Section` blocks, then `Key Takeaways`. Out-of-order required headings must produce validation errors.
+- Duplicate `Overview`, `Learning Objectives`, or `Key Takeaways` headings must produce validation errors.
+- A `lecture-component` block outside a `## Section: <section title>` block must produce a validation error.
+- Body content before `## Overview` is allowed only if it is blank whitespace; non-empty body content before `## Overview` must produce a validation error.
+- Content under `## Overview` must include at least one non-empty paragraph.
+- `## Learning Objectives` and `## Key Takeaways` must each contain at least one Markdown bullet item.
+- Duplicate `## Section: <section title>` titles are allowed, but section navigation anchors must remain unique and link to the correct section instances.
+- Unknown non-component fenced code blocks are treated as normal Markdown content and are allowed inside sections.
+
+Validation behavior:
+
+- The project must provide a machine-friendly validation command: `npm run validate`. It must validate `content/lecture.template.md`, print author-locatable errors, and exit with a nonzero status when validation fails.
+- Validation failures must produce a blocking validation screen instead of partially rendering the lecture.
+- The validation screen must list all detected invalid or missing fields from the template parse.
+- Each validation error must include a concise problem statement, the relevant field, section heading, or component type when known, and an expected format or allowed value when applicable.
+- For errors that can be located in source text, validation should include a line number or equivalent locator; when a line number is not reliable, the error must include enough section or component context for the author to find the issue quickly.
+- Validation errors should include a short remediation hint when the expected fix is mechanical, such as using an allowed `level` value or adding a missing component field.
+- Validation errors must include section context when the invalid content appears inside a section.
+- Unsupported component type errors must include the unsupported type and the section where it appears.
+- Invalid component payload errors must include the component type and the missing or invalid field names.
+- Missing required sections must produce validation errors naming each missing section.
+- Invalid frontmatter YAML, malformed component YAML, or an unclosed `lecture-component` fence must produce validation errors with enough context for the author to locate the problem.
+- Invalid `level` values must produce a validation error listing the allowed values: `beginner`, `intermediate`, and `advanced`.
+- Empty `Learning Objectives`, `Key Takeaways`, or `step_list.steps` lists must produce validation errors.
+- A `## Section: <section title>` heading with an empty section title must produce a validation error.
+- A section with no meaningful content block must produce a validation error.
+- The validation screen must show all detected validation errors from one parse pass when possible, rather than stopping after the first error.
+
+P0 MVP validation requirements are: missing or empty frontmatter fields, invalid `level`, missing required sections, empty objective or takeaway lists, empty section titles, sections with no meaningful content block, unsupported component types, invalid component payloads, invalid frontmatter YAML, malformed component YAML, and unclosed `lecture-component` fences must block rendering and show author-locatable errors.
+
+P1 validation polish is: detecting every possible cascading error after severely malformed Markdown or YAML. The implementation should show multiple validation failures from one parse pass when possible, but MVP acceptance does not require perfect recovery from syntax errors that prevent reliable parsing of later content.
+
+For syntax-breaking cases such as invalid frontmatter YAML, malformed component YAML, or an unclosed `lecture-component` fence, MVP acceptance allows a single high-quality blocking error when later content cannot be parsed reliably. For structurally parseable templates, validation should aggregate all detectable P0 errors from the same parse pass.
+
+The repository must include reusable validation coverage for the P0 invalid cases. This may be automated parser tests, invalid fixture templates under `examples/invalid/`, or both. Fixture or test names must make the invalid case clear enough for a reviewer to map them to the P0 validation requirements.
+
+## Rendering Requirements
+
+The rendering requirements below describe the intended product behavior. The acceptance tiers and MVP test protocol define which checks block launch versus confidence or quality-bar acceptance.
+
+- Render a complete lecture page from the template.
+- Show lecture title, description, audience, duration, and level.
+- Show a table of contents or section navigation.
+- Render each section in order.
+- Render all supported component types through shared component-kit components.
+- Provide a readable responsive layout on desktop and mobile.
+- Include a blocking validation screen for any template validation failure.
+- At 390px and 1280px viewport widths, the page must not horizontally overflow.
+- Section navigation must link to every `## Section: <section title>` block in the order it appears.
+- If validation fails, the rendered page must show a clear list of all detected validation errors instead of partial lecture content.
+- The page must have clear visual hierarchy between lecture metadata, section content, and component blocks.
+- All supported component types must be visually distinguishable from normal body text.
+- Code blocks must remain readable without breaking the page layout on mobile and desktop.
+- Section navigation must be usable at 390px viewport width.
+
+Quality-bar accessibility requirements:
+
+- The rendered page should use semantic HTML headings in document order.
+- Section navigation should be keyboard usable and expose visible focus states.
+- Text and component UI should meet WCAG AA contrast expectations for normal text.
+
+## Component Kit Requirements
+
+All base lecture UI components must live under one component-kit directory, for example:
+
+`src/components/lecture-kit/`
+
+The component kit should include reusable components for:
+
+- Page shell and layout.
+- Lecture header.
+- Section navigation.
+- Section renderer.
+- Callout.
+- Concept card.
+- Step list.
+- Code block.
+
+Implementation must not duplicate lecture component UI outside this folder unless there is a clear product reason.
+
+## Documentation Requirements
+
+Create a README that explains:
+
+- What the lecture site engine does.
+- How to install dependencies with npm.
+- How to run local preview after dependencies are installed.
+- How to validate the active template with `npm run validate`.
+- The expected local preview URL.
+- Where lecture template files live.
+- How to fill the template from raw lecture text.
+- Where to place a user's own raw lecture source, using `content/raw-lecture.txt` as the recommended working path for non-golden lectures.
+- Supported template fields and MVP component types.
+- A complete example template.
+- How an AI agent should use the project to create a lecture.
+- The exact `lecture-component` fenced block syntax.
+- The validation rules and common errors.
+- The location of the MVP lecture quality review checklist at `docs/mvp-review-checklist.md`.
+- The location of the golden conversion batch record at `docs/golden-conversion-batch.md`.
+- How to use the engine for a new lecture: place or paste the source lecture text into `content/raw-lecture.txt`, ask an AI agent to follow `SKILL.md`, update `content/lecture.template.md`, run `npm run validate`, run preview, and review the result with the MVP lecture quality checklist.
+- How to preview `examples/component-demo.template.md` by copying it to `content/lecture.template.md`, including a warning that this replaces the active render template and instructions to preserve the active template before copying or restore it from `examples/golden.template.md` afterward.
+
+README examples and `SKILL.md` instructions must teach the supported schema without leaking the golden conversion answer. They may name the golden files, describe the golden workflow, and include a short synthetic schema example, but they must not reproduce, summarize section-by-section, or closely paraphrase the content of `examples/golden.template.md` or the expected conversion of `examples/raw-lecture.txt`. The complete example template in the README must use generic or synthetic lecture content that is not derived from `examples/raw-lecture.txt`.
+
+## AI-Agent Skill Requirements
+
+The project should include skill instructions in `SKILL.md` that tell Codex, the MVP-supported AI-agent baseline, how to:
+
+- Read raw lecture text.
+- Identify title, audience, learning objectives, major sections, examples, and takeaways.
+- Convert the raw text into the supported lecture template schema.
+- Choose appropriate visual components from the component kit.
+- Avoid inventing unsupported component types.
+- Validate that all required template fields are present.
+- Run the documented validation command.
+- Run or describe the local preview command.
+
+The skill should optimize for deterministic structure: agents should produce the same file path, required field set, required section headings, supported component syntax, and validation-compliant output each time. Byte-identical prose is not required.
+
+MVP raw lecture input assumptions:
+
+- The golden raw input is plain text in English.
+- The source should represent one lecture, not a full course or unrelated collection of notes.
+- The expected source length is roughly 500-4,000 words. Shorter inputs may produce fewer than three sections when justified by the source.
+- Notes, outlines, and transcripts are acceptable. Speaker labels, timestamps, and filler words may be omitted when they do not carry instructional meaning.
+- If the source is incomplete, contradictory, or unclear, the agent should avoid inventing facts and should preserve uncertainty in neutral wording rather than resolving it with unsupported claims.
+
+The repository must include one golden conversion example:
+
+- `examples/raw-lecture.txt`: raw lecture source text.
+- `examples/golden.template.md`: expected structured lecture template generated from that source.
+- `content/lecture.template.md`: active MVP render input. The shipping or demo repository state may initially match `examples/golden.template.md` so the preview works immediately, but the golden conversion evaluation must run in a sanitized generation workspace where the starting `content/lecture.template.md` is absent or replaced with a minimal non-golden placeholder.
+
+The golden conversion example should prioritize realistic lecture quality over demonstrating every supported component type, but the golden raw source should contain at least one idea, process, caveat, code example, or concept that naturally supports a useful visual component. The repository must also include a separate component demo fixture at `examples/component-demo.template.md` that uses the same supported template schema and demonstrates every supported MVP component type.
+
+The component demo fixture must be parse-valid using the same validation rules as `content/lecture.template.md`. It does not need a dedicated route in MVP, but the README must explain that authors can copy it to `content/lecture.template.md` to preview every supported component.
+
+The README and `SKILL.md` must refer to this golden example only as a file path and workflow artifact. They must not expose the golden template's substantive lecture content before the golden conversion test is complete. When reviewers run the golden conversion test, the sanitized workspace state overrides the shipping demo state: `examples/golden.template.md` and any active template that reveals its answer must be inaccessible to the agent until generation and validation are complete.
+
+For a user's own lecture after MVP setup:
+
+1. The user provides one raw lecture source as plain text, preferably at `content/raw-lecture.txt`.
+2. The AI agent follows `SKILL.md` and converts that source into `content/lecture.template.md`.
+3. The agent preserves source-grounded meaning and avoids unsupported facts.
+4. The agent or user runs `npm run validate` and resolves validation errors.
+5. The user runs `npm run dev` and previews `http://localhost:3000`.
+6. The user applies the MVP lecture quality checklist and edits the source/template if needed.
+
+Golden conversion test protocol:
+
+1. Start each run from a clean repository state with `examples/raw-lecture.txt` as the only raw source input. If the repository's default `content/lecture.template.md` matches or closely reveals `examples/golden.template.md`, remove it or replace it with a minimal non-golden placeholder before the prompt is submitted.
+2. Before submitting the prompt, make `examples/golden.template.md` unavailable to the agent by removing it from the generation workspace, renaming it outside the examples directory, or otherwise making it inaccessible. Preserve a reviewer copy outside the agent-accessible workspace for later comparison. Also confirm that README, `SKILL.md`, and other agent-accessible files do not contain the golden template content or a section-by-section expected answer derived from `examples/raw-lecture.txt`.
+3. Use this exact prompt in a fresh Codex session:
+
+```text
+Follow SKILL.md. Use examples/raw-lecture.txt as the only raw lecture source. Create or update content/lecture.template.md in the supported lecture template schema. Do not read examples/golden.template.md while generating the template. Run the documented validation command and revise the template until validation passes. Preserve source-grounded meaning and avoid unsupported facts.
+```
+
+4. The agent must not inspect `examples/golden.template.md` until after `content/lecture.template.md` has been generated and validation has passed.
+5. Restore or reintroduce the reviewer copy of `examples/golden.template.md` only after generation and validation are complete.
+6. Compare the generated `content/lecture.template.md` against `examples/raw-lecture.txt` for source fidelity. Use `examples/golden.template.md` as a reviewer reference for expected structure and coverage, not as the sole oracle for exact prose or sectioning.
+7. The generated template must use the required frontmatter fields, required section headings, supported component syntax, and valid component payloads.
+8. The generated template must pass `npm run validate` with no errors.
+9. The generated lecture must pass the MVP lecture quality review checklist in `docs/mvp-review-checklist.md`.
+10. Exact prose does not need to be byte-identical to `examples/golden.template.md`, but the structure, required fields, required sections, supported component usage, validation result, and source-grounded meaning must match the supported contract and the raw source.
+
+The golden conversion test must be run as one three-run batch for the MVP launch decision. All three runs must use the selected Codex evaluation baseline. The reviewer must record the product surface, model identifier when exposed, date, repository commit or working tree state, generation workspace setup, validation output, whether `examples/golden.template.md` was unavailable during generation, and whether the starting `content/lecture.template.md` was absent or replaced with a non-golden placeholder in `docs/golden-conversion-batch.md`. At least two of three runs must pass. If fewer than two runs pass, improve the instructions or implementation and rerun a new three-run batch from a clean state.
+
+Generalization evidence beyond the golden lecture is desirable but not launch-blocking. After MVP launch, run two non-blocking smoke conversions with the same documented workflow: one outline-style lecture source and one transcript-style lecture source. Each smoke conversion should use a non-golden raw source, pass `npm run validate`, and be reviewed for source-grounded meaning. These smoke checks are product-learning evidence, not proof that every lecture format is supported.
+
+## MVP Test Protocol
+
+Reviewers verify tiered MVP completion with these checks. Steps marked launch must pass before calling the project an MVP launch. Steps marked confidence or quality-bar are required for their respective acceptance tier, but they do not block a first internal launch unless promoted to launch acceptance.
+
+1. Launch: Install dependencies with `npm install` on Node.js 24 LTS.
+2. Launch: Run `npm run validate` and confirm the active template passes.
+3. Launch: Run local preview with `npm run dev` and open `http://localhost:3000`.
+4. Launch: Confirm `content/lecture.template.md` renders a complete lecture page with metadata, overview, objectives, ordered sections, section navigation, supported components, and key takeaways.
+5. Launch: Confirm a reviewer can identify the lecture title, audience, objectives, ordered sections, key takeaways, and at least one useful visual component from the rendered page without reading the raw source.
+6. Launch: Run the golden conversion workflow as a three-run batch using the exact golden test prompt, `examples/raw-lecture.txt`, `SKILL.md`, README guidance, and repository files. For each run, `examples/golden.template.md` must be absent or inaccessible until after generation and validation are complete, `content/lecture.template.md` must not expose the golden answer, and agent-accessible docs must not include a section-by-section expected answer.
+7. Launch: Confirm at least two of three golden runs produce `content/lecture.template.md` with no validation errors and no manual schema fixes.
+8. Launch: Compare each passing generated lecture with `examples/raw-lecture.txt` for source-grounded meaning. Use `examples/golden.template.md` as a reviewer reference for required structure, valid schema use, and expected coverage. Byte-identical prose is not required.
+9. Launch: Apply `docs/mvp-review-checklist.md`, record pass/fail status for each checklist item, and confirm each passing generated lecture is realistic and useful, not only a component showcase.
+10. Confidence: Preserve the active template, copy `examples/component-demo.template.md` to `content/lecture.template.md`, confirm it passes validation, and confirm every supported component type renders. Restore the active lecture template afterward.
+11. Launch: Run the reusable P0 invalid-case validation coverage, using automated parser tests, invalid fixture templates under `examples/invalid/`, or both. Missing fields, missing sections, invalid `level`, empty required lists, empty section title, section with no meaningful content block, unsupported component type, invalid component payload, invalid frontmatter YAML, malformed component YAML, and unclosed `lecture-component` fence must each show blocking validation errors with author-locatable context.
+12. Launch: Manually check the lecture page at 390px and 1280px viewport widths for no horizontal overflow and usable section navigation.
+13. Quality-bar: Manually check readable code blocks, clear visual hierarchy, keyboard navigation focusability, and visible focus states.
+14. Quality-bar: Verify normal text and component text meet WCAG AA contrast expectations.
+15. Quality-bar: Run the educator usefulness validation, or record the reason it was accepted as a non-blocking follow-up, in `docs/educator-usefulness-log.md` or a linked quality-bar review note.
+
+## Example User Flow
+
+1. User stores raw lecture text in `content/raw-lecture.txt` for their own lecture, or uses `examples/raw-lecture.txt` for the MVP golden workflow.
+2. AI agent reads the raw text and follows `SKILL.md`.
+3. Agent creates or updates `content/lecture.template.md`.
+4. Agent or user runs `npm run validate` and resolves validation errors.
+5. Next.js app renders the lecture using the shared component kit.
+6. User runs the documented preview command after dependencies are installed and views the lecture site locally.
+
+## MVP Acceptance Tiers
+
+The MVP bar is split into launch acceptance, confidence acceptance, and quality-bar acceptance. Launch acceptance proves that the primary user can convert one raw lecture into a valid local preview. Confidence acceptance proves the implementation is robust enough to maintain. Quality-bar acceptance improves polish before broader sharing, but it does not block a first internal MVP launch unless explicitly promoted to launch acceptance.
+
+Because AI-assisted lecture conversion is the MVP's primary product promise, the golden Codex conversion batch is intentionally part of launch acceptance. A build that only validates and renders a hand-authored template may be useful as an internal renderer milestone, but it should not be called the MVP launch until the golden conversion batch and checklist requirements pass.
+
+### MVP Launch Acceptance
+
+- Given one valid sample lecture template at `content/lecture.template.md`, the app renders a complete lecture page with metadata, section navigation, overview, learning objectives, ordered lecture sections, supported components, and key takeaways.
+- The project can be installed with `npm install`, validated with `npm run validate`, previewed with `npm run dev`, and viewed at `http://localhost:3000` after dependencies are installed.
+- The README states the Node.js 24 LTS runtime expectation, npm setup command, preview command, validation command, expected local URL, and the basic workflow for a user's own lecture.
+- `SKILL.md` tells Codex how to convert raw lecture text into `content/lecture.template.md`, preserve source-grounded meaning, use only supported component syntax, run `npm run validate`, and iterate until validation passes.
+- The repository includes `examples/raw-lecture.txt`, `examples/golden.template.md`, and `content/lecture.template.md`.
+- `docs/mvp-review-checklist.md` exists, is linked from the README, includes explicit pass/fail status fields, and covers the source-fidelity checks required for golden lecture review.
+- `docs/golden-conversion-batch.md` exists and records the selected Codex evaluation baseline, date, repository commit or working tree state, generation workspace setup, validation output, proof that `examples/golden.template.md` was unavailable during generation, and proof that the starting `content/lecture.template.md` did not expose the golden answer.
+- The enforced golden conversion workflow passes in at least two of three fresh Codex runs without manual schema fixes, using a sanitized generation workspace that prevents agent access to `examples/golden.template.md`, any active `content/lecture.template.md` that reveals the golden answer, or any documentation file exposing the golden answer during generation.
+- Each launch-counted generated golden lecture passes every item in `docs/mvp-review-checklist.md` and is realistic and useful as a lecture, not only a component showcase.
+- `npm run validate` validates `content/lecture.template.md`, prints author-locatable errors, and exits nonzero when validation fails.
+- Invalid templates block rendering and show a validation screen instead of partial lecture content.
+- Missing required template fields produce blocking validation errors listing the exact missing field names.
+- Missing required sections produce blocking validation errors listing each missing section heading.
+- Invalid frontmatter YAML, malformed component YAML, and unclosed `lecture-component` fences produce blocking validation errors with author-locatable context.
+- Invalid `level` values produce blocking validation errors listing the allowed values.
+- Empty required list fields produce blocking validation errors listing the empty field names.
+- Empty section titles and sections with no meaningful content block produce blocking validation errors with section context.
+- Unsupported component types produce clear validation errors listing the unsupported type and section where it appears.
+- Invalid component payloads produce clear validation errors listing the component type and missing or invalid field names.
+- Multiple validation failures from one malformed template are shown together when they can be detected in one parse pass.
+- Validation handles all P0 MVP validation requirements; perfect cascading recovery after severely malformed syntax is not required for MVP.
+- The implementation includes reusable validation coverage for the P0 invalid cases through automated parser tests, invalid fixture templates under `examples/invalid/`, or both.
+- A reviewer can identify the lecture title, audience, objectives, ordered sections, key takeaways, and at least one useful visual component from the rendered page without reading the raw source.
+- The lecture page has no horizontal overflow at 390px and 1280px viewport widths, and section navigation is usable at 390px viewport width.
+
+### MVP Confidence Acceptance
+
+- `examples/component-demo.template.md` demonstrates all supported MVP component types using the same supported template schema.
+- `examples/component-demo.template.md` is parse-valid, and the README explains how to copy it to `content/lecture.template.md` for preview.
+- The README warns that copying `examples/component-demo.template.md` replaces the active render template and explains how to preserve the active template before copying or restore from `examples/golden.template.md`.
+- The golden conversion batch record is complete enough for a reviewer to reproduce the launch decision without relying on memory or chat history.
+
+### MVP Quality Bar Acceptance
+
+- All lecture UI components are implemented through the component-kit folder.
+- The lecture page has clear visual hierarchy, visually distinct component blocks, and code blocks that do not break the layout.
+- The lecture page uses semantic heading order, keyboard-usable section navigation, visible focus states, and WCAG AA contrast for text.
+- A target technical educator can create a review-ready lecture page from raw notes in under 30 minutes after setup and rate the result useful enough to continue editing rather than rebuilding the page layout manually.
+- Tiered MVP completion is verified with the MVP Test Protocol.
+
+## PM Review Fix Todo List
+
+- [x] Split the oversized MVP bar into launch acceptance, confidence acceptance, and quality-bar acceptance.
+- [x] Replace the brittle single golden AI-agent run with a three-run Codex launch-decision batch that passes when at least two runs pass.
+- [x] Make the `examples/golden.template.md` exclusion enforceable by requiring it to be absent or inaccessible during generation.
+- [x] Clarify that Codex in a local repository workspace is the MVP-supported AI-agent baseline.
+- [x] Add a human product-success metric for educator usefulness and time-to-review-ready output.
+- [x] Add the product rationale for the rigid one-schema template contract.
+- [x] Promote the lecture quality checklist to a first-class artifact at `docs/mvp-review-checklist.md`.
+- [x] Promote the checklist artifact into launch acceptance because launch depends on checklist results.
+- [x] Prevent golden-answer leakage through README examples, `SKILL.md`, and the starting active template.
+- [x] Require one recorded Codex evaluation baseline for each golden conversion batch.
+- [x] Define a lightweight educator usefulness validation protocol with timer boundaries and pass/fail evidence.
+- [x] Clarify that AI-assisted conversion is the MVP launch promise, while renderer-only delivery is an internal milestone.
+- [x] Add delivery milestones so renderer-only progress is not confused with MVP launch.
+- [x] Split launch-blocking success metrics from non-blocking product-learning metrics.
+- [x] Resolve the shipping demo state versus sanitized golden-evaluation workspace distinction.
+- [x] Define the minimum validation error shape for author-locatable errors.
+- [x] Move accessibility details into quality-bar language instead of launch-blocking rendering requirements.
+- [x] Add non-blocking outline and transcript smoke conversions for post-launch generalization evidence.
+- [x] Add first-class review artifacts for the golden conversion batch and educator usefulness evidence.
+- [x] Clarify that source fidelity is judged against the raw lecture, with the golden template used as a reviewer reference.
+- [x] Label MVP test protocol steps by launch, confidence, and quality-bar acceptance tier.
+- [x] Align the useful visual component requirement with launch acceptance instead of duplicating it in the quality bar.
+- [x] Promote P0 invalid-case validation coverage from confidence acceptance to launch acceptance.
+- [x] Clarify that rendering requirements describe product behavior while acceptance tiers define launch versus polish checks.
+
+## Post-MVP Polish
+
+The following improvements are desirable but do not block MVP launch:
+
+- Perfect cascading validation recovery after severely malformed Markdown or YAML that prevents reliable parsing of later content.
+- A dedicated preview route for `examples/component-demo.template.md`.
+- Automated visual regression tests for responsive layout and contrast, beyond the manual MVP checks.
+- Non-blocking smoke conversions for one outline-style lecture source and one transcript-style lecture source to learn how well the workflow generalizes beyond the golden lecture.
+
+## Closed Product Decisions
+
+- The MVP experience is a scrollable lesson page with section navigation, not a slide deck.
+- Static export is not required for MVP; local Next.js preview is required, and static export can be documented as future work.
+- Diagrams are not generated in MVP; manually authored visual blocks are the only required visual component mechanism.
+- `comparison`, `summary`, `quote`, and `quiz` components are deferred from MVP; they should validate as unsupported component types until explicitly added.
+
+## Future Enhancements
+
+- Multiple lecture templates and route generation.
+- Static export for simple hosting.
+- Theme customization.
+- Search across lectures.
+- Printable/PDF lecture output.
+- Speaker notes or classroom presentation mode.
+- Optional LLM-assisted template generation command.
+- Comparison and summary components.
+- Quote and quiz components, including accessible quiz answer reveal behavior.

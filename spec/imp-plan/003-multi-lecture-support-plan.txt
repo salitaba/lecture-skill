@@ -1,0 +1,418 @@
+Implementation Plan: Multi-Lecture Support
+==========================================
+
+## Summary
+
+Extend the single-lecture engine into a lightweight multi-lecture site with:
+- A `lectures/` directory structure for multiple lecture templates
+- A landing page listing all lectures in authored order
+- Per-lecture routes at `/lectures/<slug>`
+- Next/previous navigation on per-lecture pages
+- Collection-level validation with per-lecture status
+- Full backward compatibility when `lectures/` is absent
+
+## Architecture Analysis
+
+### Current State
+
+- **Framework**: Next.js 16 App Router, all server components, `force-dynamic` rendering
+- **Routing**: Single route at `/` (`src/app/page.tsx`)
+- **Template Reading**: `src/lib/lecture-template/readTemplate.ts` reads `content/lecture.template.md`
+- **Validation**: `src/lib/lecture-template/validateTemplate.ts` validates a single source string; returns `ValidationResult`
+- **CLI**: `scripts/validate.ts` calls `validateTemplateFile()` which reads and validates one file, exits with status code
+- **Components**: 9 server components under `src/components/lecture-kit/` — PageShell, LectureHeader, SectionNavigation, SectionRenderer, ValidationScreen, Callout, CodeBlock, ConceptCard, StepList
+- **Styling**: Single `globals.css` with CSS custom properties, responsive breakpoints at 520px and 900px
+- **Tests**: Vitest, fixture-based tests under `tests/lecture-template/`
+
+### Key Architectural Observations
+
+1. **page.tsx rendering is inline**: The lecture rendering logic (header, sections, takeaways) is written directly in `page.tsx`. This needs to be extracted into a shared `LecturePage` component so both the root route and `/lectures/[slug]` can reuse it.
+2. **ValidationScreen wraps itself in `<main>`**: It does not use `PageShell`. The per-lecture invalid-lecture route must wrap `ValidationScreen` in `PageShell` for layout consistency.
+3. **All components are server components**: No `"use client"` directives. Collection features must stay server-rendered.
+4. **`force-dynamic` on page.tsx**: Ensures server-side rendering on every request. Per-lecture routes should also use `force-dynamic` since they read from the filesystem.
+5. **Test patterns use fixture files**: Tests read from `content/` and `examples/` directories using a `fixture()` helper. Collection tests need fixture directories under `examples/`.
+
+### Files to Modify
+
+- `src/lib/lecture-template/types.ts` — Add collection types
+- `src/lib/lecture-template/readTemplate.ts` — Add collection scanning and reading
+- `src/lib/lecture-template/validateCli.ts` — Add collection validation output
+- `scripts/validate.ts` — Auto-detect collection mode
+- `src/app/page.tsx` — Extract rendering into shared component, add collection-mode detection
+- `src/app/globals.css` — Landing page and navigation styles
+
+### New Files to Create
+
+- `src/lib/lecture-template/collection.ts` — Collection scanning, metadata, and validation
+- `src/components/lecture-kit/LecturePage.tsx` — Shared lecture page rendering (extracted from page.tsx)
+- `src/components/lecture-kit/CollectionLanding.tsx` — Landing page component
+- `src/components/lecture-kit/LectureNavigation.tsx` — Next/prev navigation
+- `src/app/lectures/[slug]/page.tsx` — Per-lecture dynamic route
+- `examples/multi-lecture/lectures/01-introduction/lecture.template.md` — Example lecture 1
+- `examples/multi-lecture/lectures/02-core-concepts/lecture.template.md` — Example lecture 2
+- `tests/lecture-template/collection.test.ts` — Collection scanning tests
+- `tests/lecture-template/validate-collection-cli.test.ts` — Collection validation CLI tests
+- `tests/lecture-template/lecture-navigation.test.tsx` — Navigation component tests
+
+## Implementation Steps
+
+### Step 1: Collection Types
+
+**File**: `src/lib/lecture-template/types.ts`
+
+Add after existing types:
+
+```typescript
+export interface LectureCollectionEntry {
+  slug: string;           // subdirectory name (e.g., "01-introduction")
+  order: number;          // numeric prefix for sorting
+  templatePath: string;   // relative path: "lectures/<slug>/lecture.template.md"
+}
+
+export interface LectureCollection {
+  basePath: string;       // "lectures/"
+  entries: LectureCollectionEntry[];  // sorted by order
+}
+
+export interface LectureValidationResult {
+  slug: string;
+  templatePath: string;
+  valid: boolean;
+  errors: ValidationError[];
+  template?: LectureTemplate;
+}
+
+export interface CollectionValidationResult {
+  lectureCount: number;
+  results: LectureValidationResult[];
+  allPassed: boolean;
+}
+```
+
+### Step 2: Collection Scanning and Reading
+
+**File**: `src/lib/lecture-template/collection.ts` (new)
+
+Create with:
+- `LECTURES_DIR = "lectures"` constant
+- `isCollectionMode(): Promise<boolean>` — checks `lectures/` exists and has at least one subdirectory containing `lecture.template.md`
+- `scanLectureCollection(): Promise<LectureCollection>` — reads directory entries, matches `/^\d{2}-(.+)$/`, extracts numeric prefix, sorts by prefix, returns collection
+- `readLectureEntry(entry: LectureCollectionEntry): Promise<string>` — reads the template file for a specific entry
+- `validateCollection(): Promise<CollectionValidationResult>` — scans, reads each template, validates each, returns aggregated results
+
+Key behaviors:
+- Skip entries that don't match the numeric prefix pattern (log warning)
+- Skip empty subdirectories
+- Each lecture validates independently; one failure doesn't block others
+- `allPassed` is true only if every result has `valid: true`
+
+**File**: `src/lib/lecture-template/readTemplate.ts`
+
+Add:
+- `LECTURES_DIR = "lectures"` constant (exported)
+- `readLectureEntry(entry: LectureCollectionEntry): Promise<string>` — reads the specific template file
+- Keep existing `readActiveTemplate()` and `ACTIVE_TEMPLATE_PATH` unchanged
+
+### Step 3: Extract Lecture Page Rendering
+
+**File**: `src/components/lecture-kit/LecturePage.tsx` (new)
+
+Extract the rendering logic from `src/app/page.tsx` into a reusable server component:
+
+```typescript
+interface LecturePageProps {
+  lecture: LectureTemplate;
+  templatePath: string;
+}
+
+export function LecturePage({ lecture, templatePath }: LecturePageProps) {
+  // Same JSX currently in page.tsx lines 23-59
+  // PageShell > LectureHeader > lecture-layout > SectionNavigation + article
+}
+```
+
+This component handles the full lecture page layout: header, section navigation, overview, objectives, sections, and takeaways. Both the root page and the per-lecture route use this component.
+
+### Step 4: Per-Lecture Dynamic Route
+
+**File**: `src/app/lectures/[slug]/page.tsx` (new)
+
+```typescript
+export const dynamic = "force-dynamic";
+
+export default async function LectureSlugPage({ params }: { params: { slug: string } }) {
+  const { slug } = await params;
+  
+  // 1. Scan collection to find entry matching slug
+  const collection = await scanLectureCollection();
+  const entry = collection.entries.find(e => e.slug === slug);
+  
+  // 2. If no match, return notFound()
+  if (!entry) return notFound();
+  
+  // 3. Read and validate the template
+  const source = await readLectureEntry(entry);
+  const result = validateTemplateSource(source);
+  
+  // 4. If invalid, show validation screen (wrapped in PageShell)
+  if (!result.valid) {
+    return (
+      <PageShell>
+        <ValidationScreen errors={result.errors} templatePath={entry.templatePath} />
+        <LectureNavigation ... />
+      </PageShell>
+    );
+  }
+  
+  // 5. If valid, render full lecture page with navigation
+  return (
+    <>
+      <LecturePage lecture={result.template} templatePath={entry.templatePath} />
+      <LectureNavigation previous={...} next={...} />
+    </>
+  );
+}
+```
+
+The navigation props (`previous`, `next`) are computed from the sorted collection entries by finding the adjacent entry to the current slug.
+
+### Step 5: Next/Previous Navigation Component
+
+**File**: `src/components/lecture-kit/LectureNavigation.tsx` (new)
+
+```typescript
+interface NavTarget {
+  slug: string;
+  title: string;
+}
+
+interface LectureNavigationProps {
+  previous?: NavTarget;
+  next?: NavTarget;
+}
+```
+
+Renders at the bottom of each per-lecture page:
+- "Previous" link with adjacent lecture title (hidden if first lecture)
+- "Back to course" link (always visible, links to `/`)
+- "Next" link with adjacent lecture title (hidden if last lecture)
+
+Uses semantic `<nav>` element with `aria-label="Lecture navigation"`. Keyboard navigable with visible focus states using existing `:focus-visible` styles.
+
+### Step 6: Collection Landing Page Component
+
+**File**: `src/components/lecture-kit/CollectionLanding.tsx` (new)
+
+Server component receiving `CollectionValidationResult`:
+
+```typescript
+interface CollectionLandingProps {
+  validation: CollectionValidationResult;
+}
+```
+
+Renders:
+- `<h1>` course title derived from the collection (e.g., "Lecture Collection")
+- Lecture count and total estimated duration
+- Ordered list of lectures, each showing:
+  - Lecture number and title (linked to `/lectures/<slug>`)
+  - Description, audience, level, duration
+  - Validation status badge (PASS/FAIL) — uses text + icon, not color alone
+- Section count per lecture
+
+Responsive behavior:
+- 390px: stack vertically, full-width cards
+- 768px: moderate spacing
+- 1280px: max-width container
+
+### Step 7: Update Root Page for Collection Mode
+
+**File**: `src/app/page.tsx`
+
+Replace the inline rendering with:
+
+```typescript
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const isCollection = await isCollectionMode();
+  
+  if (isCollection) {
+    const validation = await validateCollection();
+    return (
+      <PageShell>
+        <CollectionLanding validation={validation} />
+      </PageShell>
+    );
+  }
+  
+  // Single-lecture mode (unchanged)
+  const source = await readActiveTemplate();
+  const result = validateTemplateSource(source);
+  
+  if (!result.valid) {
+    return <ValidationScreen errors={result.errors} templatePath={ACTIVE_TEMPLATE_PATH} />;
+  }
+  
+  return <LecturePage lecture={result.template} templatePath={ACTIVE_TEMPLATE_PATH} />;
+}
+```
+
+### Step 8: Collection Validation CLI
+
+**File**: `src/lib/lecture-template/validateCli.ts`
+
+Add new function:
+
+```typescript
+export async function validateCollectionCli(): Promise<CliValidationOutput>
+```
+
+Output format matches spec:
+```
+Collection validation: 3 lectures found
+
+  [PASS] 01-introduction/lecture.template.md
+  [PASS] 02-core-concepts/lecture.template.md
+  [FAIL] 03-advanced-topics/lecture.template.md
+    - Missing required section: ## Key Takeaways
+
+2 of 3 lectures passed validation.
+```
+
+Exit status: 0 if all pass, 1 if any fail.
+
+**File**: `scripts/validate.ts`
+
+Update to auto-detect collection mode:
+
+```typescript
+import { isCollectionMode } from "../src/lib/lecture-template/collection";
+
+const collection = await isCollectionMode();
+const output = collection 
+  ? await validateCollectionCli()
+  : await validateTemplateFile(process.argv[2] ?? ACTIVE_TEMPLATE_PATH);
+```
+
+### Step 9: Styles
+
+**File**: `src/app/globals.css`
+
+Add styles for:
+
+```css
+/* Collection Landing */
+.collection-landing { ... }
+.collection-header { ... }
+.collection-summary { ... }
+.lecture-list { ... }
+.lecture-list-item { ... }
+.lecture-list-meta { ... }
+.lecture-list-link { ... }
+
+/* Validation Badges */
+.validation-badge { ... }
+.validation-badge-pass { ... }
+.validation-badge-fail { ... }
+
+/* Lecture Navigation */
+.lecture-nav { ... }
+.lecture-nav-inner { ... }
+.lecture-nav-link { ... }
+.lecture-nav-back { ... }
+```
+
+Responsive additions at 520px and 900px breakpoints for collection-specific layouts.
+
+### Step 10: Example Multi-Lecture Collection
+
+Create `examples/multi-lecture/lectures/` with two valid lectures:
+- `01-introduction/lecture.template.md` — Introduction to a topic
+- `02-core-concepts/lecture.template.md` — Core concepts
+
+Both follow the existing template schema exactly. These serve as documentation and test fixtures.
+
+### Step 11: Tests
+
+**File**: `tests/lecture-template/collection.test.ts`
+
+Tests for collection scanning:
+- Empty `lectures/` directory → `isCollectionMode()` returns false
+- Directory with valid entries → returns sorted collection
+- Mixed numeric/non-numeric directory names → only numeric-prefix dirs included
+- Entries sorted by numeric prefix
+- Missing `lecture.template.md` in subdirectory → skipped
+
+**File**: `tests/lecture-template/validate-collection-cli.test.ts`
+
+Tests for collection validation CLI:
+- All valid lectures → exit 0, all PASS
+- Mixed valid/invalid → exit 1, mixed status
+- Empty collection → exit 0 with "0 lectures found" message
+- Output format matches spec exactly
+
+**File**: `tests/lecture-template/lecture-navigation.test.tsx`
+
+Tests for navigation component:
+- First lecture: only "Next" link shown
+- Last lecture: only "Previous" link shown
+- Middle lecture: both links shown
+- "Back to course" always present
+- Links point to correct slugs
+
+**File**: `tests/lecture-template/backward-compat.test.ts`
+
+Tests for backward compatibility:
+- Without `lectures/` directory → single-lecture behavior unchanged
+- With `lectures/` and `content/lecture.template.md` → collection mode, ignores single file
+
+### Step 12: Documentation
+
+**File**: `SKILL.md`
+
+Add "Multi-Lecture Collection Workflow" section:
+- Describe `lectures/` directory structure
+- Explain numeric prefix ordering
+- Document collection validation
+- Add AI-agent scaffolding instructions for collections
+- Preserve existing single-lecture workflow
+
+**File**: `README.md`
+
+Add "Multi-Lecture Collections" section:
+- Directory structure
+- Routing behavior
+- Validation in collection mode
+- Link to example collection
+
+## Data Model Changes
+
+No database or persistence changes. All data is read from the filesystem at render time.
+
+The new types (`LectureCollectionEntry`, `LectureCollection`, `CollectionValidationResult`) wrap existing `LectureTemplate` and `ValidationError` types.
+
+## Risks and Mitigations
+
+1. **Risk**: Collection mode detection could be fragile (empty `lectures/` directory)
+   - **Mitigation**: `isCollectionMode()` checks for at least one subdirectory containing `lecture.template.md`
+
+2. **Risk**: Numeric prefix parsing could break with unexpected directory names
+   - **Mitigation**: Only match `/^\d{2}-(.+)$/` pattern; skip non-matching directories
+
+3. **Risk**: Per-lecture route could conflict with future routes
+   - **Mitigation**: Use `/lectures/[slug]` namespace, clearly separated
+
+4. **Risk**: Extracting LecturePage could introduce regressions in existing single-lecture rendering
+   - **Mitigation**: Extract as a pure refactor first; verify existing tests pass before adding collection features
+
+5. **Risk**: Validation output format could drift from spec
+   - **Mitigation**: Match spec format exactly; test with mixed valid/invalid collection
+
+## Open Questions
+
+1. Should the collection landing page show a course title from a metadata file (P2)?
+   - Recommendation: Defer to P2. Use a generic title initially.
+
+2. Should "Back to course" be a breadcrumb or bottom link?
+   - Recommendation: Bottom link, consistent with next/prev navigation placement.

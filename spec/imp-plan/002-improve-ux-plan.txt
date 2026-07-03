@@ -1,0 +1,170 @@
+Implementation Plan: Improve Lecture Site UX
+
+Spec: spec/002-improve-ux.txt
+Plan status: finalized after tech-lead review
+
+## Brief Summary
+
+Improve the existing lecture preview from a plain but correct MVP into a polished local-first teaching and review surface. The change keeps the existing lecture template schema, parser, validator, and active input path `content/lecture.template.md`, while improving the rendered page hierarchy, navigation, responsive behavior, component distinction, and validation error presentation.
+
+This is primarily a component-kit and CSS feature. Route composition may change, but active-section tracking and progress indicators should be deferred for the first pass because they are P1. The P0 implementation should satisfy orientation needs with normal anchor navigation, a complete lesson-structure navigation, a visible section count, a compact mobile learning-path disclosure, better validation layout, and robust responsive styling.
+
+## Relevant Existing Files
+
+- `src/app/page.tsx`: server route that reads the active template, validates it, renders `ValidationScreen` on failure, and composes the valid lecture page.
+- `src/app/globals.css`: current global design tokens, layout, typography, responsive rules, component styling, code/table overflow, focus states, and validation styling.
+- `src/components/lecture-kit/PageShell.tsx`: shared page wrapper.
+- `src/components/lecture-kit/LectureHeader.tsx`: renders title, description, audience, duration, and level.
+- `src/components/lecture-kit/SectionNavigation.tsx`: currently renders only authored sections in an ordered sticky nav.
+- `src/components/lecture-kit/SectionRenderer.tsx`: renders authored section heading, section number, and section blocks.
+- `src/components/lecture-kit/Callout.tsx`: renders `callout` components.
+- `src/components/lecture-kit/ConceptCard.tsx`: renders `concept_card` components.
+- `src/components/lecture-kit/StepList.tsx`: renders `step_list` components.
+- `src/components/lecture-kit/CodeBlock.tsx`: renders `code_block` components.
+- `src/components/lecture-kit/ValidationScreen.tsx`: renders blocking validation errors with code, location, field, heading, section, component, and hint when available.
+- `src/lib/lecture-template/anchors.ts`: already generates stable unique anchors for duplicate section titles.
+- `src/lib/lecture-template/readTemplate.ts`: exports `ACTIVE_TEMPLATE_PATH`, `repositoryPath`, and `readActiveTemplate`; use this constant anywhere the active template path is shown.
+- `src/lib/lecture-template/types.ts`: existing `LectureTemplate`, metadata, section, render block, and validation error types.
+- `src/lib/lecture-template/validateTemplate.ts`: existing validation behavior and normalized render model; should remain schema-compatible.
+- `tests/lecture-template/render-model.test.ts`: current integration-style model tests for valid nav data and invalid template path.
+- `tests/lecture-template/renderMarkdown.test.tsx`: current React static-markup safety test.
+- `tests/lecture-template/validateTemplate.test.ts`: current parser/validator behavior and context tests.
+- `examples/component-demo.template.md`: valid fixture covering supported component types.
+- `examples/invalid/*.template.md`: invalid fixtures for validation screen data.
+
+## Proposed Implementation Steps
+
+1. Preserve the existing data contract.
+   - Do not add or require new template fields.
+   - Do not change supported component types or validation semantics.
+   - Keep `npm run validate` compatible with existing behavior unless CLI presentation is intentionally improved in a backward-compatible way.
+   - Keep all base lecture rendering UI in `src/components/lecture-kit/`; route files should compose those components.
+
+2. Add full-page anchor destinations for required lecture areas.
+   - Keep `overview-heading`, `objectives-heading`, existing section anchors, and `takeaways-heading` as working anchor targets.
+   - Define shared constants for non-section destination ids and hrefs, such as `overview-heading`, `objectives-heading`, and `takeaways-heading`, so `src/app/page.tsx` and `SectionNavigation` cannot drift.
+   - Update `SectionNavigation` to render:
+     - Overview
+     - Learning Objectives
+     - each authored section with visible section number
+     - Key Takeaways
+   - Use hrefs `#overview-heading`, `#objectives-heading`, `#${section.anchor}`, and `#takeaways-heading` unless the implementation introduces cleaner fixed ids without breaking headings.
+   - Keep duplicate section titles safe by continuing to use `section.anchor` from the parser.
+   - Add a test that navigation hrefs match the ids rendered on the actual heading targets.
+
+3. Improve header hierarchy and metadata clarity.
+   - Update `LectureHeader` to accept a visible authored-section count, either as `sectionCount` or a small derived summary prop.
+   - Present title and description as the strongest elements without creating an oversized hero.
+   - Render audience, duration, level, and section count as compact metadata badges or definition-list items that wrap cleanly for long values.
+   - Add concise learning-path/orientation copy only if it helps the dashboard without pushing content below the first viewport.
+
+4. Improve navigation for desktop and mobile.
+   - Keep desktop navigation sticky with clear hover and focus-visible states.
+   - Explicitly defer active-section tracking and do not set `aria-current` in the first pass, because no client-side current-location logic will exist. The current-location aid for P0 is the complete static lesson structure, section count, and compact learning-path navigation.
+   - Make long labels wrap cleanly with `min-width: 0`, no clipping, and no overlap.
+   - For mobile, replace the always-expanded long static nav with a compact in-page pattern. Preferred option: a native `<details>` / `<summary>` "Learning path" disclosure before content.
+   - Keep all links real anchors so navigation works without JavaScript.
+   - Ensure tap targets are comfortable, keyboard reachable, and visible on focus.
+   - Add visible `summary:focus-visible` styling if the mobile disclosure uses `<summary>`.
+
+5. Strengthen content hierarchy and reading rhythm.
+   - Adjust `src/app/globals.css` tokens and layout to create a restrained education-tool visual system.
+   - Improve max line length for prose while preserving room for code/table overflow.
+   - Distinguish overview, objectives, authored sections, and takeaways by role with restrained surfaces, borders, spacing, labels, and list styling.
+   - Avoid nested card visuals; components inside sections should not appear as heavy floating cards inside heavier cards.
+   - Add `scroll-margin-top` to anchor targets so sticky nav/header spacing does not obscure headings.
+   - Respect reduced-motion preferences by removing global smooth scrolling or wrapping `scroll-behavior: smooth` in `@media (prefers-reduced-motion: no-preference)`.
+
+6. Improve supported lecture component presentation.
+   - Keep component logic in the existing lecture-kit files.
+   - Make `callout` variants visually distinct without relying on color alone; include readable labels or border/shape treatment for note, warning, and insight.
+   - Make `ConceptCard` visually distinct from callouts.
+   - Improve `StepList` with stronger step numbers and readable wrapping for long steps.
+   - Improve `CodeBlock` language label, internal horizontal scrolling, and long-line behavior without causing body overflow.
+   - Keep component markup semantic enough for assistive technology; do not introduce decorative-only meaning.
+
+7. Improve validation screen UX.
+   - Keep validation blocking in `ValidationScreen`.
+   - Import `ACTIVE_TEMPLATE_PATH` from `src/lib/lecture-template/readTemplate.ts` in `src/app/page.tsx` and pass it to `ValidationScreen`; do not duplicate the path string in component code.
+   - Lead with a concise summary: count of blocking errors and active template path.
+   - Make each error scannable and ensure every error item shows the active template path, message, code, source area, best available location/context, field/heading/section/component, and hint when present.
+   - Grouping by source area is useful but optional if every error card is visually prioritized and scannable. If grouping is implemented, derive area from existing validation fields/code without changing validator output.
+   - Keep all details visible as plain HTML that can be copied into an AI-agent prompt.
+
+8. Add fixtures or fixture generators for UX edge cases.
+   - Add valid examples for duplicate section titles, long metadata, long section titles, long code lines, Markdown tables, all supported component types, and at least 10 authored sections.
+   - Prefer one or two targeted fixtures under `examples/` when they can cover multiple UX cases without duplicating large lecture files.
+   - Add or use an invalid fixture with representative frontmatter, heading, component, location, and hint fields for validation screen tests.
+
+9. Add focused tests for behavior that can be automated without a browser.
+   - Add static React markup tests using `renderToStaticMarkup` for `LectureHeader`, `SectionNavigation`, `ValidationScreen`, and component-kit pieces where useful.
+   - Assert that navigation includes Overview, Learning Objectives, all authored sections with unique hrefs, and Key Takeaways.
+   - Assert that the header renders section count and metadata labels.
+   - Assert that validation markup includes active template path, error count, messages, best available context fields, and hints.
+   - Keep parser and validator tests stable; update only if intentionally adding fixtures or model assertions.
+
+10. Perform manual responsive and accessibility verification.
+    - Run `npm run validate`.
+    - Run `npm run test`.
+    - Run `npm run lint`.
+    - Run `npm run typecheck`.
+    - Start `npm run dev`, perform viewport and keyboard checks, then stop the server.
+    - Use the long lecture fixture at 390px, 768px, and 1280px and record `document.documentElement.scrollWidth <= document.documentElement.clientWidth` results. If a browser-level automated check is added, it may replace the recorded manual checklist.
+    - Check keyboard tab order through navigation, details summary if used, validation screen links/controls, and visible focus.
+    - Check long lecture navigation on mobile with at least 10 authored sections.
+    - Check invalid template validation screen and restore the valid active template after manual checks.
+
+## Data Model, API, Persistence, Event, And Domain Changes
+
+- No lecture template schema changes.
+- No new parser-supported component types.
+- No database, persistence, analytics, authentication, CMS, hosted publishing, or runtime network dependency.
+- Existing `LectureTemplate` can remain unchanged. `sectionCount` can be derived in `src/app/page.tsx` and passed to `LectureHeader`.
+- `SectionNavigation` may accept a richer navigation item prop shape derived by the route or may derive required static entries internally from `sections`. Prefer the simpler public prop that keeps the route readable.
+- `ValidationScreen` should add a required or optional `templatePath` prop, but the value should come from `ACTIVE_TEMPLATE_PATH` at the route boundary rather than a duplicated literal. If a default is retained for tests, import the shared constant.
+- Active-section/progress behavior is deferred for this plan and should not affect the core data model.
+
+## Test Plan
+
+Automated tests:
+
+- Add or update `tests/lecture-template/render-model.test.ts` to assert valid fixtures still produce unique authored-section anchors, including duplicate title fixtures if added.
+- Add `tests/lecture-template/lecture-components.test.tsx` or equivalent static-markup tests for:
+  - `LectureHeader` renders title, description, metadata, and visible section count.
+  - `SectionNavigation` renders Overview, Learning Objectives, each authored section with section number and unique href, and Key Takeaways; navigation hrefs match rendered heading ids.
+  - `ValidationScreen` renders a summary, active template path, and every error item includes active template path, error message, code, location/context fields, and hints.
+  - component-kit components render role labels and content without raw HTML injection paths.
+- Keep `tests/lecture-template/renderMarkdown.test.tsx` passing for raw HTML escaping.
+- Keep existing validator fixture tests passing.
+
+Finite verification commands:
+
+```bash
+npm run validate
+npm run test
+npm run lint
+npm run typecheck
+```
+
+Manual preview:
+
+- Start `npm run dev`, perform the checks below, then stop the server.
+- Record the exact fixture used for long-lecture checks, the viewport widths, and the overflow expression results.
+
+- At 390px, 768px, and 1280px, confirm `document.documentElement.scrollWidth <= document.documentElement.clientWidth`.
+- Confirm long code blocks and Markdown tables scroll inside their own containers.
+- Confirm long metadata and long section titles wrap without clipping.
+- Confirm a long lecture with at least 10 authored sections exposes the start of content quickly on mobile because navigation is compact by default.
+- Confirm keyboard users can reach and activate all navigation links and any mobile disclosure control.
+- Confirm invalid active template screen remains blocking and is easier to triage.
+
+## Risks, Assumptions, And Open Questions
+
+- Risk: Over-investing in active-section tracking could add client complexity for a P1 requirement. Mitigation: satisfy P0 with complete lesson-structure navigation, static orientation, section count, and real anchors first.
+- Risk: Mobile navigation can still push content too low if implemented as an expanded list. Mitigation: use a compact disclosure by default and test with 10+ authored sections.
+- Risk: CSS polish can accidentally create horizontal overflow with long code, tables, metadata, or section titles. Mitigation: use `min-width: 0`, constrained widths, internal overflow containers, and manual viewport checks at required widths.
+- Risk: Styling validation groups by inferred source area may hide or reorder useful details. Mitigation: keep every error fully visible in plain HTML and derive grouping only from existing error fields.
+- Risk: Heavy surfaces around sections and components can create nested-card clutter. Mitigation: make sections use light structural framing and components use role-specific styling without excessive elevation.
+- Assumption: Static current-location/orientation through the complete learning-path nav and section count satisfies the P0 "current-location/navigation aid" requirement if active-section tracking is deferred.
+- Assumption: The project will continue using Next.js server rendering and Vitest static-markup tests; no browser test framework is required for this plan unless implementation chooses to add one.
+- Open question: After P0 UX quality gates pass, should a follow-up add active-section tracking or a reading-progress bar as P1 polish?

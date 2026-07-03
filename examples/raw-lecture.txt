@@ -1,0 +1,23 @@
+Evidence-Driven Debugging for Production Incidents
+
+This lecture is for early-career backend engineers who have deployed services but are still building confidence during incidents. The goal is to teach a simple way to move from a vague symptom to a tested explanation without guessing.
+
+Production debugging usually starts with pressure. A customer reports that checkout is slow, an alert says error rate is rising, or a teammate says the service "looks bad." The first mistake is to immediately change code or restart everything. That may hide the signal that would explain the incident. Instead, treat the incident like an evidence problem.
+
+Start by writing the symptom in observable terms. "Checkout is broken" is not observable enough. A better version is "the checkout API is returning HTTP 500 for about 12 percent of requests in the last fifteen minutes." Observable symptoms include a time range, a user impact, and a measurable behavior. If you cannot measure it yet, say that clearly and collect the missing measurement.
+
+Next, establish a timeline. Put deployments, configuration changes, traffic shifts, dependency alerts, and the first user reports on the same timeline. Do not assume the most recent deployment is the cause. It is a candidate, not a conclusion. The useful question is: what changed before the symptom, and what evidence connects that change to the failure?
+
+Logs are useful when they are read as samples of behavior, not as a wall of text. Pick a small set of failing requests and compare them with successful requests from the same time window. Look for differences in route, status code, dependency call, timeout, feature flag, tenant, region, or input shape. A single scary stack trace may be unrelated if it appears in both successful and failing paths.
+
+Metrics help separate local noise from system behavior. For example, if latency rises only on one endpoint while CPU and memory remain normal, the problem may be downstream or input-specific. If all endpoints slow down while CPU is saturated, the problem may be capacity or a hot loop. Metrics should narrow the search space; they should not replace request-level evidence.
+
+When you form a hypothesis, make it falsifiable. "The cache is bad" is too vague. "Checkout requests that miss the price cache are timing out when they call the pricing service" is better because you can test it. You can compare cache-hit and cache-miss latency, inspect pricing service errors, and check whether retries line up with the slow requests.
+
+A useful debugging loop has four steps. State the symptom, gather evidence, form one falsifiable hypothesis, and run the smallest safe test. The test might be a log query, a metric split, a feature flag rollback for a small segment, or a read-only database check. After the test, update the hypothesis. If the evidence contradicts it, discard it quickly.
+
+Be careful with fixes that destroy evidence. Restarting a service, clearing a queue, or rolling back a deployment can be the right move when users are harmed, but write down what evidence you have first. If you must mitigate before root cause is known, separate the mitigation from the explanation. "Rolling back reduced errors" does not automatically prove the reverted code caused the incident; it proves the rollback changed the system state in a helpful way.
+
+After the incident, the best postmortems explain how the team learned. Include the original symptom, the timeline, the hypotheses that were tested, the evidence that supported or rejected them, the mitigation, and the final cause if known. Avoid heroic stories about intuition. The lesson for the next engineer should be a repeatable method.
+
+The takeaway is that debugging is not guessing faster. It is reducing uncertainty with evidence. Good engineers still use intuition, but they make intuition accountable to logs, metrics, timelines, and small safe tests.
