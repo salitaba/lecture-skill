@@ -1,0 +1,6 @@
+Opening collection source notes:
+
+- A local course collection uses numbered lecture folders so authored order is visible.
+- Each folder contains its own lecture.template.md and becomes its own route.
+- Review starts at the landing page, then follows the first lecture link.
+- Navigation should make the next step obvious without requiring a hosted service.

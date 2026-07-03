@@ -13,6 +13,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "validate": "node --import ./scripts/register-ts-loader.mjs scripts/validate.ts",
+    "review:source": "node --import ./scripts/register-ts-loader.mjs scripts/reviewSource.ts",
     "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts"
   },
   "dependencies": {

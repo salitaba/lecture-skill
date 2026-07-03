@@ -37,11 +37,19 @@ npm run package:review
 
 The package command is an explicit handoff step, not part of the normal edit loop.
 
+Create a source fidelity worksheet for human review:
+
+```bash
+npm run review:source
+```
+
+The worksheet command runs validation, records the result, and still writes a worksheet when validation fails.
+
 ## Files
 
 - `content/lecture.template.md`: the fallback single-lecture render input.
+- `content/raw-lecture.txt`: recommended raw source evidence for the single-lecture workflow.
 - `lectures/`: local multi-lecture workspace for collection mode; keep it out of git if you want private course content.
-- `content/raw-lecture.txt`: recommended working path for your own raw lecture notes.
 - `examples/raw-lecture.txt`: golden raw source for MVP evaluation.
 - `examples/golden.template.md`: reviewer reference for the golden workflow.
 - `examples/component-demo.template.md`: valid demo of all supported MVP components.
@@ -56,9 +64,12 @@ The engine supports a lightweight collection mode when a root-level `lectures/` 
 
 ```text
 lectures/
+  raw-course.txt
   01-introduction/
+    raw-lecture.txt
     lecture.template.md
   02-core-concepts/
+    raw-lecture.txt
     lecture.template.md
 ```
 
@@ -71,6 +82,31 @@ In collection mode:
 
 Collection mode takes precedence over `content/lecture.template.md` whenever `lectures/` exists. If `lectures/` is absent or empty, the app falls back to the single-lecture workflow and continues to render `content/lecture.template.md` exactly as before.
 
+## Source Fidelity Review
+
+Source fidelity review is a human review workflow. It does not perform semantic fact-checking, call an LLM, score source coverage, or block schema validation. It creates an auditable worksheet that ties raw source evidence to generated templates, rendered routes, validation results, reviewer fields, and source-fidelity checklist items.
+
+Use these raw source conventions:
+
+- Single lecture: keep the source in `content/raw-lecture.txt` and the generated template in `content/lecture.template.md`.
+- Collection with per-lecture sources: keep each source in `lectures/<slug>/raw-lecture.txt` next to `lectures/<slug>/lecture.template.md`.
+- Collection split from one shared source: keep the shared source in `lectures/raw-course.txt`.
+- When both per-lecture and shared collection sources exist, the per-lecture source is primary and `lectures/raw-course.txt` is additional context.
+
+Generate a worksheet:
+
+```bash
+npm run review:source
+```
+
+The command writes `docs/review-worksheets/<timestamp>-source-fidelity-review.md`, prints the worksheet path, validation status, lecture count, and missing raw source evidence. It exits `0` when the worksheet is created, even if validation failed, because the failed validation state is useful review evidence. Missing raw source files are warnings, not command failures.
+
+Example workflows:
+
+1. Single-source workflow: save the raw lecture in `content/raw-lecture.txt`, generate `content/lecture.template.md`, run `npm run validate`, then run `npm run review:source`.
+2. Per-lecture collection workflow: create `lectures/01-introduction/raw-lecture.txt` and `lectures/01-introduction/lecture.template.md` for each lecture, run `npm run validate`, then run `npm run review:source`.
+3. Shared-source collection workflow: save the original course notes in `lectures/raw-course.txt`, generate each `lectures/<slug>/lecture.template.md`, optionally add per-lecture raw sources for tighter review, then run `npm run review:source`.
+
 ## Static Review Packages
 
 Run `npm run package:review` after `npm run validate` passes and you want to send the rendered lecture experience to a reviewer.
@@ -80,11 +116,13 @@ The command:
 - Detects single-lecture mode or collection mode using the same rules as the app.
 - Validates first and exits nonzero if the active single lecture or any collection lecture is invalid.
 - Builds a static export and writes a timestamped folder under `review-packages/<timestamp>-lecture-site/`.
-- Copies rendered HTML/assets, active source templates, `manifest.json`, `MANIFEST.md`, package `README.md`, and `REVIEW_CHECKLIST.md`.
+- Copies rendered HTML/assets, active source templates, available raw source evidence, `manifest.json`, `MANIFEST.md`, package `README.md`, `REVIEW_WORKSHEET.md`, and `REVIEW_CHECKLIST.md`.
 
 In single-lecture mode, the active source is `content/lecture.template.md` and it is copied to `source/content/lecture.template.md` inside the package.
 
-In collection mode, only active `lectures/<slug>/lecture.template.md` files are copied under `source/lectures/<slug>/lecture.template.md`. The inactive `content/lecture.template.md` file is not copied as an active source.
+In single-lecture mode, `content/raw-lecture.txt` is copied to `source/content/raw-lecture.txt` when it exists. In collection mode, only active `lectures/<slug>/lecture.template.md` files are copied under `source/lectures/<slug>/lecture.template.md`; matching `lectures/<slug>/raw-lecture.txt` files and `lectures/raw-course.txt` are copied when present. The inactive `content/lecture.template.md` file is not copied as an active source.
+
+Missing raw source evidence does not block package creation. The package command prints missing-source warnings, `manifest.json` and `MANIFEST.md` record present/missing raw source status, and package-local `REVIEW_WORKSHEET.md` gives reviewers the source fidelity checklist and notes fields.
 
 The generated package is designed to open directly from the filesystem. Send reviewers the generated package folder. Optional zip packaging is not implemented yet.
 
@@ -235,9 +273,10 @@ steps:
 3. The agent should create or update `content/lecture.template.md`.
 4. Run `npm run validate`.
 5. Fix validation errors until the command passes.
-6. Run `npm run dev` and preview `http://localhost:3000`.
-7. Review the result with `docs/mvp-review-checklist.md`.
-8. When a handoff artifact is requested, run `npm run package:review` and send the generated `review-packages/<timestamp>-lecture-site/` folder to reviewers.
+6. Run `npm run review:source` and complete the generated source fidelity worksheet.
+7. Run `npm run dev` and preview `http://localhost:3000`.
+8. Review the result with `docs/mvp-review-checklist.md`.
+9. When a handoff artifact is requested, run `npm run package:review` and send the generated `review-packages/<timestamp>-lecture-site/` folder to reviewers.
 
 For the golden MVP workflow, use `examples/raw-lecture.txt` as the only raw source. Before giving the prompt to the agent, make `examples/golden.template.md` inaccessible and remove or replace `content/lecture.template.md` with a minimal non-golden placeholder if it contains the shipping demo answer. The agent-accessible workspace must not expose the golden answer until after generation and validation are complete. Record the batch in `docs/golden-conversion-batch.md`.
 

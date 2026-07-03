@@ -6,7 +6,16 @@ import os from "node:os";
 import path from "node:path";
 import { isCollectionMode, scanLectureCollection } from "./collection";
 import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
-import type { LectureTemplate, ValidationError } from "./types";
+import {
+  COLLECTION_SHARED_RAW_SOURCE_PATH,
+  SINGLE_RAW_SOURCE_PATH,
+  type SourceReviewLecture,
+  type SourceReviewSourceEvidence,
+  type SourceReviewWorksheet,
+  collectionRawSourcePath,
+  renderSourceReviewWorksheetMarkdown
+} from "./sourceReview";
+import type { LectureMetadata, LectureTemplate, ValidationError } from "./types";
 import { validateTemplateSource } from "./validateTemplate";
 import { formatError } from "./validateCli";
 
@@ -16,6 +25,15 @@ export interface ReviewPackageSourceRecord {
   templatePath: string;
   packagePath: string;
   contents: string;
+}
+
+export interface ReviewPackageRawEvidenceRecord {
+  sourcePath: string;
+  packagePath: string;
+  status: "present" | "missing";
+  role: "primary" | "shared";
+  lectureSlug?: string;
+  contents?: string;
 }
 
 export interface ReviewPackageRoute {
@@ -51,6 +69,7 @@ export type ReviewPackagePreflight =
       lectureCount: number;
       lectures: ReviewPackageLecture[];
       sources: ReviewPackageSourceRecord[];
+      rawEvidence: ReviewPackageRawEvidenceRecord[];
       routes: ReviewPackageRoute[];
       ignoredInactiveTemplatePaths: string[];
     }
@@ -61,6 +80,7 @@ export type ReviewPackagePreflight =
       lectureCount: number;
       lectures: ReviewPackageLecture[];
       sources: ReviewPackageSourceRecord[];
+      rawEvidence: ReviewPackageRawEvidenceRecord[];
       routes: ReviewPackageRoute[];
       ignoredInactiveTemplatePaths: string[];
     };
@@ -86,9 +106,11 @@ export interface ReviewPackageManifest {
   contents: {
     renderedPages: string[];
     sourceTemplates: string[];
+    rawSourceEvidence: string[];
     reviewerFiles: string[];
   };
   lectures: ReviewPackageLecture[];
+  rawEvidence: Omit<ReviewPackageRawEvidenceRecord, "contents">[];
   ignoredInactiveTemplatePaths: string[];
   gitCommit: string;
   gitDirtyStatus: string;
@@ -122,7 +144,7 @@ export interface AssembleReviewPackageResult {
 const packageType = "static-review-package" as const;
 const projectName = "lecture-site-engine";
 const validationCommand = "npm run validate";
-const reviewerFiles = ["manifest.json", "MANIFEST.md", "README.md", "REVIEW_CHECKLIST.md"];
+const reviewerFiles = ["manifest.json", "MANIFEST.md", "README.md", "REVIEW_WORKSHEET.md", "REVIEW_CHECKLIST.md"];
 
 export async function runReviewPackagePreflight(): Promise<ReviewPackagePreflight> {
   if (await isCollectionMode()) {
@@ -159,6 +181,27 @@ export async function verifyReviewPackageSourceSnapshot(preflight: ReviewPackage
     }
   }
 
+  for (const source of preflight.rawEvidence) {
+    if (source.status === "missing") continue;
+
+    let currentContents: string;
+    try {
+      currentContents = await readFile(repositoryPath(source.sourcePath), "utf8");
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Raw source evidence changed after validation: ${source.sourcePath} is no longer readable (${formatUnknownError(error)}). Re-run npm run package:review.`
+      };
+    }
+
+    if (currentContents !== source.contents) {
+      return {
+        ok: false,
+        message: `Raw source evidence changed after validation: ${source.sourcePath}. Re-run npm run package:review after saving the final content.`
+      };
+    }
+  }
+
   return { ok: true };
 }
 
@@ -189,9 +232,13 @@ export function createReviewPackageManifest(
     contents: {
       renderedPages: preflight.routes.map((route) => route.outputPath),
       sourceTemplates: preflight.sources.map((source) => source.packagePath),
+      rawSourceEvidence: preflight.rawEvidence
+        .filter((source) => source.status === "present")
+        .map((source) => source.packagePath),
       reviewerFiles
     },
     lectures: preflight.lectures,
+    rawEvidence: preflight.rawEvidence.map(({ contents: _contents, ...source }) => source),
     ignoredInactiveTemplatePaths: preflight.ignoredInactiveTemplatePaths,
     gitCommit: runtimeMetadata.gitCommit,
     gitDirtyStatus: runtimeMetadata.gitDirtyStatus,
@@ -224,6 +271,14 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
     "## Source Templates",
     "",
     ...manifest.contents.sourceTemplates.map((source) => `- ${source}`),
+    "",
+    "## Raw Source Evidence",
+    "",
+    ...manifest.rawEvidence.map((source) =>
+      `- ${source.sourcePath}: ${source.status}${source.status === "present" ? ` -> ${source.packagePath}` : ""}${
+        source.lectureSlug ? ` (${source.lectureSlug}, ${source.role})` : ` (${source.role})`
+      }`
+    ),
     "",
     "## Lectures",
     ""
@@ -263,6 +318,7 @@ export function renderReviewPackageReadme(manifest: ReviewPackageManifest): stri
     "- `source/`: copied active lecture template files.",
     "- `manifest.json`: machine-readable package metadata.",
     "- `MANIFEST.md`: human-readable package metadata.",
+    "- `REVIEW_WORKSHEET.md`: source fidelity worksheet. Start here when comparing raw source evidence to rendered output.",
     "- `REVIEW_CHECKLIST.md`: review checklist for educational quality and source fidelity.",
     "",
     `Package path recorded at export time: ${manifest.packagePath}`,
@@ -315,6 +371,7 @@ export async function assembleReviewPackage(
       await rm(path.join(stagingDir, "lectures"), { recursive: true, force: true });
     }
     await writeCapturedSources(stagingDir, preflight.sources);
+    await writeCapturedRawEvidence(stagingDir, preflight.rawEvidence);
     await rewriteHtmlFiles(stagingDir);
 
     const packagePath = path.relative(process.cwd(), finalPackageDir) || finalPackageDir;
@@ -327,6 +384,7 @@ export async function assembleReviewPackage(
     await writeFile(path.join(stagingDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
     await writeFile(path.join(stagingDir, "MANIFEST.md"), renderReviewPackageManifestMarkdown(manifest), "utf8");
     await writeFile(path.join(stagingDir, "README.md"), renderReviewPackageReadme(manifest), "utf8");
+    await writeFile(path.join(stagingDir, "REVIEW_WORKSHEET.md"), renderSourceReviewWorksheetMarkdown(createPackageWorksheet(preflight, manifest)), "utf8");
     await writeFile(path.join(stagingDir, "REVIEW_CHECKLIST.md"), await readReviewChecklist(options.checklistSourcePath), "utf8");
 
     await rename(stagingDir, finalPackageDir);
@@ -394,6 +452,7 @@ async function runSingleLecturePreflight(): Promise<ReviewPackagePreflight> {
         contents: source
       }
     ],
+    rawEvidence: [await captureRawEvidence(SINGLE_RAW_SOURCE_PATH, "source/content/raw-lecture.txt", "primary")],
     routes: [{ route: "/", outputPath: "index.html" }],
     ignoredInactiveTemplatePaths: []
   };
@@ -402,9 +461,16 @@ async function runSingleLecturePreflight(): Promise<ReviewPackagePreflight> {
 async function runCollectionPreflight(): Promise<ReviewPackagePreflight> {
   const collection = await scanLectureCollection();
   const sources: ReviewPackageSourceRecord[] = [];
+  const rawEvidence: ReviewPackageRawEvidenceRecord[] = [];
   const lectures: ReviewPackageLecture[] = [];
   const validationLines = [`Collection validation: ${collection.entries.length} lectures found`, ""];
   const validationErrors: { slug: string; errors: ValidationError[] }[] = [];
+  const sharedRawEvidence = await captureRawEvidence(
+    COLLECTION_SHARED_RAW_SOURCE_PATH,
+    "source/lectures/raw-course.txt",
+    "shared"
+  );
+  rawEvidence.push(sharedRawEvidence);
 
   for (const entry of collection.entries) {
     let source: string;
@@ -432,6 +498,14 @@ async function runCollectionPreflight(): Promise<ReviewPackagePreflight> {
 
     const packageSourcePath = path.posix.join("source", entry.templatePath);
     const renderedOutputPath = path.posix.join("lectures", entry.slug, "index.html");
+    rawEvidence.push(
+      await captureRawEvidence(
+        collectionRawSourcePath(entry.slug),
+        path.posix.join("source", "lectures", entry.slug, "raw-lecture.txt"),
+        "primary",
+        entry.slug
+      )
+    );
     sources.push({
       templatePath: entry.templatePath,
       packagePath: packageSourcePath,
@@ -464,6 +538,7 @@ async function runCollectionPreflight(): Promise<ReviewPackagePreflight> {
     lectureCount: lectures.length,
     lectures,
     sources,
+    rawEvidence,
     routes: [
       { route: "/", outputPath: "index.html" },
       ...lectures.map((lecture) => ({
@@ -483,6 +558,7 @@ function invalidPreflight(mode: ReviewPackageMode, validation: ReviewPackageVali
     lectureCount: 0,
     lectures: [],
     sources: [],
+    rawEvidence: [],
     routes: [],
     ignoredInactiveTemplatePaths: []
   };
@@ -598,6 +674,117 @@ async function writeCapturedSources(packageRoot: string, sources: ReviewPackageS
   }
 }
 
+async function writeCapturedRawEvidence(packageRoot: string, sources: ReviewPackageRawEvidenceRecord[]) {
+  for (const source of sources) {
+    if (source.status === "missing") continue;
+    const destination = path.join(packageRoot, source.packagePath);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, source.contents ?? "", "utf8");
+  }
+}
+
+async function captureRawEvidence(
+  sourcePath: string,
+  packagePath: string,
+  role: ReviewPackageRawEvidenceRecord["role"],
+  lectureSlug?: string
+): Promise<ReviewPackageRawEvidenceRecord> {
+  try {
+    const contents = await readFile(repositoryPath(sourcePath), "utf8");
+    return {
+      sourcePath,
+      packagePath,
+      status: "present",
+      role,
+      lectureSlug,
+      contents
+    };
+  } catch (error) {
+    if (isMissingPath(error)) {
+      return {
+        sourcePath,
+        packagePath,
+        status: "missing",
+        role,
+        lectureSlug
+      };
+    }
+    throw error;
+  }
+}
+
+function createPackageWorksheet(preflight: Extract<ReviewPackagePreflight, { valid: true }>, manifest: ReviewPackageManifest): SourceReviewWorksheet {
+  const sharedSource = preflight.rawEvidence.find((source) => source.role === "shared");
+  const lectures: SourceReviewLecture[] = preflight.lectures.map((lecture) => {
+    const primarySource = preflight.rawEvidence.find(
+      (source) => source.role === "primary" && (lecture.slug ? source.lectureSlug === lecture.slug : source.sourcePath === SINGLE_RAW_SOURCE_PATH)
+    );
+    const additionalSources = preflight.rawEvidence
+      .filter((source) => source.role === "shared" && source.status === "present")
+      .map(toSourceReviewEvidence);
+
+    return {
+      slug: lecture.slug,
+      templatePath: lecture.sourceTemplatePath,
+      packageTemplatePath: lecture.packageSourcePath,
+      renderedRoute: lecture.slug ? `/lectures/${lecture.slug}` : "/",
+      renderedOutputPath: lecture.renderedOutputPath,
+      validationStatus: "passed",
+      validationErrors: [],
+      metadata: {
+        title: lecture.title,
+        description: lecture.description,
+        audience: lecture.audience,
+        duration: lecture.duration,
+        level: lecture.level as LectureMetadata["level"]
+      },
+      sectionCount: lecture.sectionCount,
+      sectionTitles: [],
+      primarySource: toSourceReviewEvidence(
+        primarySource ?? {
+          sourcePath: lecture.slug ? collectionRawSourcePath(lecture.slug) : SINGLE_RAW_SOURCE_PATH,
+          packagePath: lecture.slug ? path.posix.join("source", "lectures", lecture.slug, "raw-lecture.txt") : "source/content/raw-lecture.txt",
+          status: "missing",
+          role: "primary",
+          lectureSlug: lecture.slug
+        }
+      ),
+      additionalSources
+    };
+  });
+
+  return {
+    projectName,
+    createdAt: manifest.createdAt,
+    mode: preflight.mode,
+    validation: {
+      command: preflight.validation.command,
+      status: preflight.validation.status,
+      result: "passed",
+      stdout: preflight.validation.stdout,
+      stderr: preflight.validation.stderr
+    },
+    lectureCount: preflight.lectureCount,
+    collectionLandingRoute: preflight.mode === "collection" ? "/" : undefined,
+    sharedSource: sharedSource ? toSourceReviewEvidence(sharedSource) : undefined,
+    packageContext: {
+      packagePath: manifest.packagePath,
+      entryHtmlPath: manifest.entryHtmlPath
+    },
+    lectures
+  };
+}
+
+function toSourceReviewEvidence(source: ReviewPackageRawEvidenceRecord): SourceReviewSourceEvidence {
+  return {
+    sourcePath: source.sourcePath,
+    packagePath: source.status === "present" ? source.packagePath : undefined,
+    status: source.status,
+    role: source.role,
+    lectureSlug: source.lectureSlug
+  };
+}
+
 async function rewriteHtmlFiles(packageRoot: string) {
   const htmlFiles = await collectHtmlFiles(packageRoot);
   for (const htmlFile of htmlFiles) {
@@ -642,6 +829,10 @@ async function pathExists(targetPath: string): Promise<boolean> {
     if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
   }
+}
+
+function isMissingPath(error: unknown): boolean {
+  return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT";
 }
 
 async function readReviewChecklist(sourcePath?: string): Promise<string> {

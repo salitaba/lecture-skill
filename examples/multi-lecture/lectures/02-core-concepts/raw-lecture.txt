@@ -1,0 +1,6 @@
+Core concepts source notes:
+
+- Collection validation checks each lecture independently and reports per-lecture pass/fail status.
+- A failing lecture should not hide the rest of the course from local inspection.
+- Per-lecture routes use /lectures/<slug>.
+- Learners need forward, backward, and back-to-course navigation.

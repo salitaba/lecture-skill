@@ -1,0 +1,297 @@
+Implementation Plan: Source Fidelity Review Workflow
+====================================================
+
+Spec: spec/005-source-fidelity-review-workflow.txt
+Plan status: finalized after tech-lead review
+
+## Brief Summary
+
+Add a first-class source fidelity review workflow to the Lecture Site Engine. The new workflow should let authors run `npm run review:source` to create a timestamped Markdown worksheet under `docs/review-worksheets/` for either the active single lecture or active collection. The worksheet records validation status, generated template metadata, raw source evidence paths, rendered route/package path context, reviewer checklist fields, and notes fields for human source-fidelity approval.
+
+Static review packages should include raw source files when they exist and include a package-level `REVIEW_WORKSHEET.md` generated from the same worksheet model. Missing raw source files should never block validation or packaging, but should be visible in the worksheet, `MANIFEST.md`, `manifest.json`, and terminal warnings because reviewers cannot complete source-fidelity approval from the package alone.
+
+This feature does not add semantic fact-checking, LLM integration, source coverage scoring, browser side-by-side review, authentication, persistence, or changes to learner-facing lecture rendering.
+
+## Relevant Existing Files
+
+- `package.json`: currently has `validate` and `package:review`; add `review:source`.
+- `scripts/validate.ts`: existing CLI for single lecture or collection validation; source review should use the same mode decision.
+- `scripts/packageReview.ts`: existing package CLI; extend it to include raw-source evidence and a generated worksheet after validation/build succeeds.
+- `scripts/register-ts-loader.mjs`: reuse for any new TypeScript CLI script.
+- `src/lib/lecture-template/collection.ts`: owns collection-mode detection, collection scanning, authored lecture ordering, and validation.
+- `src/lib/lecture-template/readTemplate.ts`: owns repository-relative paths such as `content/lecture.template.md`, `lectures/`, and `repositoryPath()`.
+- `src/lib/lecture-template/validateCli.ts`: existing validation output model and formatting. Reuse rather than reimplementing validation text.
+- `src/lib/lecture-template/validateTemplate.ts`: returns parsed valid templates and validation errors for invalid templates.
+- `src/lib/lecture-template/types.ts`: defines lecture metadata and validation result types; add source-review types here only if they are shared outside the source-review module.
+- `src/lib/lecture-template/reviewPackage.ts`: existing static package preflight, manifest, Markdown manifest, package assembly, and source-template copying. Extend carefully rather than duplicating package metadata logic.
+- `scripts/packageReview.ts`: currently validates, builds, assembles package, and prints package path. Add package worksheet creation here.
+- `tests/lecture-template/review-package.test.ts`: current deterministic package tests; extend for raw source evidence and package worksheet behavior.
+- `tests/lecture-template/validate-cli.test.ts` and `tests/lecture-template/validate-collection-cli.test.ts`: useful patterns for validation CLI assertions.
+- `tests/lecture-template/collection.test.ts`: temp-directory patterns for collection fixtures and source path behavior.
+- `examples/multi-lecture/`: README and existing tests reference this collection scaffold, but it is not present in the current file listing. Restore it before adding source-review collection examples that depend on it.
+- `content/raw-lecture.txt`: existing recommended single-lecture raw source path.
+- `content/lecture.template.md`: active single-lecture generated template path.
+- `lectures/<slug>/lecture.template.md`: active collection generated template path.
+- `lectures/<slug>/raw-lecture.txt`: new primary per-lecture raw source convention.
+- `lectures/raw-course.txt`: new shared collection raw source convention.
+- `docs/mvp-review-checklist.md`: existing generic checklist; keep it, but the new worksheet needs source-fidelity-specific checklist items.
+- `README.md`: document raw source conventions, `npm run review:source`, package evidence behavior, and examples.
+- `SKILL.md`: update AI-agent workflow so agents preserve raw source files and run/create source review artifacts when requested.
+
+## Proposed Implementation Steps
+
+1. Add source-review path constants and evidence discovery.
+   - Create `src/lib/lecture-template/sourceReview.ts` as the primary module for this feature.
+   - Keep CLI and package scripts thin; put source discovery, validation capture, worksheet model creation, Markdown rendering, and package worksheet rendering in this module.
+   - Define constants:
+     - single raw source: `content/raw-lecture.txt`
+     - single template: `content/lecture.template.md`
+     - collection shared raw source: `lectures/raw-course.txt`
+     - collection per-lecture raw source: `lectures/<slug>/raw-lecture.txt`
+     - worksheet output directory: `docs/review-worksheets/`
+   - Use `repositoryPath()` and POSIX-style repository-relative paths in models and Markdown.
+   - Treat raw source files as evidence only. Do not feed them into rendering or validation.
+
+2. Define a source-review model that supports valid and invalid lectures.
+   - Suggested types:
+     - `SourceReviewMode = "single-lecture" | "collection"`
+     - `SourceEvidenceStatus = "present" | "missing"`
+     - `SourceReviewValidationStatus = "passed" | "failed"`
+     - `SourceReviewWorksheet`
+     - `SourceReviewLecture`
+     - `SourceReviewSourceEvidence`
+     - `SourceReviewPackageContext`
+   - The model should include:
+     - project name
+     - created timestamp
+     - mode
+     - validation command and status
+     - validation stdout/stderr or a concise validation summary
+     - active template path
+     - rendered route
+     - optional package path and package rendered output path
+     - metadata fields when the template parses, even if validation fails
+     - section count when available
+     - validation errors for invalid lectures
+     - primary raw source path and status
+     - additional shared raw source path and status for collection lectures
+   - Do not require valid templates to create a worksheet. Invalid templates should still produce sections that say source fidelity approval is not ready until validation passes.
+
+3. Implement worksheet preflight by reusing existing validation behavior.
+   - Add `createSourceReviewWorksheet(options?)` or equivalent in `sourceReview.ts`.
+   - Detect mode with `isCollectionMode()` so `review:source`, `validate`, the app, and `package:review` agree.
+   - In single-lecture mode:
+     - Read `content/lecture.template.md` if possible.
+     - Run `validateTemplateSource()` on its contents.
+     - Capture metadata and section count when valid.
+     - Capture validation errors when invalid.
+     - For invalid templates, parse fallback preview metadata and section titles using a shared helper derived from the existing `collection.ts` preview-template behavior so worksheets still show title/section context while clearly blocking approval.
+     - Locate `content/raw-lecture.txt`.
+     - Set rendered route to `/`.
+   - In collection mode:
+     - Use `scanLectureCollection()` for authored order.
+     - Evaluate every collection entry independently so one invalid lecture does not stop worksheet generation.
+     - For invalid collection lectures, reuse the same preview-metadata helper instead of dropping metadata entirely.
+     - Locate `lectures/<slug>/raw-lecture.txt` as primary evidence for that lecture.
+     - Locate `lectures/raw-course.txt` as additional shared evidence when present.
+     - When both primary and shared sources exist, mark per-lecture source as primary and shared source as additional context.
+     - Set collection landing route to `/` and lecture routes to `/lectures/<slug>`.
+   - Use the same output shape as `validateCollectionCli()` for aggregate validation text, but avoid a second pass that can disagree with per-lecture worksheet records if files change during the command. Prefer factoring collection validation summary rendering into a reusable helper consumed by both `validateCli.ts` and `sourceReview.ts`.
+
+4. Render source-fidelity Markdown worksheets.
+   - Add `renderSourceReviewWorksheetMarkdown(worksheet)` in `sourceReview.ts`.
+   - For single-lecture mode, include:
+     - project name
+     - review creation timestamp
+     - source mode: `single-lecture`
+     - validation command and result
+     - active template path
+     - raw source path or `missing`
+     - rendered preview route `/`
+     - latest/package path when provided by packaging
+     - title, description, audience, duration, level, and section count when available
+     - validation errors when invalid
+     - reviewer name and review date blank fields
+     - source-fidelity checklist with `[ ] Pass / [ ] Fail / [ ] Needs revision`
+     - educational quality, rendered-output inspection, notes, required revisions, and overall result fields
+   - For collection mode, include:
+     - source mode: `collection`
+     - number of lectures found
+     - aggregate validation result
+     - shared raw course source path or `missing`
+     - collection landing route `/`
+     - package path when available
+     - one section per lecture with slug, template path, primary raw source status, additional shared source status, rendered route, validation result, metadata, checklist, notes, required revisions, and overall result fields.
+   - Keep output deterministic except timestamp and optional package path so tests can assert structure.
+   - Use ASCII Markdown only.
+
+5. Add the `npm run review:source` CLI.
+   - Create `scripts/reviewSource.ts`.
+   - The command should:
+     - create `docs/review-worksheets/` if needed
+     - create `docs/review-worksheets/<timestamp>-source-fidelity-review.md`
+     - write the rendered worksheet
+     - print a short terminal summary:
+       - worksheet path
+       - mode
+       - validation passed/failed
+       - number of lectures
+       - count/list of missing raw source files
+       - reminder that human review fields still need completion
+   - The command should exit zero even when validation fails unless an IO error prevents worksheet creation. Validation failure is worksheet evidence, not a command failure for this workflow.
+   - Missing raw source files should warn but not fail.
+   - Add `"review:source": "node --import ./scripts/register-ts-loader.mjs scripts/reviewSource.ts"` to `package.json`.
+
+6. Integrate raw-source evidence into static review packages.
+   - Extend `ReviewPackagePreflight` in `src/lib/lecture-template/reviewPackage.ts` with a raw-evidence snapshot list separate from generated template `sources`.
+   - Suggested raw evidence record:
+     - `sourcePath`
+     - `packagePath`
+     - `status: "present" | "missing"`
+     - `contents` when present
+     - `role: "primary" | "shared"`
+     - optional `lectureSlug`
+   - Capture raw evidence during `runReviewPackagePreflight()` so package metadata, warnings, copied files, and `REVIEW_WORKSHEET.md` all describe the same source state.
+   - Extend `verifyReviewPackageSourceSnapshot()` or add a sibling verification helper so present raw evidence is rechecked before `runStaticBuild()`. If a present raw source changes or disappears after preflight, fail packaging with an actionable message to rerun `npm run package:review`.
+   - Extend `ReviewPackageManifest` to include raw source evidence paths/statuses without storing raw source contents in JSON.
+   - In single-lecture mode, snapshot `content/raw-lecture.txt` when it exists and write captured contents to `source/content/raw-lecture.txt`.
+   - In collection mode, snapshot each `lectures/<slug>/raw-lecture.txt` when present and write captured contents to `source/lectures/<slug>/raw-lecture.txt`.
+   - Snapshot `lectures/raw-course.txt` when present and write captured contents to `source/lectures/raw-course.txt`.
+   - Do not fail packaging when raw sources are missing.
+   - Clearly mark present and missing source evidence in `manifest.json`, `MANIFEST.md`, and the package worksheet.
+   - Add a distinct `Raw Source Evidence` section to `MANIFEST.md`; keep it separate from generated `Source Templates`.
+   - Keep existing generated template source copying unchanged:
+     - single: `source/content/lecture.template.md`
+     - collection: `source/lectures/<slug>/lecture.template.md`
+   - Do not copy unrelated repository files, inactive content, or arbitrary files under `lectures/`.
+
+7. Generate a package-level `REVIEW_WORKSHEET.md`.
+   - During `assembleReviewPackage()`, after the final package path is known but before the staging directory is renamed, create a package worksheet model from the already captured `ReviewPackagePreflight` plus manifest/package context:
+     - package path
+     - package entry HTML path
+     - per-lecture rendered output paths inside the package
+     - package source paths for raw source and template files
+   - Do not call a fresh repository-scanning `createSourceReviewWorksheet()` from package assembly. Package worksheets must reflect the preflight snapshot used for validation, static build, copied evidence, and manifest generation.
+   - Write it to `REVIEW_WORKSHEET.md` at package root.
+   - Add `REVIEW_WORKSHEET.md` to `reviewerFiles` and package `README.md`.
+   - Keep `REVIEW_CHECKLIST.md` for the existing generic checklist unless the implementation chooses to replace only duplicated source-fidelity content in docs. Do not remove it without an explicit reason.
+   - Package creation should still require generated templates to be valid, matching the current `package:review` behavior. Invalid package worksheets are generated by `npm run review:source`, not by completed packages.
+
+8. Add package summary warnings and reviewer status fields.
+   - Update `scripts/packageReview.ts` summary to print:
+     - package directory
+     - open path
+     - `REVIEW_WORKSHEET.md` path
+     - included raw source paths, if any
+     - warning with missing expected raw source paths, if any
+   - Add optional reviewer status fields to `manifest.json` only when the implementation can read a completed worksheet reliably.
+     - For P1, the lowest-risk implementation is to omit completed-review extraction unless a clearly documented worksheet status parser is added.
+     - If implemented, parse only package-local `REVIEW_WORKSHEET.md` fields with exact labels and record conservative values such as `not_started`, `needs_revision`, `failed`, or `passed`.
+   - Do not make package creation depend on reviewer status.
+
+9. Update documentation and agent instructions.
+   - Restore or add `examples/multi-lecture/lectures/01-introduction/lecture.template.md` and `examples/multi-lecture/lectures/02-core-concepts/lecture.template.md` before documenting collection source-review examples, because README and existing tests already reference this scaffold.
+   - Add raw-source example files only for paths the docs/tests use:
+     - `examples/multi-lecture/lectures/01-introduction/raw-lecture.txt`
+     - `examples/multi-lecture/lectures/02-core-concepts/raw-lecture.txt`
+     - optional `examples/multi-lecture/lectures/raw-course.txt` for the shared-source workflow.
+   - Update `README.md` with:
+     - raw source conventions for single lecture, per-lecture collection sources, and shared collection source
+     - `npm run review:source`
+     - the fact that worksheet generation runs validation but still creates output when validation fails
+     - static package source-evidence behavior and missing-source warnings
+     - example workflows for single-source, per-lecture source, and shared-source collection workflows
+   - Update `SKILL.md` with:
+     - preserve raw source files and never overwrite them with generated prose
+     - single lecture raw source path
+     - collection raw source path options
+     - validate after generation
+     - run `npm run review:source` before approval review
+     - run `npm run package:review` only for portable handoff artifacts
+   - Update any package README text generated by `reviewPackage.ts` to tell reviewers to start with `REVIEW_WORKSHEET.md`.
+
+10. Add focused automated tests.
+   - Add `tests/lecture-template/source-review.test.ts` for deterministic source-review helpers.
+   - Cover single-lecture worksheet model:
+     - valid template with present `content/raw-lecture.txt`
+     - valid template with missing raw source
+     - invalid template still creates a worksheet model with validation failure, parsed preview metadata/section context when possible, and no metadata approval
+   - Cover collection worksheet model:
+     - per-lecture raw sources present
+     - shared `lectures/raw-course.txt` present
+     - both per-lecture and shared sources present, with per-lecture primary and shared additional
+     - one invalid lecture and one valid lecture both appear in worksheet
+     - missing raw source paths are marked `missing`
+   - Cover Markdown renderer:
+     - required checklist items
+     - reviewer fields
+     - validation result
+     - routes and paths
+     - package context when provided
+   - Extend `tests/lecture-template/review-package.test.ts`:
+     - raw source files are copied when present
+     - copied raw source files come from captured preflight contents, not a later live read
+     - present raw source changes after preflight cause package verification to fail before build/assembly
+     - missing raw source files do not fail package assembly
+     - `manifest.json` and `MANIFEST.md` expose present and missing source evidence statuses
+     - `MANIFEST.md` has a separate `Raw Source Evidence` section distinct from `Source Templates`
+     - package root includes `REVIEW_WORKSHEET.md`
+     - package `README.md` and reviewer files list include `REVIEW_WORKSHEET.md`
+   - Add at least one script-level or controlled subprocess test for `scripts/reviewSource.ts`:
+     - invalid template creates a file under `docs/review-worksheets/`
+     - output says validation failed
+     - process exits `0`
+     - an IO failure that prevents worksheet creation exits nonzero
+
+11. Verification commands for implementation.
+   - Run focused tests while implementing:
+
+```bash
+npm run test -- tests/lecture-template/source-review.test.ts tests/lecture-template/review-package.test.ts
+```
+
+   - Run full local verification before completion:
+
+```bash
+npm run validate
+npm run test
+npm run typecheck
+npm run lint
+npm run review:source
+npm run package:review
+```
+
+   - Manual package checks:
+     - Inspect the generated `docs/review-worksheets/<timestamp>-source-fidelity-review.md`.
+     - Inspect package `REVIEW_WORKSHEET.md`, `manifest.json`, `MANIFEST.md`, and `source/`.
+     - Confirm missing raw sources produce warnings but do not block packaging.
+     - Confirm raw source files are present in package `source/` only when they exist in expected paths.
+
+## Data Model, API, Persistence, Event, And Domain Changes
+
+- No lecture template schema changes.
+- No new learner-facing route or component is required for P0/P1.
+- No database, hosted review portal, authentication, review comments, semantic scoring, embeddings, claim extraction, or LLM API integration.
+- Add a new local CLI command: `npm run review:source`.
+- Add local Markdown artifacts:
+  - `docs/review-worksheets/<timestamp>-source-fidelity-review.md`
+  - package-local `REVIEW_WORKSHEET.md`
+- Add source-review-specific TypeScript interfaces in `src/lib/lecture-template/sourceReview.ts` unless another module needs to share them.
+- Extend review-package manifest data to include raw source evidence paths/statuses, but do not include raw source contents in JSON.
+- Keep `npm run validate` separate from source fidelity review. Validation remains structural; source fidelity remains a human checklist workflow.
+
+## Risks, Assumptions, And Open Questions
+
+- Risk: The current review-package preflight only returns valid lectures for valid packages. Mitigation: implement worksheet preflight separately so `npm run review:source` can include invalid lectures and validation errors.
+- Risk: Validation output could diverge from worksheet per-lecture records if files are read twice. Mitigation: factor shared validation summary rendering or build the worksheet and summary from the same in-memory pass.
+- Risk: Copying raw sources into packages can expose confidential material. Mitigation: copy only expected source evidence paths when they exist, document that authors control inclusion by keeping/removing files at those paths, and never scan arbitrary raw files.
+- Risk: Live raw source files can change between package validation and package assembly. Mitigation: capture raw evidence contents during package preflight, verify present evidence before static build, and write copied evidence from captured contents.
+- Risk: Existing `reviewPackage.ts` is already broad. Mitigation: keep source-review rendering in a separate module and call it from package assembly rather than adding all worksheet logic to the package module.
+- Risk: Markdown worksheet parsing for completed reviewer status can become brittle. Mitigation: treat manifest reviewer status as optional P1 and omit it unless exact-field parsing is intentionally implemented and tested.
+- Risk: Missing raw source evidence could be overlooked because package creation still succeeds. Mitigation: print terminal warnings and mark missing evidence in worksheet, `MANIFEST.md`, and `manifest.json`.
+- Risk: Collection mode with both per-lecture and shared source can confuse reviewers. Mitigation: always label per-lecture source as primary and shared course source as additional context.
+- Assumption: `docs/review-worksheets/` should be created by the command and not pre-seeded.
+- Assumption: The package-level `REVIEW_WORKSHEET.md` is generated at packaging time from the package preflight snapshot plus package paths, not copied from the latest prior worksheet and not regenerated by rescanning live files.
+- Assumption: Package creation should continue to require valid generated templates, even though standalone worksheet creation supports invalid templates.
+- Open question: Should generated worksheet files under `docs/review-worksheets/` be committed for audit history, ignored by default, or left to project policy?
+- Open question: Should package-level `manifest.json` include a future `reviewStatus` field initialized to `not_started`, or only include reviewer status after a completed worksheet parser exists?

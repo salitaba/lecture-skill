@@ -92,6 +92,19 @@ describe("review package helpers", () => {
     });
   });
 
+  it("fails raw evidence snapshot verification when raw source changes after preflight", async () => {
+    copyFixture("examples/golden.template.md", "content/lecture.template.md");
+    writeText("content/raw-lecture.txt", "Original raw source.");
+    const preflight = await runReviewPackagePreflight();
+
+    writeText("content/raw-lecture.txt", "Changed raw source.");
+
+    await expect(verifyReviewPackageSourceSnapshot(preflight)).resolves.toEqual({
+      ok: false,
+      message: expect.stringContaining("Raw source evidence changed after validation")
+    });
+  });
+
   it("returns invalid preflight results without creating package output", async () => {
     copyFixture("examples/invalid/empty-overview.template.md", "content/lecture.template.md");
 
@@ -115,6 +128,7 @@ describe("review package helpers", () => {
 
   it("builds a stable manifest model and readable MANIFEST.md", async () => {
     copyFixture("examples/golden.template.md", "content/lecture.template.md");
+    writeText("content/raw-lecture.txt", "Raw source for review.");
     const preflight = await runReviewPackagePreflight();
 
     const manifest = createReviewPackageManifest(preflight, {
@@ -149,7 +163,42 @@ describe("review package helpers", () => {
     expect(markdown).toContain("Lectures: 1");
     expect(markdown).toContain("Entry file: index.html");
     expect(markdown).toContain("Source: content/lecture.template.md");
+    expect(markdown).toContain("## Raw Source Evidence");
+    expect(markdown).toContain("content/raw-lecture.txt: present -> source/content/raw-lecture.txt");
     expect(markdown).toContain("Package path: review-packages/2026-07-04-0130-lecture-site");
+  });
+
+  it("marks missing raw source evidence in package manifests without failing assembly", async () => {
+    copyFixture("examples/golden.template.md", "content/lecture.template.md");
+    const preflight = await runReviewPackagePreflight();
+    writeText("out/index.html", '<a href="/">Home</a>');
+
+    const result = await assembleReviewPackage(preflight, {
+      exportedOutDir: path.join(tempRoot, "out"),
+      packagesRoot: path.join(tempRoot, "review-packages"),
+      createdAt: new Date(2026, 6, 4, 1, 30),
+      runtimeMetadata: {
+        gitCommit: "unavailable",
+        gitDirtyStatus: "unavailable",
+        npmVersion: "unavailable"
+      }
+    });
+
+    const manifest = JSON.parse(readFileSync(path.join(result.packageDir, "manifest.json"), "utf8"));
+    const manifestMarkdown = readFileSync(path.join(result.packageDir, "MANIFEST.md"), "utf8");
+    const worksheet = readFileSync(path.join(result.packageDir, "REVIEW_WORKSHEET.md"), "utf8");
+
+    expect(manifest.rawEvidence).toEqual([
+      {
+        sourcePath: "content/raw-lecture.txt",
+        packagePath: "source/content/raw-lecture.txt",
+        status: "missing",
+        role: "primary"
+      }
+    ]);
+    expect(manifestMarkdown).toContain("content/raw-lecture.txt: missing (primary)");
+    expect(worksheet).toContain("Primary raw source: content/raw-lecture.txt (missing)");
+    expect(pathExists(path.join(result.packageDir, "source/content/raw-lecture.txt"))).toBe(false);
   });
 
   it("rewrites root exported HTML for direct file opening", () => {
@@ -204,7 +253,9 @@ describe("review package helpers", () => {
 
   it("assembles a package from exported output and captured sources", async () => {
     copyFixture("examples/golden.template.md", "content/lecture.template.md");
+    writeText("content/raw-lecture.txt", "Captured raw source.");
     const preflight = await runReviewPackagePreflight();
+    writeText("content/raw-lecture.txt", "Changed after preflight but before assembly.");
     writeText("out/index.html", '<a href="/lectures/01-introduction/">Lecture</a><script src="/_next/static/main.js"></script>');
     writeText("out/_next/static/main.js", "console.log('ok');");
 
@@ -224,10 +275,58 @@ describe("review package helpers", () => {
     expect(readFileSync(path.join(result.packageDir, "source/content/lecture.template.md"), "utf8")).toBe(
       readFileSync(path.join(tempRoot, "content/lecture.template.md"), "utf8")
     );
+    expect(readFileSync(path.join(result.packageDir, "source/content/raw-lecture.txt"), "utf8")).toBe("Captured raw source.");
     expect(pathExists(path.join(result.packageDir, "manifest.json"))).toBe(true);
     expect(pathExists(path.join(result.packageDir, "MANIFEST.md"))).toBe(true);
     expect(pathExists(path.join(result.packageDir, "README.md"))).toBe(true);
+    expect(pathExists(path.join(result.packageDir, "REVIEW_WORKSHEET.md"))).toBe(true);
     expect(pathExists(path.join(result.packageDir, "REVIEW_CHECKLIST.md"))).toBe(true);
+    expect(readFileSync(path.join(result.packageDir, "README.md"), "utf8")).toContain("REVIEW_WORKSHEET.md");
+    expect(result.manifest.contents.reviewerFiles).toContain("REVIEW_WORKSHEET.md");
+  });
+
+  it("packages collection raw evidence only from expected paths", async () => {
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+    copyFixture(
+      "examples/multi-lecture/lectures/02-core-concepts/lecture.template.md",
+      "lectures/02-core-concepts/lecture.template.md"
+    );
+    writeText("lectures/01-introduction/raw-lecture.txt", "Introduction raw source.");
+    writeText("lectures/02-core-concepts/raw-lecture.txt", "Core concepts raw source.");
+    writeText("lectures/raw-course.txt", "Shared raw source.");
+    writeText("lectures/notes/raw-lecture.txt", "Unrelated raw source.");
+    const preflight = await runReviewPackagePreflight();
+    writeText("out/index.html", '<a href="/lectures/01-introduction/">Lecture</a>');
+    writeText("out/lectures/01-introduction/index.html", '<a href="/">Home</a>');
+    writeText("out/lectures/02-core-concepts/index.html", '<a href="/">Home</a>');
+
+    const result = await assembleReviewPackage(preflight, {
+      exportedOutDir: path.join(tempRoot, "out"),
+      packagesRoot: path.join(tempRoot, "review-packages"),
+      createdAt: new Date(2026, 6, 4, 1, 30),
+      runtimeMetadata: {
+        gitCommit: "unavailable",
+        gitDirtyStatus: "unavailable",
+        npmVersion: "unavailable"
+      }
+    });
+
+    expect(readFileSync(path.join(result.packageDir, "source/lectures/01-introduction/raw-lecture.txt"), "utf8")).toBe(
+      "Introduction raw source."
+    );
+    expect(readFileSync(path.join(result.packageDir, "source/lectures/02-core-concepts/raw-lecture.txt"), "utf8")).toBe(
+      "Core concepts raw source."
+    );
+    expect(readFileSync(path.join(result.packageDir, "source/lectures/raw-course.txt"), "utf8")).toBe("Shared raw source.");
+    expect(pathExists(path.join(result.packageDir, "source/lectures/notes/raw-lecture.txt"))).toBe(false);
+    expect(result.manifest.rawEvidence.map((source) => source.sourcePath)).toEqual([
+      "lectures/raw-course.txt",
+      "lectures/01-introduction/raw-lecture.txt",
+      "lectures/02-core-concepts/raw-lecture.txt"
+    ]);
   });
 });
 

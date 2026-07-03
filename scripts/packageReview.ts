@@ -45,6 +45,26 @@ async function main() {
     process.stdout.write("\nReview package created.\n");
     process.stdout.write(`Package directory: ${result.packageDir}\n`);
     process.stdout.write(`Open: ${result.entryHtmlPath}\n`);
+    process.stdout.write(`Source fidelity worksheet: ${path.join(result.packageDir, "REVIEW_WORKSHEET.md")}\n`);
+
+    const includedRawSources = result.manifest.rawEvidence.filter((source) => source.status === "present");
+    const missingPrimarySources = result.manifest.rawEvidence.filter((source) => source.status === "missing" && source.role === "primary");
+
+    if (includedRawSources.length > 0) {
+      process.stdout.write("Included raw source evidence:\n");
+      for (const source of includedRawSources) {
+        process.stdout.write(`- ${source.sourcePath} -> ${source.packagePath}\n`);
+      }
+    } else {
+      process.stdout.write("Included raw source evidence: none\n");
+    }
+
+    if (missingPrimarySources.length > 0) {
+      process.stdout.write("Missing raw source evidence:\n");
+      for (const source of missingPrimarySources) {
+        process.stdout.write(`- ${source.sourcePath}\n`);
+      }
+    }
   } catch (error) {
     process.stderr.write(`Review package failed: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

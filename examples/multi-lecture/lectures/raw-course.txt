@@ -1,0 +1,3 @@
+Shared course source:
+
+This short course teaches technical educators how to structure a local multi-lecture collection. The course should keep authored order visible, validate every lecture independently, and preserve clear navigation from the landing page into each lecture and back again.

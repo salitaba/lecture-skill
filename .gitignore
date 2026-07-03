@@ -5,6 +5,9 @@ dist/
 *.tsbuildinfo
 npm-debug.log*
 lectures/
+!examples/multi-lecture/lectures/
+!examples/multi-lecture/lectures/**/
+!examples/multi-lecture/lectures/**
 out/
 .next-review/
 review-packages/

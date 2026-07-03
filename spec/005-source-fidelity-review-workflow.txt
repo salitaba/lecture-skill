@@ -1,0 +1,337 @@
+Feature: Source Fidelity Review Workflow
+
+## Product Summary
+
+Add a first-class source fidelity review workflow to the Lecture Site Engine so technical educators and reviewers can compare generated lecture output against the raw source material without reconstructing context manually.
+
+The product already supports local lecture generation, validation, multi-lecture collections, improved reading UX, and static review packages. Those features answer "can we render and hand off a valid lecture?" The next product gap is "can a reviewer confidently verify that the lecture stayed faithful to the source?"
+
+The primary product outcome is: after an AI agent or educator creates a single lecture or collection, the project can produce a structured review worksheet that records the raw source path, generated template metadata, validation result, rendered output path, checklist status fields, and reviewer notes. When a static review package is created, the package should optionally include the relevant raw source files and the review worksheet so a reviewer has the evidence needed to judge source fidelity.
+
+This feature does not automate semantic fact-checking and does not add an LLM integration. It creates the product workflow, artifacts, and package support needed for humans and AI-assisted reviewers to perform source-grounded review consistently.
+
+The primary user remains a technical educator using a local repository and AI coding agent. The secondary user is a subject-matter reviewer who needs to confirm that generated lecture content preserves the original lecture's claims, examples, caveats, and practical steps.
+
+## Problem
+
+The current project has a good schema validator and a human MVP checklist, but source fidelity review is still too manual.
+
+Today a reviewer must piece together:
+
+- Which raw source file was used.
+- Which generated template or collection lectures came from that source.
+- Whether validation passed at the time of review.
+- Which rendered output path should be inspected.
+- Which checklist items were reviewed and by whom.
+- Whether the static review package contains enough source evidence to verify claims.
+
+This creates product risk because a generated lecture can be structurally valid but still be educationally wrong. The validator can catch missing headings, invalid components, and malformed frontmatter. It cannot catch unsupported claims, omitted caveats, changed meaning, or examples invented by the AI agent.
+
+The existing `docs/mvp-review-checklist.md` is useful but generic. It does not bind a review session to specific source paths, generated templates, rendered pages, package paths, validation output, reviewer identity, or per-lecture status. In multi-lecture mode, this gap becomes larger because each lecture may need its own source evidence and review decision.
+
+## Goals
+
+- Make raw lecture source files a first-class part of the review workflow.
+- Define predictable raw source locations for single-lecture and multi-lecture modes.
+- Add a command or workflow that generates a source fidelity review worksheet for the active single lecture or collection.
+- Record validation status and generated lecture metadata in the worksheet.
+- Give reviewers concrete pass/fail fields for source fidelity, lecture quality, and rendered-output inspection.
+- Support per-lecture review status in collection mode.
+- Integrate source evidence and review worksheets into static review packages when source files are available.
+- Preserve the current local-first authoring workflow.
+- Keep the feature compatible with AI-agent-assisted generation without adding an in-app AI service.
+
+## Priority
+
+P0 requirements:
+
+- Document raw source conventions for single-lecture and collection workflows.
+- Generate a review worksheet for the active single lecture or collection.
+- Include validation status, template path, source path, rendered route or package output path, and lecture metadata in the worksheet.
+- Include concrete pass/fail source fidelity checklist items.
+- Support per-lecture worksheet sections in collection mode.
+- Update `SKILL.md` and README so AI agents know when and how to create or preserve raw source files for review.
+- Include source files and the generated worksheet in static review packages when source files exist.
+
+P1 requirements:
+
+- Add a short terminal summary that tells the author which worksheet was created and which items still need human review.
+- Add a package-level `REVIEW_WORKSHEET.md` index that links each lecture to its source, template, and rendered page.
+- Add optional reviewer status fields to `manifest.json` when a completed worksheet exists.
+- Add examples for single-source, per-lecture source, and shared-source collection workflows.
+
+P2 requirements:
+
+- Browser review mode that shows rendered lecture content and raw source evidence side by side.
+- Optional excerpt anchors from generated sections back to raw source notes.
+- Optional source coverage hints generated by a future AI-assisted workflow.
+- Reviewer sign-off metadata with names, dates, and final approval state.
+
+## Non-Goals
+
+- No automatic factual accuracy scoring.
+- No in-app LLM API integration.
+- No claim extraction, semantic search, embeddings, or model-based comparison in this feature.
+- No browser-based lecture editor.
+- No database, authentication, multi-user review comments, or hosted review portal.
+- No requirement that every local draft include raw source files.
+- No blocking change to `npm run validate`; schema validation should remain separate from source fidelity review.
+- No requirement to include confidential raw source in a review package unless the author explicitly keeps the source files in the expected source paths.
+
+## Design Principles
+
+- Review confidence is the product outcome. The workflow should help reviewers make a decision, not pretend to automate judgment it cannot support.
+- Source evidence should travel with handoff artifacts when the author chooses to include it.
+- Schema validity and source fidelity are separate checks. A lecture can pass validation and still fail review.
+- The workflow should be explicit and auditable: source path, template path, validation result, reviewer, date, and decision should be visible.
+- Collection review should scale per lecture without forcing reviewers to read the entire course at once.
+- The feature should be easy for an AI agent to follow deterministically.
+
+## Recommended Experience Direction
+
+### Raw Source Conventions
+
+Keep the existing single-lecture source convention:
+
+```text
+content/raw-lecture.txt
+content/lecture.template.md
+```
+
+For collection mode, support one raw source file per lecture:
+
+```text
+lectures/
+  01-introduction/
+    raw-lecture.txt
+    lecture.template.md
+  02-core-concepts/
+    raw-lecture.txt
+    lecture.template.md
+```
+
+Also support a shared collection source file for cases where the AI agent split one long source into multiple lectures:
+
+```text
+lectures/
+  raw-course.txt
+  01-introduction/
+    lecture.template.md
+  02-core-concepts/
+    lecture.template.md
+```
+
+When both per-lecture and shared collection sources exist, the per-lecture source should be treated as the primary review source for that lecture and the shared source should be listed as additional context.
+
+Raw source files are review evidence, not render inputs. The app should not display them in the learner-facing lecture page by default.
+
+### Review Worksheet Command
+
+Add a documented command such as:
+
+```bash
+npm run review:source
+```
+
+The command should detect single-lecture or collection mode using the same rules as the app and validation command.
+
+The command should:
+
+1. Run validation for the active lecture or collection.
+2. Parse generated template metadata.
+3. Locate expected raw source files.
+4. Create a timestamped worksheet under `docs/review-worksheets/`.
+5. Print the worksheet path and validation summary.
+
+Recommended worksheet path:
+
+```text
+docs/review-worksheets/<timestamp>-source-fidelity-review.md
+```
+
+The command should create a worksheet even when validation fails, because a failed validation state is still useful review evidence. The worksheet must clearly mark invalid lectures as not ready for source fidelity approval.
+
+### Single-Lecture Worksheet Contents
+
+For single-lecture mode, the worksheet should include:
+
+- Project name.
+- Review creation timestamp.
+- Source mode: `single-lecture`.
+- Validation command and result.
+- Active template path: `content/lecture.template.md`.
+- Raw source path: `content/raw-lecture.txt`, or `missing`.
+- Rendered preview route: `/`.
+- Latest review package path, if the worksheet was created as part of packaging.
+- Lecture title, description, audience, duration, level, and section count.
+- Reviewer name and review date fields.
+- Pass/fail checklist items.
+- Notes fields for source fidelity concerns, educational quality concerns, and required revisions.
+- Overall result: pass, fail, or needs revision.
+
+### Collection Worksheet Contents
+
+For collection mode, the worksheet should include a collection summary followed by one review section per lecture.
+
+Collection summary:
+
+- Source mode: `collection`.
+- Number of lectures found.
+- Validation command and aggregate result.
+- Shared raw course source path, if present.
+- Collection landing route: `/`.
+- Package path, if available.
+
+Per-lecture section:
+
+- Lecture slug.
+- Template path.
+- Primary raw source path, or `missing`.
+- Additional shared source path, if present.
+- Rendered route.
+- Validation result.
+- Title, description, audience, duration, level, and section count.
+- Reviewer pass/fail fields.
+- Notes and required revisions.
+
+One invalid lecture should not prevent worksheet generation for the rest of the collection.
+
+### Source Fidelity Checklist
+
+The worksheet should include concrete pass/fail items such as:
+
+- Every major claim in the generated lecture is supported by the listed raw source.
+- Important examples from the source are preserved unless omitted for clear concision.
+- Important caveats, limitations, warnings, or uncertainties are preserved.
+- The generated lecture does not add unsupported tools, statistics, promises, references, or implementation details.
+- Rewording and reordering do not change the source meaning.
+- Learning objectives are supported by the source and reflected in the lecture sections.
+- Components clarify source material and do not introduce unsupported concepts.
+- Key takeaways recap source-grounded practical lessons.
+- The rendered page matches the generated template metadata and section order.
+
+The checklist should use explicit status fields such as:
+
+```text
+[ ] Pass / [ ] Fail / [ ] Needs revision
+```
+
+### Static Review Package Integration
+
+Enhance `npm run package:review` so review packages can include source fidelity evidence when available.
+
+Recommended package additions:
+
+```text
+review-packages/<timestamp>-lecture-site/
+  REVIEW_WORKSHEET.md
+  source/
+    content/raw-lecture.txt
+    content/lecture.template.md
+    lectures/<slug>/raw-lecture.txt
+    lectures/<slug>/lecture.template.md
+```
+
+In single-lecture mode:
+
+- Include `content/raw-lecture.txt` when it exists.
+- Mark raw source as `missing` in manifests and worksheets when it does not exist.
+
+In collection mode:
+
+- Include each `lectures/<slug>/raw-lecture.txt` when it exists.
+- Include `lectures/raw-course.txt` when it exists.
+- Do not fail packaging solely because raw source files are missing.
+- Clearly mark missing source evidence in `MANIFEST.md`, `manifest.json`, and `REVIEW_WORKSHEET.md`.
+
+The package should warn when source files are missing because reviewers cannot complete source fidelity approval from the package alone.
+
+### Documentation And AI-Agent Workflow
+
+Update README and `SKILL.md` with a short review workflow:
+
+1. Place raw source in `content/raw-lecture.txt` for a single lecture or in the relevant collection source paths.
+2. Ask the AI agent to create or update the lecture templates from those sources.
+3. Run `npm run validate`.
+4. Run `npm run review:source`.
+5. Complete the generated worksheet before approving the lecture.
+6. Run `npm run package:review` when a portable handoff artifact is needed.
+
+The skill should instruct AI agents to preserve raw source files and not overwrite them with generated prose.
+
+## Success Metrics / Quality Gates
+
+- A reviewer can identify the raw source, generated template, rendered route, validation result, and review status for a single lecture from one worksheet.
+- In collection mode, a reviewer can complete source fidelity review one lecture at a time from the generated worksheet.
+- A static review package contains enough source evidence and worksheet structure for a reviewer to evaluate source fidelity without cloning the full repository, when source files exist.
+- Missing raw source files are visible and cannot be mistaken for approved source fidelity.
+- The workflow does not block normal schema validation or local preview.
+- An AI agent can follow `SKILL.md` to preserve raw source files, generate valid templates, run validation, and create a source fidelity worksheet.
+
+## Functional Requirements
+
+- Add a documented source fidelity review workflow.
+- Add a command such as `npm run review:source`.
+- The command must detect single-lecture and collection modes.
+- The command must run validation and record the result.
+- The command must generate a Markdown worksheet under `docs/review-worksheets/`.
+- The worksheet must include source paths, template paths, rendered routes, validation status, lecture metadata, and review fields.
+- The worksheet must support one section per lecture in collection mode.
+- The command must exit successfully when it creates a worksheet, even if validation fails, but the worksheet must clearly mark invalid lectures as not approval-ready.
+- The command must report missing raw source files clearly.
+- Static review packages must include raw source files when present.
+- Static review packages must include a review worksheet or link-equivalent review artifact.
+- Manifests must record whether raw source evidence was included, missing, or unavailable.
+- README and `SKILL.md` must document the workflow.
+
+## Accessibility Requirements
+
+- Markdown worksheets must be readable in plain text and rendered Markdown viewers.
+- Package review artifacts must use clear headings and tables that remain understandable without color.
+- Any future browser review mode must be keyboard accessible and must not rely on color alone for review status.
+
+## Privacy And Safety Requirements
+
+- Raw source files may contain private teaching material, transcripts, or proprietary notes.
+- Packaging must make it visible when raw source files are included.
+- Documentation must warn authors to remove confidential raw source files before creating a package if the reviewer should not receive them.
+- The workflow must not upload raw source material to external services.
+- The command must not call network services.
+
+## Acceptance Criteria
+
+- `npm run review:source` or the chosen equivalent creates a source fidelity worksheet for a valid single lecture.
+- The worksheet records `content/raw-lecture.txt` as the raw source when it exists.
+- The worksheet marks the raw source as missing when `content/raw-lecture.txt` does not exist.
+- The worksheet records validation result, template path, rendered route, title, audience, duration, level, and section count.
+- In collection mode, the worksheet includes one review section per lecture.
+- In collection mode, per-lecture `raw-lecture.txt` files are associated with the matching lecture.
+- In collection mode, `lectures/raw-course.txt` is recorded as shared source context when present.
+- Invalid lectures still appear in the worksheet with validation failure status and are marked not approval-ready.
+- `npm run package:review` includes available raw source files in the package source directory.
+- `npm run package:review` includes a review worksheet or package-level equivalent.
+- `manifest.json` and `MANIFEST.md` record raw source inclusion status.
+- README documents raw source conventions and review commands.
+- `SKILL.md` tells AI agents to preserve raw sources, generate templates from them, run validation, and create a review worksheet when review is requested.
+- Existing validation, rendering, collection, and package tests still pass.
+
+## Suggested Verification
+
+- Run `npm run review:source` with `content/raw-lecture.txt` present and confirm the worksheet records it.
+- Temporarily move `content/raw-lecture.txt`, run the command, and confirm the worksheet marks raw source as missing.
+- Run the command in collection mode with per-lecture raw source files and confirm each lecture maps to the correct source.
+- Run the command in collection mode with only `lectures/raw-course.txt` and confirm it is listed as shared source context.
+- Run the command with one invalid lecture and confirm the worksheet is created while marking that lecture not approval-ready.
+- Run `npm run package:review` and confirm available raw source files and the review worksheet are included.
+- Inspect `manifest.json` and `MANIFEST.md` for raw source inclusion status.
+- Run `npm run validate`, `npm run test`, `npm run typecheck`, and `npm run lint`.
+
+## Implementation Notes
+
+- Reuse existing collection detection, template parsing, validation, and package manifest code where possible.
+- Keep the worksheet generator as a CLI script rather than a route-level feature for P0.
+- Store generated worksheets under `docs/review-worksheets/` so they are easy to find and can be committed when useful.
+- Avoid making source fidelity review part of `npm run validate`; authors should be able to validate drafts before source evidence is ready.
+- Use stable Markdown headings so future tooling can parse completed worksheets if needed.
+- Treat missing raw source as a review warning, not a validation failure.
+- Keep raw source inclusion in packages explicit in terminal output and manifests.

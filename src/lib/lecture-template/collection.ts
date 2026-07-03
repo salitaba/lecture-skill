@@ -96,7 +96,7 @@ async function collectLectureEntries(logSkippedDirectories: boolean): Promise<Le
   }
 }
 
-function buildLecturePreviewTemplate(parsed: ReturnType<typeof parseLectureTemplate>): LectureTemplate {
+export function buildLecturePreviewTemplate(parsed: ReturnType<typeof parseLectureTemplate>): LectureTemplate {
   return {
     metadata: {
       title: stringValue(parsed.frontmatter.value.title),

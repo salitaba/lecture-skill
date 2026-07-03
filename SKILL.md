@@ -7,6 +7,7 @@ Use this skill to convert one raw lecture source into `content/lecture.template.
 - Read one raw lecture source.
 - For the MVP golden workflow, use `examples/raw-lecture.txt` as the only raw source.
 - For a user's own lecture, prefer `content/raw-lecture.txt`.
+- Preserve raw source files as review evidence. Never overwrite a raw source file with generated lecture prose.
 - Do not read `examples/golden.template.md` while generating the golden template.
 
 ## Output
@@ -55,9 +56,11 @@ For a collection:
 
 1. Read the course outline or multi-lecture source.
 2. Create one numbered subdirectory per lecture under `lectures/`.
-3. Write a valid `lecture.template.md` in each subdirectory using the same schema as the single-lecture workflow.
-4. Run `npm run validate` to validate the whole collection.
-5. Revise the lectures until every entry passes validation.
+3. Preserve source evidence as `lectures/<slug>/raw-lecture.txt` for each lecture when per-lecture source is available.
+4. Preserve a shared source as `lectures/raw-course.txt` when one course source is split into multiple lectures.
+5. Write a valid `lecture.template.md` in each subdirectory using the same schema as the single-lecture workflow.
+6. Run `npm run validate` to validate the whole collection.
+7. Revise the lectures until every entry passes validation.
 
 Use `examples/multi-lecture/` as a reference collection scaffold. Keep the single-lecture workflow above intact for repos that do not have `lectures/`.
 
@@ -71,8 +74,21 @@ Use `examples/multi-lecture/` as a reference collection scaffold. Keep the singl
 6. Use visual components only when they improve comprehension.
 7. Keep every component inside a `## Section: <section title>` block.
 8. Run `npm run validate`.
-9. Revise `content/lecture.template.md` until validation passes.
-10. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
+9. Revise `content/lecture.template.md` or collection templates until validation passes.
+10. Run `npm run review:source` before approval review so the reviewer has source paths, validation status, rendered routes, and checklist fields.
+11. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
+
+## Source Fidelity Review
+
+Raw sources are review evidence, not learner-facing render inputs.
+
+- Single lecture raw source: `content/raw-lecture.txt`.
+- Single lecture generated template: `content/lecture.template.md`.
+- Collection per-lecture raw source: `lectures/<slug>/raw-lecture.txt`.
+- Collection shared raw source: `lectures/raw-course.txt`.
+- When both per-lecture and shared sources exist, treat per-lecture source as primary and shared source as additional context.
+
+Run `npm run review:source` after validation work. The command creates `docs/review-worksheets/<timestamp>-source-fidelity-review.md` even when validation fails, because invalid state is useful review evidence. Missing raw source files should be reported, but they are not schema validation failures.
 
 ## Review Package Handoff
 
@@ -81,10 +97,12 @@ Create a static review package only when the user asks for a handoff artifact or
 1. Create or update the single lecture template or collection templates.
 2. Run `npm run validate`.
 3. Revise templates until validation passes.
-4. Run `npm run package:review`.
-5. Report the generated `review-packages/<timestamp>-lecture-site/` path.
+4. Run `npm run review:source` if the reviewer needs source fidelity evidence before handoff.
+5. Run `npm run package:review`.
+6. Report the generated `review-packages/<timestamp>-lecture-site/` path.
 
 Packaging validates before export. Invalid single lectures or invalid collection lectures must be fixed before a completed package is created.
+Use `npm run package:review` only for portable handoff artifacts. The package includes `REVIEW_WORKSHEET.md` and any raw source files present at the expected evidence paths.
 
 ## Supported Components
 
