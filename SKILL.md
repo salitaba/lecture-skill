@@ -74,6 +74,18 @@ Use `examples/multi-lecture/` as a reference collection scaffold. Keep the singl
 9. Revise `content/lecture.template.md` until validation passes.
 10. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
 
+## Review Package Handoff
+
+Create a static review package only when the user asks for a handoff artifact or the workflow explicitly calls for one. Do not export automatically after every lecture generation.
+
+1. Create or update the single lecture template or collection templates.
+2. Run `npm run validate`.
+3. Revise templates until validation passes.
+4. Run `npm run package:review`.
+5. Report the generated `review-packages/<timestamp>-lecture-site/` path.
+
+Packaging validates before export. Invalid single lectures or invalid collection lectures must be fixed before a completed package is created.
+
 ## Supported Components
 
 Use only these component types.

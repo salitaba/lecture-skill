@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "validate": "node --import ./scripts/register-ts-loader.mjs scripts/validate.ts"
+    "validate": "node --import ./scripts/register-ts-loader.mjs scripts/validate.ts",
+    "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts"
   },
   "dependencies": {
     "next": "16.2.10",

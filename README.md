@@ -29,6 +29,14 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+Create a portable static review package when you are ready to hand off a validated lecture or collection:
+
+```bash
+npm run package:review
+```
+
+The package command is an explicit handoff step, not part of the normal edit loop.
+
 ## Files
 
 - `content/lecture.template.md`: the fallback single-lecture render input.
@@ -40,6 +48,7 @@ Open `http://localhost:3000`.
 - `examples/multi-lecture/`: example collection scaffold for multi-lecture mode.
 - `docs/mvp-review-checklist.md`: human pass/fail review checklist.
 - `docs/golden-conversion-batch.md`: launch-decision record for the three-run golden conversion batch.
+- `review-packages/`: generated static review packages, ignored by git.
 
 ## Multi-Lecture Collections
 
@@ -61,6 +70,25 @@ In collection mode:
 - `npm run validate` validates every `lectures/*/lecture.template.md` file and reports per-lecture status.
 
 Collection mode takes precedence over `content/lecture.template.md` whenever `lectures/` exists. If `lectures/` is absent or empty, the app falls back to the single-lecture workflow and continues to render `content/lecture.template.md` exactly as before.
+
+## Static Review Packages
+
+Run `npm run package:review` after `npm run validate` passes and you want to send the rendered lecture experience to a reviewer.
+
+The command:
+
+- Detects single-lecture mode or collection mode using the same rules as the app.
+- Validates first and exits nonzero if the active single lecture or any collection lecture is invalid.
+- Builds a static export and writes a timestamped folder under `review-packages/<timestamp>-lecture-site/`.
+- Copies rendered HTML/assets, active source templates, `manifest.json`, `MANIFEST.md`, package `README.md`, and `REVIEW_CHECKLIST.md`.
+
+In single-lecture mode, the active source is `content/lecture.template.md` and it is copied to `source/content/lecture.template.md` inside the package.
+
+In collection mode, only active `lectures/<slug>/lecture.template.md` files are copied under `source/lectures/<slug>/lecture.template.md`. The inactive `content/lecture.template.md` file is not copied as an active source.
+
+The generated package is designed to open directly from the filesystem. Send reviewers the generated package folder. Optional zip packaging is not implemented yet.
+
+The command owns Next's generated `out/` directory for the current run. If `out/` already exists before packaging starts, the command stops and asks you to move or remove it rather than overwriting a user-owned export.
 
 ## Template Schema
 
@@ -209,6 +237,7 @@ steps:
 5. Fix validation errors until the command passes.
 6. Run `npm run dev` and preview `http://localhost:3000`.
 7. Review the result with `docs/mvp-review-checklist.md`.
+8. When a handoff artifact is requested, run `npm run package:review` and send the generated `review-packages/<timestamp>-lecture-site/` folder to reviewers.
 
 For the golden MVP workflow, use `examples/raw-lecture.txt` as the only raw source. Before giving the prompt to the agent, make `examples/golden.template.md` inaccessible and remove or replace `content/lecture.template.md` with a minimal non-golden placeholder if it contains the shipping demo answer. The agent-accessible workspace must not expose the golden answer until after generation and validation are complete. Record the batch in `docs/golden-conversion-batch.md`.
 

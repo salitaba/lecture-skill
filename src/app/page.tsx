@@ -6,8 +6,6 @@ import { isCollectionMode, validateCollection } from "@/lib/lecture-template/col
 import { ACTIVE_TEMPLATE_PATH, readActiveTemplate } from "@/lib/lecture-template/readTemplate";
 import { validateTemplateSource } from "@/lib/lecture-template/validateTemplate";
 
-export const dynamic = "force-dynamic";
-
 export default async function Home() {
   if (await isCollectionMode()) {
     const validation = await validateCollection();

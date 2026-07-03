@@ -1,0 +1,259 @@
+Implementation Plan: Static Review Package
+==========================================
+
+Spec: spec/004-static-review-package.txt
+Plan status: finalized after tech-lead review
+
+## Brief Summary
+
+Add a local static review-package workflow for the Lecture Site Engine. The new `npm run package:review` command validates the active single lecture or lecture collection, creates a timestamped directory under `review-packages/`, copies static rendered pages and assets, includes source templates, and writes both `manifest.json` and `MANIFEST.md`.
+
+Normal authoring must remain unchanged: `npm run validate` and `npm run dev` continue to read templates from the repository and render the local preview. Packaging is an explicit handoff step. It should produce a browser-openable artifact that works offline and does not require Node.js, project dependencies, a local static server, or a running Next.js dev server for review.
+
+Current Next.js static export documentation for the repository's installed Next version family confirms that `output: "export"` makes `next build` produce static HTML/CSS/JS in an `out` directory, and App Router dynamic routes must be enumerated with `generateStaticParams` for static prerendering. This feature should use a temporary static-export build mode rather than a custom lecture renderer, but the current routes must be made export-compatible.
+
+## Relevant Existing Files
+
+- `package.json`: currently has `dev`, `build`, `lint`, `test`, `typecheck`, and `validate`; add `package:review`.
+- `next.config.ts`: currently empty; add an environment-gated static export configuration so normal dev/build behavior stays unchanged.
+- `.gitignore`: currently ignores `node_modules/`, `.next/`, `coverage/`, `dist/`, `*.tsbuildinfo`, `npm-debug.log*`, and `lectures/`; add `out/`, `review-packages/`, and any export-specific build directory such as `.next-review/`.
+- `scripts/register-ts-loader.mjs`: existing TypeScript loader used by scripts; reuse for the packaging script.
+- `scripts/validate.ts`: detects collection mode and delegates to single-template or collection validation.
+- `src/lib/lecture-template/validateCli.ts`: exposes `validateTemplateFile`, `validateCollectionCli`, and `formatError`; reuse formatting so validation failures stay author-locatable.
+- `src/lib/lecture-template/readTemplate.ts`: defines `ACTIVE_TEMPLATE_PATH`, `LECTURES_DIR`, `repositoryPath`, `readActiveTemplate`, and `readLectureEntry`.
+- `src/lib/lecture-template/collection.ts`: detects collection mode, scans `lectures/NN-slug/lecture.template.md`, reads entries, and validates all lectures.
+- `src/lib/lecture-template/types.ts`: has `LectureTemplate`, `LectureCollectionEntry`, `LectureValidationResult`, and `CollectionValidationResult`; add package manifest types here or in a dedicated package module.
+- `src/app/page.tsx`: root route currently reads active content, detects collection mode, and exports `dynamic = "force-dynamic"`.
+- `src/app/lectures/[slug]/page.tsx`: per-lecture route currently reads collection entries, validates a lecture, builds previous/next navigation, and exports `dynamic = "force-dynamic"`.
+- `src/components/lecture-kit/LecturePage.tsx`: reusable rendered lecture page.
+- `src/components/lecture-kit/CollectionLanding.tsx`: collection landing page; current links use absolute `/lectures/<slug>` hrefs.
+- `src/components/lecture-kit/LectureNavigation.tsx`: next/previous/back-to-course navigation; current links are absolute app routes.
+- `README.md`: document the author-facing export command and package contents.
+- `SKILL.md`: document the AI-agent handoff workflow.
+- `docs/mvp-review-checklist.md`: candidate source for a P1 `REVIEW_CHECKLIST.md` copied into packages.
+- `tests/lecture-template/collection.test.ts`: current collection scanning and validation tests.
+- `tests/lecture-template/validate-collection-cli.test.ts`: current collection CLI output tests.
+- `tests/lecture-template/validate-cli.test.ts`: current single-template CLI output tests.
+
+## Proposed Implementation Steps
+
+1. Add a review-package module and CLI entrypoint.
+   - Create `src/lib/lecture-template/reviewPackage.ts` for package preflight, manifest creation, source selection, HTML rewrite helpers, and file assembly helpers.
+   - Create `scripts/packageReview.ts` as the CLI entrypoint.
+   - Keep route components focused on rendering the lecture experience.
+   - Use Node built-ins for P0 packaging; do not add a dependency unless optional zip generation is implemented later.
+
+2. Add `npm run package:review`.
+   - Update `package.json` with:
+     - `package:review`: `node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts`
+   - The command should:
+     - Detect collection mode with `isCollectionMode()`.
+     - Run a package preflight that validates and captures exact source contents.
+     - Exit nonzero and print validation output when invalid.
+     - Build static output only after validation passes.
+     - Create a timestamped directory such as `review-packages/2026-07-04-0130-lecture-site/`.
+     - Print a concise success summary with the package directory and entry HTML path.
+
+3. Implement one atomic `runReviewPackagePreflight()` result.
+   - The preflight result should contain:
+     - mode: `single-lecture` or `collection`
+     - validation command label and validation CLI output
+     - validation status
+     - lecture count
+     - exported route plan
+     - validated lecture metadata
+     - exact validated template source contents for each active lecture
+     - source template paths
+   - In single-lecture mode, read and validate `content/lecture.template.md`.
+   - In collection mode, scan and validate every active `lectures/<slug>/lecture.template.md`.
+   - Do not re-read templates later for source copying or manifest generation. Copy source files from the exact contents captured during successful preflight so validation, manifest metadata, copied sources, and rendered routes cannot silently diverge if files change during packaging.
+   - The static build still reads from the active filesystem templates. If a template changes between preflight and build, fail the package by comparing current file contents with the captured preflight contents immediately before `next build`.
+   - Do not include raw lecture prose in the manifest; raw prose appears only in copied source template files.
+
+4. Add environment-gated static export configuration with explicit output ownership.
+   - Update `next.config.ts` so `LECTURE_REVIEW_EXPORT=1` sets:
+     - `output: "export"`
+     - `trailingSlash: true`
+     - `distDir: ".next-review"` if using a separate build directory is helpful
+   - Leave default config unchanged when the environment variable is absent so `npm run dev` and normal `npm run build` behavior stay unchanged.
+   - Treat Next's `out/` directory as owned by the packaging command only for the current run.
+     - Before building, if `out/` already exists, fail with an actionable message asking the user to move or remove it, unless the implementation can prove it created that directory in this run.
+     - After a successful package copy, remove the command-created `out/` directory or leave it ignored only if there is a documented reason.
+     - On failure, remove only staging/build directories created by this command; never delete a pre-existing `out/`.
+   - Add `.gitignore` entries for `out/`, `review-packages/`, and `.next-review/` if that build directory is used.
+
+5. Make App Router routes export-compatible with a concrete contract.
+   - Remove `export const dynamic = "force-dynamic"` from `src/app/page.tsx` and `src/app/lectures/[slug]/page.tsx`; do not leave export compatibility to implementation judgment.
+   - Add `generateStaticParams()` to `src/app/lectures/[slug]/page.tsx`; it should scan the current collection and return `{ slug }` for every lecture.
+   - Add `export const dynamicParams = false` to `src/app/lectures/[slug]/page.tsx`.
+   - Keep validation screens available in local preview, but static packages should only contain valid output because packaging blocks invalid content before build.
+   - Verify that `npm run dev` still reflects template edits without requiring a restart after removing `force-dynamic`. If stale preview behavior appears, add the smallest route/cache adjustment that still works with static export.
+   - Add an implementation verification note: `LECTURE_REVIEW_EXPORT=1 next build` must fail during development if a dynamic collection route is missing from `generateStaticParams`; do not mask that failure in the package script.
+
+6. Run the static build in controlled staging.
+   - The packaging script should spawn `next build` with `LECTURE_REVIEW_EXPORT=1`.
+   - Run the pre-build source-content comparison described in Step 3 immediately before spawning the build.
+   - Use `out/` as the Next static export source only when the script established ownership for this run.
+   - Avoid creating the final package directory until validation, source comparison, static build, local-file rewrite, manifest generation, and source-copy planning have all succeeded.
+   - If a staging directory is used under `/tmp` or `review-packages/.tmp-*`, remove it on failure.
+   - Do not modify active lecture templates or collection templates.
+
+7. Assemble the final package directory.
+   - Create a filesystem-safe timestamp with sortable local time, for example `YYYY-MM-DD-HHmm`.
+   - Copy rendered output from `out/` into the package root.
+   - Root `index.html` is always the rendered app entry:
+     - In collection mode, it is the exported collection landing page.
+     - In single-lecture mode, it is the exported lecture page.
+   - Keep reviewer context in `README.md`, `MANIFEST.md`, `manifest.json`, and optional `PACKAGE_INDEX.html` if a package index is implemented. Do not replace root `index.html` with a separate package index because acceptance criteria expect opening the package entry to show the rendered lecture or collection.
+   - Copy Next static assets required by the exported pages.
+   - Copy active source templates from captured preflight contents under `source/` preserving relative paths:
+     - single mode: `source/content/lecture.template.md`
+     - collection mode: every `source/lectures/<slug>/lecture.template.md`
+   - In collection mode, do not copy `content/lecture.template.md` as an active source. If it exists, record it as ignored metadata only if useful; do not copy it by default because it can contain private inactive notes.
+   - Do not copy `node_modules`, `.next/cache`, unrelated repository files, raw lecture notes, inactive content, or pre-existing build directories.
+
+8. Require local-file navigation and asset rewriting.
+   - Direct `file://` browser opening is a required behavior, not a fallback to a local server.
+   - Add a dedicated helper such as `rewriteExportedHtmlForFileProtocol(html, htmlPath, packageRoot)` and run it on every exported `.html` file in the package.
+   - Rewrite internal page links from absolute app paths to file-relative paths:
+     - from root `index.html`, `/lectures/01-introduction/` becomes `lectures/01-introduction/index.html` or `lectures/01-introduction/`
+     - from nested lecture pages, `/` becomes `../../index.html` or the correct relative root path
+     - from nested lecture pages, `/lectures/02-core-concepts/` becomes `../02-core-concepts/index.html` or the correct relative sibling path
+   - Rewrite asset references such as `/_next/static/...` so they resolve relative to the current HTML file while preserving the copied `_next/` directory at package root.
+   - Handle `href`, `src`, `srcset`, stylesheet links, preload/modulepreload links, and script tags.
+   - Do not rewrite external URLs, protocol URLs, hashes, `mailto:`, `tel:`, data URLs, or links to copied source/manifest files unless the link is intentionally generated by package metadata.
+   - Keep the rewrite deterministic and covered by tests. Do not parse or regenerate lecture content manually.
+
+9. Write `manifest.json`.
+   - Include:
+     - package creation timestamp
+     - project name
+     - package type
+     - source mode
+     - validation command run
+     - validation result
+     - exported route count
+     - lecture count
+     - entry HTML path
+     - package contents summary
+     - per-lecture slug, title, description, audience, level, duration, source template path, rendered output path, and section count
+     - ignored inactive template paths when applicable
+     - git commit hash or `unavailable`
+     - dirty working tree status or `unavailable`
+     - Node.js version
+     - npm version
+   - Gather git and npm metadata with child processes and degrade to `unavailable` if commands fail.
+   - Keep the manifest stable and low-noise so tests can assert shape without depending on exact timestamps.
+
+10. Write `MANIFEST.md` and reviewer helper files.
+   - Generate `MANIFEST.md` from the same manifest model as readable reviewer-facing Markdown.
+   - Add a short package-local `README.md` for P1:
+     - open `index.html`
+     - what the package contains
+     - how to inspect source templates and manifests
+     - that no Node.js, npm install, local static server, or dev server is required
+   - Copy or adapt `docs/mvp-review-checklist.md` to `REVIEW_CHECKLIST.md` for P1 if it is still the right reviewer checklist. If it is too MVP-specific, create a concise checklist from the spec's quality gates instead.
+   - If a package index is added, name it `PACKAGE_INDEX.html` and link to it from `README.md`/`MANIFEST.md`; do not replace root `index.html`.
+
+11. Update project documentation.
+   - Update `README.md` with:
+     - `npm run package:review`
+     - output path under `review-packages/`
+     - validation preflight behavior
+     - single-lecture vs collection source selection
+     - `out/` conflict behavior if a pre-existing export directory is present
+     - what to send to reviewers
+   - Update `SKILL.md` with the AI-agent workflow:
+     - validate first
+     - revise until valid
+     - run `npm run package:review` only when a handoff artifact is requested
+     - report the generated path
+
+12. Add focused automated tests.
+   - Add `tests/lecture-template/review-package.test.ts` for preflight, package model, manifest generation, source selection, and HTML rewriting.
+   - Use temp directories and `process.chdir()` patterns already used in `collection.test.ts`.
+   - Test single-lecture source selection and manifest fields.
+   - Test collection source selection, lecture ordering, rendered output paths, and inactive `content/lecture.template.md` exclusion.
+   - Test that copied source content comes from the captured preflight result, and that changed source contents before build cause a package failure.
+   - Test invalid single lecture and invalid collection preflight return nonzero and do not create a completed package directory.
+   - Test generated `MANIFEST.md` includes mode, lecture count, package path hints, source paths, and entry file.
+   - Test `rewriteExportedHtmlForFileProtocol()` for:
+     - root `index.html` links
+     - nested `lectures/<slug>/index.html` links
+     - `href`, `src`, `srcset`, stylesheet/preload links, script tags, and `_next` assets
+     - no rewrites for external URLs, hashes, `mailto:`, `tel:`, data URLs, or unrelated manifest/source links
+   - Keep fast Vitest coverage focused on deterministic helpers. Do not rely only on command-construction unit tests for this feature.
+
+13. Require real static-export smoke verification.
+   - Automated helper tests are not enough because the main risk is actual Next static export compatibility.
+   - Before completing implementation, run a real `npm run package:review` in single-lecture mode.
+   - Before completing implementation, run a real `npm run package:review` in collection mode using a valid two-lecture collection.
+   - Confirm both packages contain rewritten HTML and open from the printed entry HTML path without the dev server.
+   - Run:
+
+```bash
+npm run validate
+npm run test
+npm run typecheck
+npm run lint
+npm run package:review
+```
+
+Manual verification:
+
+- Single mode:
+  - Ensure no root `lectures/` collection is active.
+  - Run `npm run package:review`.
+  - Open the printed `index.html` path directly in a browser.
+  - Inspect `manifest.json`, `MANIFEST.md`, `README.md`, and `source/content/lecture.template.md`.
+
+- Collection mode:
+  - Use a valid two-lecture `lectures/` fixture.
+  - Run `npm run package:review`.
+  - Open the printed `index.html` path directly in a browser.
+  - Confirm the collection landing page links to every lecture.
+  - Confirm next/previous and back-to-course links work without a dev server.
+  - Confirm every active `lectures/<slug>/lecture.template.md` is copied under `source/`.
+
+- Invalid preflight:
+  - Temporarily introduce an invalid template.
+  - Run `npm run package:review`.
+  - Confirm the command exits nonzero, prints validation details, and creates no completed package.
+  - Restore valid content.
+
+- Responsive/accessibility:
+  - Check package pages at 390px, 768px, and 1280px.
+  - Confirm `document.documentElement.scrollWidth <= document.documentElement.clientWidth`.
+  - Confirm keyboard navigation and visible focus states still work.
+  - Confirm package README/manifest/source links wrap cleanly.
+
+## Data Model, API, Persistence, Event, And Domain Changes
+
+- No lecture template schema changes.
+- No new lecture component types.
+- No database, CMS, authentication, hosted publishing, learner tracking, analytics, review comments, or upload integration.
+- Add review-package-specific TypeScript interfaces either in `src/lib/lecture-template/reviewPackage.ts` or `src/lib/lecture-template/types.ts`:
+  - `ReviewPackageMode = "single-lecture" | "collection"`
+  - `ReviewPackagePreflight`
+  - `ReviewPackageLecture`
+  - `ReviewPackageManifest`
+  - `ReviewPackageContents`
+- Keep package metadata derived from validated `LectureTemplate` values and collection entries captured during preflight.
+- Add no runtime network dependency. The package command may run local installed tools after dependencies are installed.
+- Do not make export part of normal authoring or validation.
+
+## Risks, Assumptions, And Open Questions
+
+- Risk: `force-dynamic` routes conflict with Next static export. Mitigation: remove the static route config, add `generateStaticParams`/`dynamicParams = false`, and run real package smoke checks.
+- Risk: Static export emits absolute URLs that do not work from `file://`. Mitigation: make post-export HTML rewriting mandatory and test root/nested pages plus `_next` assets.
+- Risk: Rewriting exported HTML can be brittle. Mitigation: rewrite only known HTML attributes and known internal route/asset prefixes, cover representative HTML snippets, and do not transform lecture content semantics.
+- Risk: A pre-existing `out/` directory could be user-owned. Mitigation: fail before build unless the package command can prove it created `out/` in the current run.
+- Risk: Running `next build` inside `package:review` may be slower than the 2-minute target on cold machines. Mitigation: keep package assembly lean, avoid extra dependencies, and document that dependencies must already be installed.
+- Risk: Removing `force-dynamic` may change local preview caching. Mitigation: test `npm run dev` edits after route changes and add the smallest static-export-compatible cache adjustment if stale content appears.
+- Risk: Source files can change between validation and build. Mitigation: capture exact source contents during preflight and compare active files again immediately before build.
+- Risk: A failed build could leave confusing partial output. Mitigation: validate first, build in staging, and only create the final timestamped package after success.
+- Risk: Manifest git state can fail in archives without `.git`. Mitigation: record `unavailable` rather than failing the package.
+- Risk: Collection mode currently ignores `content/lecture.template.md`; copying it into the package could expose inactive notes. Mitigation: copy only active source templates and optionally record ignored single-template path metadata.
+- Assumption: A temporary `LECTURE_REVIEW_EXPORT=1 next build` path is acceptable for the packaging command because the spec asks for a local handoff artifact, not a permanent app-wide static build mode.
+- Assumption: Root `index.html` should stay the rendered lecture or collection page; reviewer metadata lives in adjacent README/manifest files and optional `PACKAGE_INDEX.html`.
+- Open question: Should optional zip generation be included in the first implementation if Node 24 has sufficient built-in support available, or deferred to avoid a new dependency?

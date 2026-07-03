@@ -7,10 +7,25 @@ import type { LectureCollectionEntry } from "@/lib/lecture-template/types";
 import { validateTemplateSource } from "@/lib/lecture-template/validateTemplate";
 import { notFound } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+export const dynamicParams = false;
+
+const staticExportPlaceholderSlug = "__review-package-placeholder__";
+
+export async function generateStaticParams() {
+  const collection = await scanLectureCollection();
+  if (collection.entries.length === 0 && process.env.LECTURE_REVIEW_EXPORT === "1") {
+    return [{ slug: staticExportPlaceholderSlug }];
+  }
+
+  return collection.entries.map((entry) => ({ slug: entry.slug }));
+}
 
 export default async function LectureSlugPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  if (slug === staticExportPlaceholderSlug) {
+    notFound();
+  }
+
   const collection = await scanLectureCollection();
   const currentIndex = collection.entries.findIndex((entry) => entry.slug === slug);
 

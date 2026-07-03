@@ -1,0 +1,673 @@
+import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { accessSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { isCollectionMode, scanLectureCollection } from "./collection";
+import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
+import type { LectureTemplate, ValidationError } from "./types";
+import { validateTemplateSource } from "./validateTemplate";
+import { formatError } from "./validateCli";
+
+export type ReviewPackageMode = "single-lecture" | "collection";
+
+export interface ReviewPackageSourceRecord {
+  templatePath: string;
+  packagePath: string;
+  contents: string;
+}
+
+export interface ReviewPackageRoute {
+  route: string;
+  outputPath: string;
+}
+
+export interface ReviewPackageLecture {
+  slug?: string;
+  title: string;
+  description: string;
+  audience: string;
+  level: string;
+  duration: string;
+  sourceTemplatePath: string;
+  packageSourcePath: string;
+  renderedOutputPath: string;
+  sectionCount: number;
+}
+
+export interface ReviewPackageValidationOutput {
+  command: string;
+  status: number;
+  stdout: string;
+  stderr: string;
+}
+
+export type ReviewPackagePreflight =
+  | {
+      valid: true;
+      mode: ReviewPackageMode;
+      validation: ReviewPackageValidationOutput;
+      lectureCount: number;
+      lectures: ReviewPackageLecture[];
+      sources: ReviewPackageSourceRecord[];
+      routes: ReviewPackageRoute[];
+      ignoredInactiveTemplatePaths: string[];
+    }
+  | {
+      valid: false;
+      mode: ReviewPackageMode;
+      validation: ReviewPackageValidationOutput;
+      lectureCount: number;
+      lectures: ReviewPackageLecture[];
+      sources: ReviewPackageSourceRecord[];
+      routes: ReviewPackageRoute[];
+      ignoredInactiveTemplatePaths: string[];
+    };
+
+export interface ReviewPackageRuntimeMetadata {
+  gitCommit: string;
+  gitDirtyStatus: string;
+  nodeVersion: string;
+  npmVersion: string;
+}
+
+export interface ReviewPackageManifest {
+  createdAt: string;
+  projectName: string;
+  packageType: "static-review-package";
+  sourceMode: ReviewPackageMode;
+  validationCommand: string;
+  validationResult: "passed";
+  exportedRouteCount: number;
+  lectureCount: number;
+  entryHtmlPath: string;
+  packagePath: string;
+  contents: {
+    renderedPages: string[];
+    sourceTemplates: string[];
+    reviewerFiles: string[];
+  };
+  lectures: ReviewPackageLecture[];
+  ignoredInactiveTemplatePaths: string[];
+  gitCommit: string;
+  gitDirtyStatus: string;
+  nodeVersion: string;
+  npmVersion: string;
+}
+
+export interface SourceSnapshotVerification {
+  ok: boolean;
+  message?: string;
+}
+
+export interface CreateManifestOptions {
+  createdAt?: Date;
+  packagePath?: string;
+  runtimeMetadata?: Partial<ReviewPackageRuntimeMetadata>;
+}
+
+export interface AssembleReviewPackageOptions extends CreateManifestOptions {
+  exportedOutDir: string;
+  packagesRoot?: string;
+  checklistSourcePath?: string;
+}
+
+export interface AssembleReviewPackageResult {
+  packageDir: string;
+  entryHtmlPath: string;
+  manifest: ReviewPackageManifest;
+}
+
+const packageType = "static-review-package" as const;
+const projectName = "lecture-site-engine";
+const validationCommand = "npm run validate";
+const reviewerFiles = ["manifest.json", "MANIFEST.md", "README.md", "REVIEW_CHECKLIST.md"];
+
+export async function runReviewPackagePreflight(): Promise<ReviewPackagePreflight> {
+  if (await isCollectionMode()) {
+    return runCollectionPreflight();
+  }
+
+  return runSingleLecturePreflight();
+}
+
+export async function verifyReviewPackageSourceSnapshot(preflight: ReviewPackagePreflight): Promise<SourceSnapshotVerification> {
+  if (!preflight.valid) {
+    return {
+      ok: false,
+      message: "Cannot verify source snapshots for an invalid review-package preflight."
+    };
+  }
+
+  for (const source of preflight.sources) {
+    let currentContents: string;
+    try {
+      currentContents = await readFile(repositoryPath(source.templatePath), "utf8");
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Source template changed after validation: ${source.templatePath} is no longer readable (${formatUnknownError(error)}).`
+      };
+    }
+
+    if (currentContents !== source.contents) {
+      return {
+        ok: false,
+        message: `Source template changed after validation: ${source.templatePath}. Re-run npm run package:review after saving the final content.`
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+export function createReviewPackageManifest(
+  preflight: ReviewPackagePreflight,
+  options: CreateManifestOptions = {}
+): ReviewPackageManifest {
+  if (!preflight.valid) {
+    throw new Error("Cannot create a review package manifest from an invalid preflight.");
+  }
+
+  const runtimeMetadata = {
+    ...getReviewPackageRuntimeMetadata(),
+    ...options.runtimeMetadata
+  };
+
+  return {
+    createdAt: (options.createdAt ?? new Date()).toISOString(),
+    projectName,
+    packageType,
+    sourceMode: preflight.mode,
+    validationCommand: preflight.validation.command,
+    validationResult: "passed",
+    exportedRouteCount: preflight.routes.length,
+    lectureCount: preflight.lectureCount,
+    entryHtmlPath: "index.html",
+    packagePath: options.packagePath ?? "review-packages/<timestamp>-lecture-site",
+    contents: {
+      renderedPages: preflight.routes.map((route) => route.outputPath),
+      sourceTemplates: preflight.sources.map((source) => source.packagePath),
+      reviewerFiles
+    },
+    lectures: preflight.lectures,
+    ignoredInactiveTemplatePaths: preflight.ignoredInactiveTemplatePaths,
+    gitCommit: runtimeMetadata.gitCommit,
+    gitDirtyStatus: runtimeMetadata.gitDirtyStatus,
+    nodeVersion: runtimeMetadata.nodeVersion,
+    npmVersion: runtimeMetadata.npmVersion
+  };
+}
+
+export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManifest): string {
+  const lines = [
+    "# Static Review Package Manifest",
+    "",
+    `Package path: ${manifest.packagePath}`,
+    `Entry file: ${manifest.entryHtmlPath}`,
+    `Created at: ${manifest.createdAt}`,
+    `Project: ${manifest.projectName}`,
+    `Mode: ${manifest.sourceMode}`,
+    `Validation: ${manifest.validationResult} (${manifest.validationCommand})`,
+    `Lectures: ${manifest.lectureCount}`,
+    `Exported routes: ${manifest.exportedRouteCount}`,
+    `Git commit: ${manifest.gitCommit}`,
+    `Working tree: ${manifest.gitDirtyStatus}`,
+    `Node.js: ${manifest.nodeVersion}`,
+    `npm: ${manifest.npmVersion}`,
+    "",
+    "## Rendered Pages",
+    "",
+    ...manifest.contents.renderedPages.map((page) => `- ${page}`),
+    "",
+    "## Source Templates",
+    "",
+    ...manifest.contents.sourceTemplates.map((source) => `- ${source}`),
+    "",
+    "## Lectures",
+    ""
+  ];
+
+  for (const lecture of manifest.lectures) {
+    lines.push(
+      `- ${lecture.slug ? `${lecture.slug}: ` : ""}${lecture.title}`,
+      `  Source: ${lecture.sourceTemplatePath}`,
+      `  Rendered output: ${lecture.renderedOutputPath}`,
+      `  Audience: ${lecture.audience}`,
+      `  Level: ${lecture.level}`,
+      `  Duration: ${lecture.duration}`,
+      `  Sections: ${lecture.sectionCount}`
+    );
+  }
+
+  if (manifest.ignoredInactiveTemplatePaths.length > 0) {
+    lines.push("", "## Ignored Inactive Templates", "", ...manifest.ignoredInactiveTemplatePaths.map((source) => `- ${source}`));
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+export function renderReviewPackageReadme(manifest: ReviewPackageManifest): string {
+  return [
+    "# Lecture Review Package",
+    "",
+    "Open `index.html` in a browser to review the rendered lecture experience.",
+    "",
+    "This folder is self-contained for review. It does not require Node.js, `npm install`, a local static server, or the Next.js development server.",
+    "",
+    "## Contents",
+    "",
+    "- `index.html`: rendered entry page.",
+    "- `_next/`: static assets used by the rendered pages.",
+    "- `source/`: copied active lecture template files.",
+    "- `manifest.json`: machine-readable package metadata.",
+    "- `MANIFEST.md`: human-readable package metadata.",
+    "- `REVIEW_CHECKLIST.md`: review checklist for educational quality and source fidelity.",
+    "",
+    `Package path recorded at export time: ${manifest.packagePath}`,
+    `Source mode: ${manifest.sourceMode}`,
+    `Lecture count: ${manifest.lectureCount}`,
+    ""
+  ].join("\n");
+}
+
+export function createFilesystemSafeTimestamp(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}-${hours}${minutes}`;
+}
+
+export function rewriteExportedHtmlForFileProtocol(html: string, htmlPath: string, packageRoot: string): string {
+  let rewritten = html.replace(/\bsrcset=(["'])(.*?)\1/g, (_match, quote: string, value: string) => {
+    return `srcset=${quote}${rewriteSrcset(value, htmlPath, packageRoot)}${quote}`;
+  });
+
+  rewritten = rewritten.replace(/\b(href|src)=(["'])(.*?)\2/g, (_match, attribute: string, quote: string, value: string) => {
+    return `${attribute}=${quote}${rewritePackageUrl(value, htmlPath, packageRoot)}${quote}`;
+  });
+
+  return rewritten;
+}
+
+export async function assembleReviewPackage(
+  preflight: ReviewPackagePreflight,
+  options: AssembleReviewPackageOptions
+): Promise<AssembleReviewPackageResult> {
+  if (!preflight.valid) {
+    throw new Error("Cannot assemble a review package from an invalid preflight.");
+  }
+
+  const packagesRoot = options.packagesRoot ?? repositoryPath("review-packages");
+  const createdAt = options.createdAt ?? new Date();
+  const timestamp = createFilesystemSafeTimestamp(createdAt);
+  await mkdir(packagesRoot, { recursive: true });
+
+  const finalPackageDir = await choosePackageDirectory(packagesRoot, `${timestamp}-lecture-site`);
+  const stagingDir = await mkdtemp(path.join(packagesRoot, `.tmp-${timestamp}-`));
+
+  try {
+    await cp(options.exportedOutDir, stagingDir, { recursive: true });
+    if (preflight.mode === "single-lecture") {
+      await rm(path.join(stagingDir, "lectures"), { recursive: true, force: true });
+    }
+    await writeCapturedSources(stagingDir, preflight.sources);
+    await rewriteHtmlFiles(stagingDir);
+
+    const packagePath = path.relative(process.cwd(), finalPackageDir) || finalPackageDir;
+    const manifest = createReviewPackageManifest(preflight, {
+      createdAt,
+      packagePath,
+      runtimeMetadata: options.runtimeMetadata
+    });
+
+    await writeFile(path.join(stagingDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    await writeFile(path.join(stagingDir, "MANIFEST.md"), renderReviewPackageManifestMarkdown(manifest), "utf8");
+    await writeFile(path.join(stagingDir, "README.md"), renderReviewPackageReadme(manifest), "utf8");
+    await writeFile(path.join(stagingDir, "REVIEW_CHECKLIST.md"), await readReviewChecklist(options.checklistSourcePath), "utf8");
+
+    await rename(stagingDir, finalPackageDir);
+
+    return {
+      packageDir: finalPackageDir,
+      entryHtmlPath: path.join(finalPackageDir, "index.html"),
+      manifest
+    };
+  } catch (error) {
+    await rm(stagingDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+export function getReviewPackageRuntimeMetadata(): ReviewPackageRuntimeMetadata {
+  return {
+    gitCommit: runMetadataCommand("git", ["rev-parse", "HEAD"]),
+    gitDirtyStatus: getGitDirtyStatus(),
+    nodeVersion: process.version,
+    npmVersion: runMetadataCommand("npm", ["--version"])
+  };
+}
+
+async function runSingleLecturePreflight(): Promise<ReviewPackagePreflight> {
+  const templatePath = ACTIVE_TEMPLATE_PATH;
+
+  let source: string;
+  try {
+    source = await readFile(repositoryPath(templatePath), "utf8");
+  } catch (error) {
+    return invalidPreflight("single-lecture", {
+      command: validationCommand,
+      status: 1,
+      stdout: "",
+      stderr: `Could not validate ${templatePath}: ${formatUnknownError(error)}\n`
+    });
+  }
+
+  const result = validateTemplateSource(source);
+  if (!result.valid) {
+    return invalidPreflight("single-lecture", {
+      command: validationCommand,
+      status: 1,
+      stdout: "",
+      stderr: [`Invalid lecture template: ${templatePath}`, ...result.errors.map(formatError)].join("\n") + "\n"
+    });
+  }
+
+  return {
+    valid: true,
+    mode: "single-lecture",
+    validation: {
+      command: validationCommand,
+      status: 0,
+      stdout: `Valid lecture template: ${templatePath}\n`,
+      stderr: ""
+    },
+    lectureCount: 1,
+    lectures: [buildLectureRecord(result.template, undefined, templatePath, "source/content/lecture.template.md", "index.html")],
+    sources: [
+      {
+        templatePath,
+        packagePath: "source/content/lecture.template.md",
+        contents: source
+      }
+    ],
+    routes: [{ route: "/", outputPath: "index.html" }],
+    ignoredInactiveTemplatePaths: []
+  };
+}
+
+async function runCollectionPreflight(): Promise<ReviewPackagePreflight> {
+  const collection = await scanLectureCollection();
+  const sources: ReviewPackageSourceRecord[] = [];
+  const lectures: ReviewPackageLecture[] = [];
+  const validationLines = [`Collection validation: ${collection.entries.length} lectures found`, ""];
+  const validationErrors: { slug: string; errors: ValidationError[] }[] = [];
+
+  for (const entry of collection.entries) {
+    let source: string;
+    try {
+      source = await readFile(repositoryPath(entry.templatePath), "utf8");
+    } catch (error) {
+      return invalidPreflight("collection", {
+        command: validationCommand,
+        status: 1,
+        stdout: "",
+        stderr: `Could not validate collection: ${formatUnknownError(error)}\n`
+      });
+    }
+
+    const result = validateTemplateSource(source);
+    validationLines.push(`  [${result.valid ? "PASS" : "FAIL"}] ${entry.slug}/lecture.template.md`);
+
+    if (!result.valid) {
+      validationErrors.push({ slug: entry.slug, errors: result.errors });
+      for (const error of result.errors) {
+        validationLines.push(`    - ${error.code}: ${error.message}`);
+      }
+      continue;
+    }
+
+    const packageSourcePath = path.posix.join("source", entry.templatePath);
+    const renderedOutputPath = path.posix.join("lectures", entry.slug, "index.html");
+    sources.push({
+      templatePath: entry.templatePath,
+      packagePath: packageSourcePath,
+      contents: source
+    });
+    lectures.push(buildLectureRecord(result.template, entry.slug, entry.templatePath, packageSourcePath, renderedOutputPath));
+  }
+
+  const passingCount = collection.entries.length - validationErrors.length;
+  validationLines.push("", `${passingCount} of ${collection.entries.length} lectures passed validation.`);
+
+  if (validationErrors.length > 0) {
+    return invalidPreflight("collection", {
+      command: validationCommand,
+      status: 1,
+      stdout: `${validationLines.join("\n")}\n`,
+      stderr: ""
+    });
+  }
+
+  return {
+    valid: true,
+    mode: "collection",
+    validation: {
+      command: validationCommand,
+      status: 0,
+      stdout: `${validationLines.join("\n")}\n`,
+      stderr: ""
+    },
+    lectureCount: lectures.length,
+    lectures,
+    sources,
+    routes: [
+      { route: "/", outputPath: "index.html" },
+      ...lectures.map((lecture) => ({
+        route: `/lectures/${lecture.slug}`,
+        outputPath: lecture.renderedOutputPath
+      }))
+    ],
+    ignoredInactiveTemplatePaths: activeTemplateExists() ? [ACTIVE_TEMPLATE_PATH] : []
+  };
+}
+
+function invalidPreflight(mode: ReviewPackageMode, validation: ReviewPackageValidationOutput): ReviewPackagePreflight {
+  return {
+    valid: false,
+    mode,
+    validation,
+    lectureCount: 0,
+    lectures: [],
+    sources: [],
+    routes: [],
+    ignoredInactiveTemplatePaths: []
+  };
+}
+
+function buildLectureRecord(
+  template: LectureTemplate,
+  slug: string | undefined,
+  sourceTemplatePath: string,
+  packageSourcePath: string,
+  renderedOutputPath: string
+): ReviewPackageLecture {
+  return {
+    slug,
+    title: template.metadata.title,
+    description: template.metadata.description,
+    audience: template.metadata.audience,
+    level: template.metadata.level,
+    duration: template.metadata.duration,
+    sourceTemplatePath,
+    packageSourcePath,
+    renderedOutputPath,
+    sectionCount: template.sections.length
+  };
+}
+
+function activeTemplateExists(): boolean {
+  try {
+    accessSync(repositoryPath(ACTIVE_TEMPLATE_PATH), constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function getGitDirtyStatus(): string {
+  const output = runMetadataCommand("git", ["status", "--porcelain"]);
+  if (output === "unavailable") return output;
+  return output.trim() === "" ? "clean" : "dirty";
+}
+
+function runMetadataCommand(command: string, args: string[]): string {
+  try {
+    const output = execFileSync(command, args, {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    }).trim();
+    return output === "" ? "unavailable" : output;
+  } catch {
+    return "unavailable";
+  }
+}
+
+function rewriteSrcset(value: string, htmlPath: string, packageRoot: string): string {
+  return value
+    .split(",")
+    .map((candidate) => {
+      const trimmed = candidate.trim();
+      const [url, ...descriptor] = trimmed.split(/\s+/);
+      if (!url) return candidate;
+      const rewrittenUrl = rewritePackageUrl(url, htmlPath, packageRoot);
+      return [rewrittenUrl, ...descriptor].join(" ");
+    })
+    .join(", ");
+}
+
+function rewritePackageUrl(value: string, htmlPath: string, packageRoot: string): string {
+  if (!value.startsWith("/") || value.startsWith("//") || shouldPreserveUrl(value)) {
+    return value;
+  }
+
+  const { pathname, suffix } = splitUrlSuffix(value);
+  let targetPath = pathname.replace(/^\/+/, "");
+
+  if (targetPath === "") {
+    targetPath = "index.html";
+  } else if (targetPath.endsWith("/")) {
+    targetPath = `${targetPath}index.html`;
+  } else if (targetPath.startsWith("lectures/") && !targetPath.endsWith(".html")) {
+    targetPath = `${targetPath}/index.html`;
+  }
+
+  const htmlRelativePath = toPosixPath(path.relative(packageRoot, htmlPath));
+  const htmlDirectory = path.posix.dirname(htmlRelativePath);
+  const relativePath = path.posix.relative(htmlDirectory === "." ? "" : htmlDirectory, targetPath);
+  return `${relativePath || path.posix.basename(targetPath)}${suffix}`;
+}
+
+function shouldPreserveUrl(value: string): boolean {
+  return (
+    value.startsWith("#") ||
+    /^[a-z][a-z0-9+.-]*:/i.test(value) ||
+    value.startsWith("mailto:") ||
+    value.startsWith("tel:") ||
+    value.startsWith("data:")
+  );
+}
+
+function splitUrlSuffix(value: string): { pathname: string; suffix: string } {
+  const match = value.match(/^([^?#]*)([?#].*)?$/);
+  return {
+    pathname: match?.[1] ?? value,
+    suffix: match?.[2] ?? ""
+  };
+}
+
+async function writeCapturedSources(packageRoot: string, sources: ReviewPackageSourceRecord[]) {
+  for (const source of sources) {
+    const destination = path.join(packageRoot, source.packagePath);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await writeFile(destination, source.contents, "utf8");
+  }
+}
+
+async function rewriteHtmlFiles(packageRoot: string) {
+  const htmlFiles = await collectHtmlFiles(packageRoot);
+  for (const htmlFile of htmlFiles) {
+    const html = await readFile(htmlFile, "utf8");
+    await writeFile(htmlFile, rewriteExportedHtmlForFileProtocol(html, htmlFile, packageRoot), "utf8");
+  }
+}
+
+async function collectHtmlFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const htmlFiles: string[] = [];
+
+  for (const entry of entries) {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      htmlFiles.push(...(await collectHtmlFiles(absolutePath)));
+    } else if (entry.isFile() && entry.name.endsWith(".html")) {
+      htmlFiles.push(absolutePath);
+    }
+  }
+
+  return htmlFiles;
+}
+
+async function choosePackageDirectory(packagesRoot: string, baseName: string): Promise<string> {
+  let candidate = path.join(packagesRoot, baseName);
+  let suffix = 2;
+
+  while (await pathExists(candidate)) {
+    candidate = path.join(packagesRoot, `${baseName}-${suffix}`);
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await stat(targetPath);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function readReviewChecklist(sourcePath?: string): Promise<string> {
+  const defaultChecklistPath = repositoryPath("docs/mvp-review-checklist.md");
+  const checklistPath = sourcePath ?? defaultChecklistPath;
+
+  try {
+    return await readFile(checklistPath, "utf8");
+  } catch {
+    return [
+      "# Review Checklist",
+      "",
+      "- [ ] Open `index.html` directly from the package folder.",
+      "- [ ] Confirm the rendered lecture or collection matches the intended source templates.",
+      "- [ ] Confirm titles, audience, objectives, sections, and key takeaways are visible.",
+      "- [ ] Inspect copied files under `source/` when comparing rendered output with authored content.",
+      "- [ ] Record any educational quality, source fidelity, or navigation issues.",
+      ""
+    ].join("\n");
+  }
+}
+
+function toPosixPath(value: string): string {
+  return value.split(path.sep).join(path.posix.sep);
+}
+
+function formatUnknownError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

@@ -1,0 +1,88 @@
+import { spawn } from "node:child_process";
+import { rm, stat } from "node:fs/promises";
+import path from "node:path";
+import {
+  assembleReviewPackage,
+  runReviewPackagePreflight,
+  verifyReviewPackageSourceSnapshot
+} from "../src/lib/lecture-template/reviewPackage";
+
+const outDir = path.join(process.cwd(), "out");
+
+async function main() {
+  const preflight = await runReviewPackagePreflight();
+  if (preflight.validation.stdout) process.stdout.write(preflight.validation.stdout);
+  if (preflight.validation.stderr) process.stderr.write(preflight.validation.stderr);
+
+  if (!preflight.valid) {
+    process.exitCode = 1;
+    return;
+  }
+
+  if (await pathExists(outDir)) {
+    process.stderr.write(
+      "Cannot create review package because out/ already exists. Move or remove out/ and run npm run package:review again.\n"
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const snapshot = await verifyReviewPackageSourceSnapshot(preflight);
+  if (!snapshot.ok) {
+    process.stderr.write(`${snapshot.message ?? "Source template changed after validation."}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
+    await runStaticBuild();
+
+    const result = await assembleReviewPackage(preflight, {
+      exportedOutDir: outDir,
+      packagesRoot: path.join(process.cwd(), "review-packages")
+    });
+
+    process.stdout.write("\nReview package created.\n");
+    process.stdout.write(`Package directory: ${result.packageDir}\n`);
+    process.stdout.write(`Open: ${result.entryHtmlPath}\n`);
+  } catch (error) {
+    process.stderr.write(`Review package failed: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  } finally {
+    await rm(outDir, { recursive: true, force: true });
+  }
+}
+
+function runStaticBuild(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("npm", ["run", "build"], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        LECTURE_REVIEW_EXPORT: "1"
+      },
+      stdio: "inherit"
+    });
+
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`next build exited with status ${code ?? "unknown"}`));
+      }
+    });
+  });
+}
+
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await stat(targetPath);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+await main();

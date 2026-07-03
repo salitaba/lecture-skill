@@ -1,0 +1,330 @@
+Feature: Static Review Package
+
+## Product Summary
+
+Add a static review package workflow to the Lecture Site Engine so a technical educator can export the current single lecture or multi-lecture collection into a portable, browser-openable artifact for review, teaching preparation, or stakeholder handoff.
+
+The current product is strong for local authoring and preview: an educator or AI coding agent can create valid lecture templates, run validation, and preview them at `http://localhost:3000`. Multi-lecture support adds collection-level browsing in the local app. The next product gap is handoff. Reviewers currently need the full repository, Node.js 24, npm dependencies, and the dev server to inspect the result. That is too much friction for curriculum review, peer feedback, or sharing with a non-developer instructor.
+
+The primary product outcome is: after a lecture or collection passes validation, the author can run one documented command that creates a static review package containing the rendered lecture experience and enough source/context files for a reviewer to inspect the output without installing project dependencies.
+
+The primary user remains the technical educator using a local repository and AI coding agent. The secondary user is a reviewer who may not be comfortable running a Next.js development server but can open local HTML files or review a zipped folder. Students or public web visitors may benefit later, but this feature is not a hosted publishing workflow.
+
+## Problem
+
+The engine currently stops at local preview. That is acceptable for generation and authoring, but weak for product adoption because the person who creates a lecture is often not the only person who needs to review it.
+
+Today, a reviewer must either:
+
+- Clone or receive the whole repository.
+- Install Node.js 24 and npm dependencies.
+- Run `npm run validate`.
+- Run `npm run dev`.
+- Open the local preview URL.
+
+This creates friction when:
+
+- A subject-matter expert only needs to review educational quality and source fidelity.
+- A teaching lead wants to compare multiple generated lectures quickly.
+- An educator wants to send a preview to a colleague without exposing unrelated repository files.
+- A reviewer needs an artifact that captures exactly what was validated at the time of handoff.
+- A multi-lecture collection needs to be reviewed as a course outline without requiring local setup.
+
+The product should keep the local-first authoring model, but the handoff artifact should not require a running development server.
+
+## Goals
+
+- Provide one documented command to create a static review package for the active single lecture or collection.
+- Validate before export and block package creation when the active lecture or any collection lecture has validation errors.
+- Include rendered static pages that preserve the existing lecture and collection experience.
+- Include a concise review manifest that records export time, source template paths, validation status, lecture count, titles, and package contents.
+- Include the source template files used to create the package so reviewers can compare rendered output with authored content.
+- Support both single-lecture mode and collection mode without changing the template schema.
+- Keep the package local and portable; it should work without network access and without a running Next.js server.
+- Preserve the existing local preview workflow and avoid making export required for normal authoring.
+
+## Priority
+
+P0 requirements:
+
+- Export command for single-lecture mode.
+- Export command for collection mode.
+- Validation preflight that blocks export on validation failure.
+- Static rendered HTML for all valid lecture pages and collection landing pages.
+- Review manifest included in the package.
+- Source templates included in the package.
+- README and `SKILL.md` instructions for when and how to create a review package.
+
+P1 requirements:
+
+- Optional zip archive generation after the folder export succeeds.
+- Human-readable review checklist copied into the package.
+- Package index page that links to the rendered output, manifest, and included source templates.
+- Clear terminal summary showing package path and next review steps.
+
+P2 requirements:
+
+- Theme or branding metadata for review packages.
+- Package signing or checksum verification.
+- PDF or print-optimized output.
+- Hosted deployment integration.
+
+## Non-Goals
+
+- No CMS, database, authentication, or hosted publishing workflow.
+- No automatic upload to a hosting provider or file sharing service.
+- No public analytics, learner tracking, or review comments system.
+- No browser-based authoring editor.
+- No change to the lecture template schema or supported component types.
+- No requirement that the exported package replace `npm run dev` during authoring.
+- No guarantee that arbitrary dynamic Next.js features outside the lecture engine are exportable.
+
+## Design Principles
+
+- Handoff should be boring and reliable: one command should produce a folder a reviewer can open.
+- Export must reflect validated content only; invalid lectures should not produce review artifacts.
+- The package should be self-describing so a reviewer can tell what was exported, when, and from which source files.
+- The exported output should match the local preview closely enough that review feedback applies to the authored lecture.
+- The workflow should be easy for an AI agent to run after generating or revising lecture templates.
+- Static export is a review tool, not a publishing platform.
+
+## Recommended Experience Direction
+
+### Author Workflow
+
+The author creates or updates a lecture or collection as today:
+
+```bash
+npm run validate
+npm run dev
+```
+
+When ready to hand off the result, the author runs:
+
+```bash
+npm run package:review
+```
+
+The command should:
+
+1. Detect single-lecture mode or collection mode using the same rules as the app.
+2. Run validation for the active lecture or collection.
+3. Stop with actionable validation output if anything fails.
+4. Build static rendered output.
+5. Copy the required static files, templates, and review metadata into a package directory.
+6. Print the final package path and the local file a reviewer should open.
+
+Recommended package path:
+
+```text
+review-packages/<timestamp>-lecture-site/
+```
+
+The timestamp should be filesystem-safe and sortable, such as `2026-07-04-0130`.
+
+### Reviewer Workflow
+
+The reviewer receives a folder or zip file. The reviewer should be able to:
+
+- Open `index.html` or a clearly named package landing page in a browser.
+- Navigate the single lecture or collection without running `npm install`.
+- Read a package manifest that lists exported lectures, source template paths, validation status, and creation time.
+- Inspect copied template source files.
+- Use the copied review checklist when evaluating generated lecture quality.
+
+For a collection, the exported package opens on the collection landing page and links to each lecture page.
+
+For a single lecture, the exported package opens directly on the rendered lecture page or on a minimal package index that clearly links to the rendered lecture.
+
+### Package Contents
+
+P0 package contents:
+
+```text
+review-packages/<timestamp>-lecture-site/
+  index.html
+  assets/
+  manifest.json
+  MANIFEST.md
+  source/
+    content/lecture.template.md
+    lectures/<slug>/lecture.template.md
+```
+
+In single-lecture mode, include `source/content/lecture.template.md`.
+
+In collection mode, include every exported `lectures/<slug>/lecture.template.md`. If `content/lecture.template.md` also exists, it should not be included as an active source unless the manifest explicitly marks it as ignored because collection mode took precedence.
+
+Recommended P1 package contents:
+
+```text
+  REVIEW_CHECKLIST.md
+  README.md
+```
+
+`README.md` inside the package should be short and reviewer-oriented. It should explain which file to open and what the package contains. It should not duplicate the project README.
+
+### Manifest
+
+The package should include both machine-readable and human-readable manifests:
+
+- `manifest.json`: stable structured data for tools.
+- `MANIFEST.md`: readable summary for reviewers.
+
+The manifest should include:
+
+- Package creation timestamp.
+- Project name and package type.
+- Source mode: `single-lecture` or `collection`.
+- Validation command run.
+- Validation result.
+- Exported route count.
+- Lecture count.
+- For each lecture: slug when available, title, description, audience, level, duration, source template path, rendered output path, and section count.
+- Repository commit hash when available; if unavailable, record `unavailable`.
+- Dirty working tree status when available; if unavailable, record `unavailable`.
+- Node.js and npm versions used for export.
+
+The manifest should not include raw lecture prose beyond titles, descriptions, metadata, and file paths.
+
+### Validation Preflight
+
+The export command must never silently package invalid content.
+
+In single-lecture mode:
+
+- Validate `content/lecture.template.md`.
+- If invalid, print the same author-locatable errors as `npm run validate`.
+- Exit nonzero and do not create a package.
+
+In collection mode:
+
+- Validate every `lectures/*/lecture.template.md`.
+- If any lecture fails, print the per-lecture validation summary.
+- Exit nonzero and do not create a package.
+
+If a partially created package directory exists after failure, the command should either remove it or mark it as incomplete. The preferred behavior is to create package output only after validation and static build succeed.
+
+### Static Rendering
+
+The exported pages should preserve:
+
+- Header metadata.
+- Section navigation.
+- Overview, learning objectives, sections, components, and key takeaways.
+- Collection landing page.
+- Per-lecture routes.
+- Next/previous lecture navigation.
+- Back-to-course links.
+- Validation-free output, because invalid content is blocked before export.
+- Responsive layout at 390px, 768px, and 1280px.
+- Keyboard navigation and visible focus states.
+
+The exported package should not require a running Next.js server. It may rely on static HTML, CSS, and client assets generated by the existing framework build.
+
+If some framework behavior cannot be exported statically without changing app architecture, the implementation should prefer small routing/build adjustments over adding a separate renderer. A separate static renderer should be considered only if the framework export path would be fragile or excessively complex.
+
+### AI-Agent Workflow
+
+Update `SKILL.md` so an AI agent can create a review package after generating a lecture:
+
+1. Create or update the lecture template or collection templates.
+2. Run `npm run validate`.
+3. Revise until validation passes.
+4. Run `npm run package:review` when the user asks for a handoff artifact.
+5. Report the generated package path.
+
+The agent should not export automatically during every lecture generation. Export is a handoff step requested by the user or product workflow.
+
+## Success Metrics / Quality Gates
+
+- A reviewer can open the exported package in a browser without installing dependencies or running a dev server.
+- The exported package includes all rendered pages needed to review the active single lecture or collection.
+- The exported package includes the source templates used for the rendered output.
+- The manifest makes it clear what was exported, from which paths, when, and with what validation result.
+- Invalid templates do not produce completed review packages.
+- A technical educator can generate a review package within 2 minutes after validation already passes.
+- A reviewer can identify lecture title, audience, objectives, ordered sections, key takeaways, and collection order from the package alone.
+- The package works offline after creation.
+
+## Functional Requirements
+
+- Add a package script named `package:review`.
+- The script must support both single-lecture mode and collection mode.
+- The script must run validation before creating package output.
+- The script must exit nonzero if validation fails.
+- The script must create a new timestamped package directory under `review-packages/`.
+- The script must not require network access after dependencies are installed.
+- The script must include rendered static pages and assets.
+- The script must include source template files for exported lectures.
+- The script must include `manifest.json`.
+- The script must include `MANIFEST.md`.
+- The script must print a concise success summary with the package path and entry HTML path.
+- The script must preserve existing `npm run validate`, `npm run dev`, and app rendering behavior.
+- The script must not modify active lecture templates.
+- The script must not include `node_modules`, `.next/cache`, unrelated repository files, or private raw lecture notes unless they are active source templates.
+
+## Accessibility Requirements
+
+- Exported pages must preserve the accessibility behavior of the local preview.
+- Navigation links must work with keyboard input.
+- Focus states must remain visible.
+- The package entry page, if added, must use semantic headings and links.
+- Manifest links from the package index must be readable and keyboard accessible.
+- The package must not depend on color alone to communicate validation or review status.
+
+## Responsive Requirements
+
+- Exported rendered pages must have no body-level horizontal overflow at 390px, 768px, and 1280px.
+- The package index page, if added, must remain readable on phone-width screens.
+- Source and manifest links must wrap cleanly instead of clipping.
+- Code blocks and tables in exported lecture pages must preserve their existing overflow behavior.
+
+## Documentation Requirements
+
+- README documents `npm run package:review`.
+- README explains where package output is written.
+- README explains that validation must pass before export.
+- README explains how collection mode affects package contents.
+- `SKILL.md` documents the optional review-package handoff workflow for AI agents.
+- The generated package includes a short reviewer-facing `README.md` in P1.
+
+## Acceptance Criteria
+
+- Running `npm run package:review` in valid single-lecture mode creates a timestamped package under `review-packages/`.
+- The single-lecture package opens in a browser and shows the rendered lecture without a dev server.
+- The single-lecture package includes `source/content/lecture.template.md`.
+- Running `npm run package:review` in valid collection mode creates a timestamped package under `review-packages/`.
+- The collection package opens on a collection landing page and links to every exported lecture.
+- The collection package includes every active `lectures/<slug>/lecture.template.md`.
+- The package includes `manifest.json` and `MANIFEST.md`.
+- The manifest records mode, export time, validation result, lecture count, exported paths, source template paths, Node.js version, npm version, and git state when available.
+- The script exits nonzero and creates no completed package when validation fails.
+- The script does not include `node_modules`, unrelated repository files, or inactive raw lecture notes.
+- Existing tests for parsing, validation, rendering, and collection behavior still pass.
+- README and `SKILL.md` document the workflow.
+
+## Suggested Verification
+
+- Run `npm run validate` in single-lecture mode.
+- Run `npm run package:review` in single-lecture mode and open the exported entry HTML file.
+- Inspect the single-lecture `manifest.json`, `MANIFEST.md`, and copied source template.
+- Create or use a valid two-lecture collection.
+- Run `npm run validate` in collection mode.
+- Run `npm run package:review` in collection mode and open the exported entry HTML file.
+- Confirm every collection lecture link works without the dev server.
+- Introduce an invalid template, run `npm run package:review`, and confirm it exits nonzero without creating a completed package.
+- Confirm no package contains `node_modules`, `.next/cache`, unrelated repository files, or inactive raw lecture notes.
+- Check exported pages at 390px, 768px, and 1280px.
+- Run `npm run test`, `npm run typecheck`, and `npm run lint`.
+
+## Implementation Notes
+
+- Prefer using the framework's static build/export capabilities before creating a custom HTML renderer.
+- Keep packaging logic in scripts rather than route components.
+- Reuse existing collection scanning and validation utilities instead of duplicating filesystem rules.
+- Generate package metadata from validated templates rather than parsing rendered HTML.
+- Add focused tests around manifest creation, validation preflight, and package file selection.
+- Add `review-packages/` to `.gitignore` so generated handoff artifacts are not committed by default.
+- If the export process requires temporary files, write them under a temporary directory and move the final package into place only after success.
+- Avoid adding heavy packaging dependencies unless the optional zip requirement is implemented.
