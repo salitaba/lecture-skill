@@ -1,8 +1,13 @@
-import { useId } from "react";
+"use client";
+
+import { useId, useState } from "react";
 import type { QuizComponent } from "@/lib/lecture-template/types";
 
 export function Quiz({ component }: { component: QuizComponent }) {
-  const answerLabelId = useId();
+  const [revealed, setRevealed] = useState(false);
+  const baseId = useId();
+  const answerRegionId = `${baseId}-answer`;
+  const answerLabelId = `${baseId}-answer-label`;
 
   return (
     <aside className="lecture-component quiz-card">
@@ -13,13 +18,26 @@ export function Quiz({ component }: { component: QuizComponent }) {
           <li key={`${option}-${index}`}>{option}</li>
         ))}
       </ol>
-      <div className="quiz-answer" aria-labelledby={answerLabelId}>
+      <button
+        type="button"
+        className="quiz-reveal-button"
+        aria-expanded={revealed}
+        aria-controls={answerRegionId}
+        onClick={() => setRevealed((current) => !current)}
+      >
+        {revealed ? "Hide answer" : "Show answer"}
+      </button>
+      <div id={answerRegionId} className="quiz-answer" hidden={!revealed} aria-labelledby={answerLabelId}>
         <p id={answerLabelId} className="quiz-answer-label">
-          Static answer key
+          Answer
         </p>
         <p className="quiz-answer-value">{component.answer}</p>
         {component.explanation ? <p className="quiz-explanation">{component.explanation}</p> : null}
       </div>
+      <noscript className="quiz-noscript">
+        <style>{".quiz-reveal-button { display: none !important; }"}</style>
+        Interactive answer reveal requires JavaScript. Printed output includes the answer and explanation.
+      </noscript>
     </aside>
   );
 }

@@ -40,6 +40,12 @@ level: "beginner"
 
 `level` must be `beginner`, `intermediate`, or `advanced`.
 
+When starting new work, prefer the local scaffold commands over hand-creating paths:
+
+- Run `npm run new:collection` for a new multi-lecture course workspace.
+- Run `npm run new:lecture` to create the next lecture in the active workflow.
+- Do not overwrite raw source files or existing templates unless the user explicitly asks.
+
 ## Multi-Lecture Collection Workflow
 
 When the repository contains a `lectures/` directory, treat it as a collection of lecture templates instead of a single active lecture. Use numbered subdirectories so authored order stays obvious:
@@ -55,14 +61,27 @@ lectures/
 For a collection:
 
 1. Read the course outline or multi-lecture source.
-2. Create one numbered subdirectory per lecture under `lectures/`.
-3. Preserve source evidence as `lectures/<slug>/raw-lecture.txt` for each lecture when per-lecture source is available.
-4. Preserve a shared source as `lectures/raw-course.txt` when one course source is split into multiple lectures.
-5. Write a valid `lecture.template.md` in each subdirectory using the same schema as the single-lecture workflow.
-6. Run `npm run validate` to validate the whole collection.
-7. Revise the lectures until every entry passes validation.
+2. Add `lectures/course.yaml` when the course title and description are known. This file is optional and separate from lecture frontmatter.
+3. Create one numbered subdirectory per lecture under `lectures/`, preferably with `npm run new:lecture`.
+4. Preserve source evidence as `lectures/<slug>/raw-lecture.txt` for each lecture when per-lecture source is available.
+5. Preserve a shared source as `lectures/raw-course.txt` when one course source is split into multiple lectures.
+6. Write a valid `lecture.template.md` in each subdirectory using the same schema as the single-lecture workflow.
+7. Run `npm run validate` or `npm run validate -- --json` to validate the whole collection.
+8. Revise the lectures until every entry and course metadata passes validation.
 
 Use `examples/multi-lecture/` as a reference collection scaffold. Keep the single-lecture workflow above intact for repos that do not have `lectures/`.
+
+`lectures/course.yaml` supports these P0 fields:
+
+```yaml
+title: "Course title"
+description: "Short course description."
+audience: "Technical learners"
+level: "beginner"
+duration: "3 hours"
+```
+
+`title` and `description` are required when the file exists. `audience`, `level`, and `duration` are optional; `level` must be `beginner`, `intermediate`, or `advanced`.
 
 ## Conversion Process
 
@@ -73,10 +92,11 @@ Use `examples/multi-lecture/` as a reference collection scaffold. Keep the singl
 5. Create 3-6 coherent ordered sections unless the source is clearly shorter.
 6. Use visual components only when they improve comprehension.
 7. Keep every component inside a `## Section: <section title>` block.
-8. Run `npm run validate`.
+8. Run `npm run validate`. Use `npm run validate -- --json` when revising from machine-readable feedback.
 9. Revise `content/lecture.template.md` or collection templates until validation passes.
 10. Run `npm run review:source` before approval review so the reviewer has source paths, validation status, rendered routes, and checklist fields.
-11. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
+11. Run `npm run doctor` before preview, source-review, or package handoff.
+12. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
 
 ## Source Fidelity Review
 
@@ -103,6 +123,7 @@ Create a static review package only when the user asks for a handoff artifact or
 
 Packaging validates before export. Invalid single lectures or invalid collection lectures must be fixed before a completed package is created.
 Use `npm run package:review` only for portable handoff artifacts. The package includes `REVIEW_WORKSHEET.md` and any raw source files present at the expected evidence paths.
+Valid `lectures/course.yaml` metadata is copied into collection packages and appears in `manifest.json`, `MANIFEST.md`, and package-local worksheets. Invalid course metadata blocks package creation.
 
 ## Supported Components
 
@@ -199,7 +220,7 @@ explanation: "Validation checks the active template or collection."
 ```
 ````
 
-Rendered label: `Quiz: Knowledge check`. Use `quiz` for static teaching checks that should be visibly recognizable as quizzes. Quizzes render a visible static answer key; they are not secure assessment, grading, learner tracking, hidden-answer tests, learner accounts, or analytics. The `answer` must exactly match one option after trimming whitespace.
+Rendered label: `Quiz: Knowledge check`. Use `quiz` for lightweight knowledge checks with feedback revealed on demand. The schema is unchanged: `question`, `options`, `answer`, and optional `explanation`; the `answer` must exactly match one option after trimming whitespace. Interactive pages initially show the question, options, and a `Show answer` button, then toggle to `Hide answer` after reveal. Printed output includes the answer and explanation by default. If JavaScript is unavailable, the rendered quiz shows a `<noscript>` message explaining that interactive reveal requires JavaScript and that printed output includes the answer and explanation. Quiz reveal is a pacing aid, not secure assessment, grading, learner tracking, answer encryption, anti-cheating, learner accounts, analytics, or source-code secrecy.
 
 Do not invent custom component types. Unsupported component types fail validation.
 
@@ -212,3 +233,4 @@ Do not invent custom component types. Unsupported component types fail validatio
 - Every section has meaningful content.
 - Component YAML uses only supported types and required fields.
 - `npm run validate` passes without errors.
+- `npm run doctor` reports the project is ready for the intended next step.

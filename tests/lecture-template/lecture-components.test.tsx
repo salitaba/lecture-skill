@@ -156,7 +156,7 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain(`<p aria-labelledby="${topicId} ${rightLabelId}">Many components</p>`);
   });
 
-  it("renders quiz as a static teaching check and quote as blockquote", () => {
+  it("renders quiz as a collapsed reveal check and quote as blockquote", () => {
     const html = renderToStaticMarkup(
       <>
         <Quote
@@ -185,7 +185,20 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("Quiz: Knowledge check");
     expect(html).toContain('<h3 class="quiz-question">Which command validates?</h3>');
     expect(html).toContain('<ol class="quiz-options">');
-    expect(html).toContain("Static answer key");
+    expect(html).toContain('type="button"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Show answer");
+    const answerRegionId = html.match(/aria-controls="([^"]+)"/)?.[1];
+    const answerLabelId = html.match(/aria-labelledby="([^"]+)"/)?.[1];
+    expect(answerRegionId).toBeTruthy();
+    expect(answerLabelId).toBeTruthy();
+    expect(html).toContain(`id="${answerRegionId}"`);
+    expect(html).toContain(`id="${answerLabelId}"`);
+    expect(html).toContain(`id="${answerRegionId}" class="quiz-answer" hidden="" aria-labelledby="${answerLabelId}"`);
+    expect(html).toContain(`<p id="${answerLabelId}" class="quiz-answer-label">Answer</p>`);
+    expect(html).toContain('<noscript class="quiz-noscript">');
+    expect(html).toContain(".quiz-reveal-button { display: none !important; }");
+    expect(html).toContain("Interactive answer reveal requires JavaScript.");
     expect(html).toContain('<p class="quiz-answer-value">npm run validate</p>');
     expect(html).toContain("Validation checks the template.");
   });
@@ -297,7 +310,8 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("Recap");
     expect(html).toContain("<blockquote>");
     expect(html).toContain("Quiz: Knowledge check");
-    expect(html).toContain("Static answer key");
+    expect(html).toContain("Show answer");
+    expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("After components.");
   });
 });

@@ -14,7 +14,7 @@ This visual gallery shows how each supported lecture component appears in the re
 
 - Identify every supported lecture component by its rendered role label.
 - Apply the exact fenced YAML syntax for supported components.
-- Preview wrapping, static answer-key behavior, and internal code scrolling in the local Next.js app.
+- Preview wrapping, quiz answer reveal behavior, and internal code scrolling in the local Next.js app.
 
 ## Section: Highlight Components
 
@@ -114,7 +114,7 @@ context: "Source quote components are for short excerpts or named statements; th
 
 ## Section: Check Understanding Components
 
-Use Quiz components for static teaching checks with a visible answer key, not hidden answers or scoring.
+Use Quiz components for lightweight knowledge checks with feedback revealed on demand. In the preview, click `Show answer` to review the answer and explanation.
 
 ```lecture-component
 type: quiz
@@ -125,12 +125,12 @@ options:
   - "npm run package:review"
   - "Run the browser only and assume validation is equivalent to visual inspection."
 answer: "npm run validate"
-explanation: "Validation checks the active template or collection and exits nonzero on blocking errors; the rendered quiz then shows this static answer key intentionally as teaching feedback."
+explanation: "Validation checks the active template or collection and exits nonzero on blocking errors; the rendered quiz reveals this feedback only when the learner clicks Show answer."
 ```
 
 ## Key Takeaways
 
 - The engine supports callout, concept_card, step_list, code_block, comparison, summary, quote, and quiz components.
 - Components must use fenced YAML with the lecture-component language tag.
-- Quiz is a static teaching check with a visible answer key.
+- Quiz is a knowledge check whose answer and explanation are revealed on demand.
 - The component demo is valid visual-gallery content but should be restored after previewing.

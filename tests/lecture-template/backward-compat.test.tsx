@@ -73,6 +73,41 @@ Ignored.
     expect(html).not.toContain("Ignored Single Lecture");
     expect(html).not.toContain("Evidence-Driven Debugging for Production Incidents");
   });
+
+  it("renders declared course metadata on the collection landing page", async () => {
+    writeText(
+      "lectures/course.yaml",
+      [
+        'title: "Declared Course"',
+        'description: "A declared collection description."',
+        'audience: "Platform engineers"',
+        'level: "advanced"',
+        'duration: "2 hours"',
+        ""
+      ].join("\n")
+    );
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+
+    const html = renderToStaticMarkup(<>{await Home()}</>);
+
+    expect(html).toContain("Declared Course");
+    expect(html).toContain("A declared collection description.");
+    expect(html).toContain("Platform engineers");
+    expect(html).toContain("advanced");
+    expect(html).not.toContain("Lecture Collection</h1>");
+  });
+
+  it("shows course metadata validation errors instead of trusting invalid metadata", async () => {
+    writeText("lectures/course.yaml", "title: ''\ndescription: ''\n");
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+
+    const html = renderToStaticMarkup(<>{await Home()}</>);
+
+    expect(html).toContain("Course metadata validation failed");
+    expect(html).toContain("lectures/course.yaml");
+    expect(html).toContain("COURSE_METADATA_REQUIRED_FIELD");
+    expect(html).toContain("Course metadata");
+  });
 });
 
 function copyFixture(sourcePath: string, destinationPath: string) {

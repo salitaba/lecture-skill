@@ -2,9 +2,9 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } fr
 import { constants } from "node:fs";
 import { accessSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import os from "node:os";
 import path from "node:path";
-import { isCollectionMode, scanLectureCollection } from "./collection";
+import { isCollectionMode, validateCollection } from "./collection";
+import { COURSE_METADATA_PATH } from "./courseMetadata";
 import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
 import {
   COLLECTION_SHARED_RAW_SOURCE_PATH,
@@ -15,7 +15,7 @@ import {
   collectionRawSourcePath,
   renderSourceReviewWorksheetMarkdown
 } from "./sourceReview";
-import type { LectureMetadata, LectureTemplate, ValidationError } from "./types";
+import type { CourseMetadata, CourseMetadataValidationResult, LectureMetadata, LectureTemplate } from "./types";
 import { validateTemplateSource } from "./validateTemplate";
 import { formatError } from "./validateCli";
 
@@ -23,6 +23,12 @@ export type ReviewPackageMode = "single-lecture" | "collection";
 
 export interface ReviewPackageSourceRecord {
   templatePath: string;
+  packagePath: string;
+  contents: string;
+}
+
+export interface ReviewPackageCourseMetadataRecord {
+  sourcePath: string;
   packagePath: string;
   contents: string;
 }
@@ -69,6 +75,8 @@ export type ReviewPackagePreflight =
       lectureCount: number;
       lectures: ReviewPackageLecture[];
       sources: ReviewPackageSourceRecord[];
+      courseMetadata?: CourseMetadataValidationResult;
+      courseMetadataSource?: ReviewPackageCourseMetadataRecord;
       rawEvidence: ReviewPackageRawEvidenceRecord[];
       routes: ReviewPackageRoute[];
       ignoredInactiveTemplatePaths: string[];
@@ -80,6 +88,8 @@ export type ReviewPackagePreflight =
       lectureCount: number;
       lectures: ReviewPackageLecture[];
       sources: ReviewPackageSourceRecord[];
+      courseMetadata?: CourseMetadataValidationResult;
+      courseMetadataSource?: ReviewPackageCourseMetadataRecord;
       rawEvidence: ReviewPackageRawEvidenceRecord[];
       routes: ReviewPackageRoute[];
       ignoredInactiveTemplatePaths: string[];
@@ -106,9 +116,11 @@ export interface ReviewPackageManifest {
   contents: {
     renderedPages: string[];
     sourceTemplates: string[];
+    courseMetadata: string[];
     rawSourceEvidence: string[];
     reviewerFiles: string[];
   };
+  courseMetadata?: CourseMetadata;
   lectures: ReviewPackageLecture[];
   rawEvidence: Omit<ReviewPackageRawEvidenceRecord, "contents">[];
   ignoredInactiveTemplatePaths: string[];
@@ -181,6 +193,25 @@ export async function verifyReviewPackageSourceSnapshot(preflight: ReviewPackage
     }
   }
 
+  if (preflight.courseMetadataSource) {
+    let currentContents: string;
+    try {
+      currentContents = await readFile(repositoryPath(preflight.courseMetadataSource.sourcePath), "utf8");
+    } catch (error) {
+      return {
+        ok: false,
+        message: `Course metadata changed after validation: ${preflight.courseMetadataSource.sourcePath} is no longer readable (${formatUnknownError(error)}). Re-run npm run package:review.`
+      };
+    }
+
+    if (currentContents !== preflight.courseMetadataSource.contents) {
+      return {
+        ok: false,
+        message: `Course metadata changed after validation: ${preflight.courseMetadataSource.sourcePath}. Re-run npm run package:review after saving the final content.`
+      };
+    }
+  }
+
   for (const source of preflight.rawEvidence) {
     if (source.status === "missing") continue;
 
@@ -232,11 +263,13 @@ export function createReviewPackageManifest(
     contents: {
       renderedPages: preflight.routes.map((route) => route.outputPath),
       sourceTemplates: preflight.sources.map((source) => source.packagePath),
+      courseMetadata: preflight.courseMetadataSource ? [preflight.courseMetadataSource.packagePath] : [],
       rawSourceEvidence: preflight.rawEvidence
         .filter((source) => source.status === "present")
         .map((source) => source.packagePath),
       reviewerFiles
     },
+    courseMetadata: preflight.courseMetadata?.status === "valid" ? preflight.courseMetadata.metadata : undefined,
     lectures: preflight.lectures,
     rawEvidence: preflight.rawEvidence.map(({ contents: _contents, ...source }) => source),
     ignoredInactiveTemplatePaths: preflight.ignoredInactiveTemplatePaths,
@@ -272,6 +305,10 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
     "",
     ...manifest.contents.sourceTemplates.map((source) => `- ${source}`),
     "",
+    "## Course Metadata",
+    "",
+    ...renderManifestCourseMetadataLines(manifest),
+    "",
     "## Raw Source Evidence",
     "",
     ...manifest.rawEvidence.map((source) =>
@@ -303,6 +340,21 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
   return `${lines.join("\n")}\n`;
 }
 
+function renderManifestCourseMetadataLines(manifest: ReviewPackageManifest): string[] {
+  if (!manifest.courseMetadata) {
+    return ["No course metadata was declared. Collection labels were inferred."];
+  }
+
+  return [
+    ...manifest.contents.courseMetadata.map((source) => `- Source: ${source}`),
+    `Title: ${manifest.courseMetadata.title}`,
+    `Description: ${manifest.courseMetadata.description}`,
+    `Audience: ${manifest.courseMetadata.audience ?? "(not specified)"}`,
+    `Level: ${manifest.courseMetadata.level ?? "(not specified)"}`,
+    `Duration: ${manifest.courseMetadata.duration ?? "(not specified)"}`
+  ];
+}
+
 export function renderReviewPackageReadme(manifest: ReviewPackageManifest): string {
   return [
     "# Lecture Review Package",
@@ -323,6 +375,7 @@ export function renderReviewPackageReadme(manifest: ReviewPackageManifest): stri
     "",
     `Package path recorded at export time: ${manifest.packagePath}`,
     `Source mode: ${manifest.sourceMode}`,
+    manifest.courseMetadata ? `Course title: ${manifest.courseMetadata.title}` : "Course metadata: not declared",
     `Lecture count: ${manifest.lectureCount}`,
     ""
   ].join("\n");
@@ -371,6 +424,7 @@ export async function assembleReviewPackage(
       await rm(path.join(stagingDir, "lectures"), { recursive: true, force: true });
     }
     await writeCapturedSources(stagingDir, preflight.sources);
+    await writeCapturedCourseMetadata(stagingDir, preflight.courseMetadataSource);
     await writeCapturedRawEvidence(stagingDir, preflight.rawEvidence);
     await rewriteHtmlFiles(stagingDir);
 
@@ -459,12 +513,11 @@ async function runSingleLecturePreflight(): Promise<ReviewPackagePreflight> {
 }
 
 async function runCollectionPreflight(): Promise<ReviewPackagePreflight> {
-  const collection = await scanLectureCollection();
+  const collection = await validateCollection();
   const sources: ReviewPackageSourceRecord[] = [];
   const rawEvidence: ReviewPackageRawEvidenceRecord[] = [];
   const lectures: ReviewPackageLecture[] = [];
-  const validationLines = [`Collection validation: ${collection.entries.length} lectures found`, ""];
-  const validationErrors: { slug: string; errors: ValidationError[] }[] = [];
+  let courseMetadataSource: ReviewPackageCourseMetadataRecord | undefined;
   const sharedRawEvidence = await captureRawEvidence(
     COLLECTION_SHARED_RAW_SOURCE_PATH,
     "source/lectures/raw-course.txt",
@@ -472,72 +525,76 @@ async function runCollectionPreflight(): Promise<ReviewPackagePreflight> {
   );
   rawEvidence.push(sharedRawEvidence);
 
-  for (const entry of collection.entries) {
+  for (const result of collection.results) {
     let source: string;
     try {
-      source = await readFile(repositoryPath(entry.templatePath), "utf8");
+      source = await readFile(repositoryPath(result.templatePath), "utf8");
     } catch (error) {
       return invalidPreflight("collection", {
         command: validationCommand,
         status: 1,
         stdout: "",
         stderr: `Could not validate collection: ${formatUnknownError(error)}\n`
-      });
+      }, { courseMetadata: collection.courseMetadata });
     }
 
-    const result = validateTemplateSource(source);
-    validationLines.push(`  [${result.valid ? "PASS" : "FAIL"}] ${entry.slug}/lecture.template.md`);
-
-    if (!result.valid) {
-      validationErrors.push({ slug: entry.slug, errors: result.errors });
-      for (const error of result.errors) {
-        validationLines.push(`    - ${error.code}: ${error.message}`);
-      }
+    if (!result.valid || !result.template) {
       continue;
     }
 
-    const packageSourcePath = path.posix.join("source", entry.templatePath);
-    const renderedOutputPath = path.posix.join("lectures", entry.slug, "index.html");
+    const packageSourcePath = path.posix.join("source", result.templatePath);
+    const renderedOutputPath = path.posix.join("lectures", result.slug, "index.html");
     rawEvidence.push(
       await captureRawEvidence(
-        collectionRawSourcePath(entry.slug),
-        path.posix.join("source", "lectures", entry.slug, "raw-lecture.txt"),
+        collectionRawSourcePath(result.slug),
+        path.posix.join("source", "lectures", result.slug, "raw-lecture.txt"),
         "primary",
-        entry.slug
+        result.slug
       )
     );
     sources.push({
-      templatePath: entry.templatePath,
+      templatePath: result.templatePath,
       packagePath: packageSourcePath,
       contents: source
     });
-    lectures.push(buildLectureRecord(result.template, entry.slug, entry.templatePath, packageSourcePath, renderedOutputPath));
+    lectures.push(buildLectureRecord(result.template, result.slug, result.templatePath, packageSourcePath, renderedOutputPath));
   }
 
-  const passingCount = collection.entries.length - validationErrors.length;
-  validationLines.push("", `${passingCount} of ${collection.entries.length} lectures passed validation.`);
+  const validation = buildCollectionPackageValidation(collection);
 
-  if (validationErrors.length > 0) {
-    return invalidPreflight("collection", {
-      command: validationCommand,
-      status: 1,
-      stdout: `${validationLines.join("\n")}\n`,
-      stderr: ""
-    });
+  if (collection.courseMetadata.status === "valid") {
+    courseMetadataSource = {
+      sourcePath: COURSE_METADATA_PATH,
+      packagePath: "source/lectures/course.yaml",
+      contents: await readFile(repositoryPath(COURSE_METADATA_PATH), "utf8")
+    };
+  }
+
+  if (!collection.allPassed) {
+    return {
+      valid: false,
+      mode: "collection",
+      validation,
+      lectureCount: collection.lectureCount,
+      lectures,
+      sources,
+      courseMetadata: collection.courseMetadata,
+      courseMetadataSource,
+      rawEvidence,
+      routes: [],
+      ignoredInactiveTemplatePaths: activeTemplateExists() ? [ACTIVE_TEMPLATE_PATH] : []
+    };
   }
 
   return {
     valid: true,
     mode: "collection",
-    validation: {
-      command: validationCommand,
-      status: 0,
-      stdout: `${validationLines.join("\n")}\n`,
-      stderr: ""
-    },
+    validation,
     lectureCount: lectures.length,
     lectures,
     sources,
+    courseMetadata: collection.courseMetadata,
+    courseMetadataSource,
     rawEvidence,
     routes: [
       { route: "/", outputPath: "index.html" },
@@ -550,7 +607,11 @@ async function runCollectionPreflight(): Promise<ReviewPackagePreflight> {
   };
 }
 
-function invalidPreflight(mode: ReviewPackageMode, validation: ReviewPackageValidationOutput): ReviewPackagePreflight {
+function invalidPreflight(
+  mode: ReviewPackageMode,
+  validation: ReviewPackageValidationOutput,
+  extras: Partial<Pick<Extract<ReviewPackagePreflight, { valid: false }>, "courseMetadata" | "courseMetadataSource">> = {}
+): ReviewPackagePreflight {
   return {
     valid: false,
     mode,
@@ -558,9 +619,48 @@ function invalidPreflight(mode: ReviewPackageMode, validation: ReviewPackageVali
     lectureCount: 0,
     lectures: [],
     sources: [],
+    courseMetadata: extras.courseMetadata,
+    courseMetadataSource: extras.courseMetadataSource,
     rawEvidence: [],
     routes: [],
     ignoredInactiveTemplatePaths: []
+  };
+}
+
+function buildCollectionPackageValidation(collection: Awaited<ReturnType<typeof validateCollection>>): ReviewPackageValidationOutput {
+  const lines = [`Collection validation: ${collection.lectureCount} lectures found`, ""];
+  if (collection.courseMetadata.status === "valid") {
+    lines.push(
+      `Course metadata: VALID ${collection.courseMetadata.path}`,
+      `  Title: ${collection.courseMetadata.metadata.title}`,
+      `  Description: ${collection.courseMetadata.metadata.description}`,
+      ""
+    );
+  } else if (collection.courseMetadata.status === "invalid") {
+    lines.push(`Course metadata: INVALID ${collection.courseMetadata.path}`);
+    for (const error of collection.courseMetadata.errors) {
+      lines.push(`  - ${error.code}: ${error.message}`);
+    }
+    lines.push("");
+  }
+
+  for (const result of collection.results) {
+    lines.push(`  [${result.valid ? "PASS" : "FAIL"}] ${result.slug}/lecture.template.md`);
+    if (!result.valid) {
+      for (const error of result.errors) {
+        lines.push(`    - ${error.code}: ${error.message}`);
+      }
+    }
+  }
+
+  const passingCount = collection.results.filter((result) => result.valid).length;
+  lines.push("", `${passingCount} of ${collection.lectureCount} lectures passed validation.`);
+
+  return {
+    command: validationCommand,
+    status: collection.allPassed ? 0 : 1,
+    stdout: `${lines.join("\n")}\n`,
+    stderr: ""
   };
 }
 
@@ -674,6 +774,13 @@ async function writeCapturedSources(packageRoot: string, sources: ReviewPackageS
   }
 }
 
+async function writeCapturedCourseMetadata(packageRoot: string, source?: ReviewPackageCourseMetadataRecord) {
+  if (!source) return;
+  const destination = path.join(packageRoot, source.packagePath);
+  await mkdir(path.dirname(destination), { recursive: true });
+  await writeFile(destination, source.contents, "utf8");
+}
+
 async function writeCapturedRawEvidence(packageRoot: string, sources: ReviewPackageRawEvidenceRecord[]) {
   for (const source of sources) {
     if (source.status === "missing") continue;
@@ -766,6 +873,7 @@ function createPackageWorksheet(preflight: Extract<ReviewPackagePreflight, { val
     },
     lectureCount: preflight.lectureCount,
     collectionLandingRoute: preflight.mode === "collection" ? "/" : undefined,
+    courseMetadata: preflight.courseMetadata,
     sharedSource: sharedSource ? toSourceReviewEvidence(sharedSource) : undefined,
     packageContext: {
       packagePath: manifest.packagePath,

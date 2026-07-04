@@ -21,6 +21,30 @@ Validate the active lecture or collection:
 npm run validate
 ```
 
+For machine-readable validation output, use:
+
+```bash
+npm run validate -- --json
+```
+
+Create a new local collection scaffold:
+
+```bash
+npm run new:collection
+```
+
+Create a new lecture in the active workflow:
+
+```bash
+npm run new:lecture
+```
+
+Check project readiness for preview, source-fidelity review, and static packaging:
+
+```bash
+npm run doctor
+```
+
 Preview locally:
 
 ```bash
@@ -64,6 +88,7 @@ The engine supports a lightweight collection mode when a root-level `lectures/` 
 
 ```text
 lectures/
+  course.yaml
   raw-course.txt
   01-introduction/
     raw-lecture.txt
@@ -79,8 +104,31 @@ In collection mode:
 - Each lecture is available at `/lectures/<slug>`, where `<slug>` is the numbered subdirectory name.
 - Each lecture page includes previous/next navigation and a back-to-course link.
 - `npm run validate` validates every `lectures/*/lecture.template.md` file and reports per-lecture status.
+- Optional `lectures/course.yaml` declares collection title, description, audience, level, and duration.
 
 Collection mode takes precedence over `content/lecture.template.md` whenever `lectures/` exists. If `lectures/` is absent or empty, the app falls back to the single-lecture workflow and continues to render `content/lecture.template.md` exactly as before.
+
+### Course Metadata
+
+Course metadata is optional and separate from lecture frontmatter. When present, `lectures/course.yaml` must include non-empty `title` and `description` fields:
+
+```yaml
+title: "Course title"
+description: "Short course description."
+audience: "Technical educators and learners"
+level: "beginner"
+duration: "3 hours"
+```
+
+Optional P0 fields are `audience`, `level`, and `duration`. `level` must be `beginner`, `intermediate`, or `advanced`. Unknown fields are ignored. Valid metadata appears on the collection landing page, source-fidelity worksheets, `manifest.json`, and `MANIFEST.md`; invalid metadata blocks validation and review-package creation while still producing actionable errors.
+
+### Authoring Commands
+
+`npm run new:collection` creates `lectures/course.yaml`, `lectures/01-introduction/lecture.template.md`, and `lectures/01-introduction/raw-lecture.txt` when `lectures/` does not already exist. It refuses to overwrite an existing collection workspace.
+
+`npm run new:lecture` creates `content/lecture.template.md` in single-lecture mode when it is missing. In collection mode, it creates the next numbered `lectures/<NN>-new-lecture/lecture.template.md` and `raw-lecture.txt`. Scaffold commands are non-interactive and never delete existing source files.
+
+`npm run doctor` reports Node/npm versions, active mode, active template paths, course metadata status, lecture count, validation status, raw source evidence status, latest worksheet/package paths, and readiness for preview, source review, and static packaging. It exits `0` when diagnostics run successfully even if readiness warnings are present; it exits nonzero only when the project cannot be inspected.
 
 ## Source Fidelity Review
 
@@ -274,7 +322,7 @@ explanation: "Validation checks the active template or collection."
 ```
 ````
 
-Rendered label: `Quiz: Knowledge check`. Use `quiz` for static teaching checks. It is not a secure assessment, grader, tracker, hidden-answer system, learner-account feature, or analytics feature; the visible static answer key is rendered in the page. `explanation` is optional.
+Rendered label: `Quiz: Knowledge check`. The authoring schema is unchanged: `question`, `options`, `answer`, and optional `explanation`. In interactive pages, the learner initially sees the question, options, and a `Show answer` button; the answer and explanation stay hidden until the learner clicks it. The same control toggles to `Hide answer` after reveal. Printed output includes the answer and explanation by default, and the no-JavaScript fallback is a `<noscript>` message that explains interactive reveal requires JavaScript while print remains available. Quiz reveal is a pacing aid, not secure assessment, grading, tracking, answer encryption, anti-cheating, learner accounts, analytics, or source-code secrecy.
 
 Unsupported custom component types still fail validation.
 

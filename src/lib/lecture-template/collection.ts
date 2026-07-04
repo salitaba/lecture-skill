@@ -1,6 +1,7 @@
 import { access, readdir } from "node:fs/promises";
 import path from "node:path";
 import { LECTURES_DIR as SHARED_LECTURES_DIR, readLectureEntry as readLectureTemplateEntry, repositoryPath } from "./readTemplate";
+import { readCourseMetadata } from "./courseMetadata";
 import { parseLectureTemplate } from "./parseTemplate";
 import { validateTemplateSource } from "./validateTemplate";
 import type {
@@ -19,11 +20,19 @@ export async function isCollectionMode(): Promise<boolean> {
   return entries.length > 0;
 }
 
-export async function scanLectureCollection(): Promise<LectureCollection> {
-  const entries = await collectLectureEntries(true);
+export interface ScanLectureCollectionOptions {
+  logSkippedDirectories?: boolean;
+}
+
+export async function scanLectureCollection(options: ScanLectureCollectionOptions = {}): Promise<LectureCollection> {
+  const [entries, courseMetadata] = await Promise.all([
+    collectLectureEntries(options.logSkippedDirectories ?? true),
+    readCourseMetadata()
+  ]);
   return {
     basePath: LECTURES_DIR,
-    entries
+    entries,
+    courseMetadata
   };
 }
 
@@ -31,8 +40,8 @@ export async function readLectureEntry(entry: LectureCollectionEntry): Promise<s
   return readLectureTemplateEntry(entry);
 }
 
-export async function validateCollection(): Promise<CollectionValidationResult> {
-  const collection = await scanLectureCollection();
+export async function validateCollection(options: ScanLectureCollectionOptions = {}): Promise<CollectionValidationResult> {
+  const collection = await scanLectureCollection(options);
   const results: LectureValidationResult[] = [];
 
   for (const entry of collection.entries) {
@@ -52,7 +61,8 @@ export async function validateCollection(): Promise<CollectionValidationResult> 
   return {
     lectureCount: results.length,
     results,
-    allPassed: results.every((result) => result.valid)
+    courseMetadata: collection.courseMetadata,
+    allPassed: results.every((result) => result.valid) && collection.courseMetadata.status !== "invalid"
   };
 }
 

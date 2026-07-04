@@ -13,6 +13,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "validate": "node --import ./scripts/register-ts-loader.mjs scripts/validate.ts",
+    "new:collection": "node --import ./scripts/register-ts-loader.mjs scripts/newCollection.ts",
+    "new:lecture": "node --import ./scripts/register-ts-loader.mjs scripts/newLecture.ts",
+    "doctor": "node --import ./scripts/register-ts-loader.mjs scripts/doctor.ts",
     "review:source": "node --import ./scripts/register-ts-loader.mjs scripts/reviewSource.ts",
     "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts"
   },
@@ -23,11 +26,15 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "26.1.0",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.10",
+    "jsdom": "^29.1.1",
     "tsx": "4.22.5",
     "typescript": "6.0.3",
     "vitest": "4.1.9"

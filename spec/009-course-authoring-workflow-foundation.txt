@@ -1,0 +1,420 @@
+Feature: Course Authoring Workflow Foundation
+
+## Product Summary
+
+Strengthen the Lecture Site Engine from a template renderer into a more complete local course authoring product by adding first-class course metadata, scaffold commands, and machine-readable validation output.
+
+The engine already supports the core rendering and review loop: an educator or AI agent can create lecture templates, validate them, preview a single lecture or collection, generate source-fidelity worksheets, and create static review packages. The next product gap is authoring workflow. Today, authors must remember directory conventions, copy example structures, infer collection-level information from folder names, and read human-oriented validation output even when an AI agent or script needs structured feedback.
+
+The primary product outcome is: a technical educator or AI agent can initialize, inspect, validate, and prepare a course or lecture collection through explicit local commands and a small course metadata file, without changing the existing lecture template schema or requiring a browser editor.
+
+This feature is about productizing the local authoring loop. It is not a CMS, hosted publishing system, LLM integration, or learner analytics feature.
+
+## Product Outcome
+
+Authors should feel that the engine gives them a predictable workflow, not only a set of files:
+
+- A new course can be scaffolded without manually copying example folders.
+- A collection can declare its own title, description, audience, prerequisites, author, and ordering intent.
+- Validation can be consumed by humans, AI agents, and scripts.
+- A diagnostic command can explain whether the project is ready for preview, review, or packaging.
+- Existing single-lecture and collection workflows remain compatible.
+
+The engine should remain local-first, deterministic, static-export friendly, and simple enough for an AI coding agent to operate reliably.
+
+## Users And Jobs
+
+Primary users:
+
+- Technical educators building lecture collections from notes, outlines, transcripts, or generated templates.
+- AI coding agents converting raw source material into validated lecture templates.
+- Reviewers who need to understand what course or collection they are reviewing.
+
+Jobs to be done:
+
+- As an educator, I want to create a new lecture or collection without remembering every required file and folder.
+- As an educator, I want the course landing page and review package to show intentional course metadata instead of inferred placeholders.
+- As an AI agent, I want machine-readable validation results so I can revise templates without parsing fragile terminal prose.
+- As a reviewer, I want a package and worksheet to identify the course title, description, source mode, lecture count, and readiness state.
+- As a maintainer, I want diagnostics that catch common setup and workflow mistakes before authors waste time in the browser.
+
+## Problem
+
+The engine has strong rendering and validation behavior, but the surrounding authoring workflow is still too implicit:
+
+- Collection identity is inferred from directory structure instead of declared as course-level metadata.
+- Authors must manually create numbered lecture directories and template files.
+- AI agents must follow prose instructions and examples instead of invoking a scaffold command.
+- `npm run validate` is useful for humans, but scripts and agents need a stable JSON mode.
+- There is no single command that explains whether the local project is ready for preview, review worksheet generation, or static packaging.
+- Static review packages and source-fidelity worksheets can include lecture metadata, but they do not yet have a first-class course metadata source.
+- Multi-lecture collections will become harder to manage as features such as search, progress tracking, print output, and review mode are added.
+
+The result is a product that works, but still depends too much on convention memory and manual setup.
+
+## Goals
+
+- Add optional course-level metadata for collection mode.
+- Keep existing collections valid when metadata is absent.
+- Use course metadata on the collection landing page, source-fidelity worksheet, and static review package manifest.
+- Add local scaffold commands for creating a new single lecture or collection lecture.
+- Add a diagnostic command that reports project readiness and common workflow issues.
+- Add machine-readable validation output for AI agents and scripts.
+- Preserve the existing lecture template schema and all supported component contracts.
+- Preserve the existing `npm run validate`, `npm run dev`, `npm run review:source`, and `npm run package:review` workflows.
+
+## Non-Goals
+
+- No browser-based authoring editor.
+- No hosted publishing, deployment automation, or remote storage.
+- No CMS, database, authentication, roles, or collaboration workflow.
+- No in-app LLM API integration.
+- No automatic source-to-template generation command.
+- No learner accounts, analytics, grading, or persistent progress tracking.
+- No arbitrary custom component plugin system.
+- No breaking change to `content/lecture.template.md` or `lectures/<slug>/lecture.template.md`.
+- No requirement that existing collections immediately add course metadata.
+
+## Product Decisions
+
+- Course metadata is optional in P0. Absence of metadata must not break current collection mode.
+- Metadata belongs at `lectures/course.yaml` for collection mode.
+- Single-lecture metadata continues to live in `content/lecture.template.md` frontmatter.
+- Folder names remain the default lecture ordering mechanism in P0.
+- Metadata may label and describe a collection, but it must not introduce a second lecture template schema.
+- CLI commands should be thin wrappers around local files, validation, and existing engine behavior.
+- JSON validation output should be stable enough for scripts and AI agents, while human terminal output remains the default.
+
+## Priority
+
+### P0: Launch Scope
+
+P0 makes the local authoring workflow explicit and scriptable.
+
+Requirements:
+
+- Support optional `lectures/course.yaml` in collection mode.
+- Validate `lectures/course.yaml` when present.
+- Render collection metadata on the collection landing page when present.
+- Include collection metadata in source-fidelity worksheets.
+- Include collection metadata in static review package `manifest.json` and `MANIFEST.md`.
+- Add `npm run new:collection` to create a minimal collection scaffold.
+- Add `npm run new:lecture` to create a numbered lecture folder in collection mode, or a single-lecture template when collection mode is not active.
+- Add `npm run doctor` to report project mode, Node/npm readiness, active content paths, validation status, raw source evidence status, and package readiness.
+- Add `npm run validate -- --json` or equivalent JSON mode for validation results.
+- Preserve current human-readable validation output as the default.
+- Update README and `SKILL.md` so educators and AI agents know when to use metadata and scaffold commands.
+- Add tests for metadata parsing, validation, landing-page rendering, CLI behavior, and JSON validation output.
+
+### P1: Workflow Polish
+
+P1 improves course organization and author confidence.
+
+Requirements:
+
+- Add optional metadata fields for `prerequisites`, `learning_path`, `author`, `version`, and `review_status`.
+- Let `npm run doctor` identify stale review packages and missing source worksheets.
+- Add scaffold options for title, slug, audience, duration, and level.
+- Add a command option that previews the next available lecture number and slug without writing files.
+- Add package README content that explains the course metadata and review state.
+- Add stronger remediation hints when course metadata is malformed.
+
+### P2: Future Course Operations
+
+P2 is intentionally outside the launch scope.
+
+Potential enhancements:
+
+- Explicit ordering overrides in `course.yaml`.
+- Course-level glossary or shared terms file.
+- Cross-lecture search index generation.
+- Local progress tracking.
+- Course print/PDF export.
+- Browser review mode that uses metadata to organize rendered output and raw source evidence.
+
+## Course Metadata Contract
+
+Recommended P0 file path:
+
+```text
+lectures/course.yaml
+```
+
+Recommended P0 shape:
+
+```yaml
+title: "Course title"
+description: "Short course description."
+audience: "Technical educators and learners"
+level: "beginner"
+duration: "3 hours"
+```
+
+Required fields when `course.yaml` is present:
+
+- `title`: non-empty string.
+- `description`: non-empty string.
+
+Optional P0 fields:
+
+- `audience`: non-empty string.
+- `level`: `beginner`, `intermediate`, or `advanced`.
+- `duration`: non-empty string.
+
+P1 optional fields:
+
+- `prerequisites`: list of non-empty strings.
+- `learning_path`: list of non-empty strings describing the intended sequence.
+- `author`: non-empty string.
+- `version`: non-empty string.
+- `review_status`: `draft`, `ready-for-review`, `approved`, or `needs-revision`.
+
+Validation behavior:
+
+- If `lectures/course.yaml` is absent, collection mode falls back to inferred collection labels.
+- If `lectures/course.yaml` is present and malformed, validation should report course metadata errors.
+- Metadata errors should be author-locatable and include the field name and expected format.
+- Invalid metadata should block `npm run validate`, `npm run package:review`, and package creation.
+- Invalid metadata should not prevent the app from showing a validation screen with actionable errors.
+- Unknown metadata fields are allowed but ignored in P0.
+
+## Scaffold Commands
+
+### `npm run new:collection`
+
+Purpose:
+
+Create a minimal collection structure for authors and AI agents.
+
+Recommended output:
+
+```text
+lectures/
+  course.yaml
+  01-introduction/
+    raw-lecture.txt
+    lecture.template.md
+```
+
+Requirements:
+
+- Do not overwrite existing user-authored lecture directories.
+- If `lectures/` already exists, print a clear message and avoid destructive changes.
+- Create a valid minimal `course.yaml`.
+- Create a valid minimal first lecture template.
+- Create an empty or placeholder `raw-lecture.txt` that clearly indicates where source evidence belongs.
+- Print next commands: `npm run validate`, `npm run dev`, and optionally `npm run review:source`.
+
+### `npm run new:lecture`
+
+Purpose:
+
+Create a new lecture template in the active workflow.
+
+Collection-mode behavior:
+
+- Find the next numeric prefix under `lectures/`.
+- Create `lectures/<next-number>-<slug>/lecture.template.md`.
+- Create `lectures/<next-number>-<slug>/raw-lecture.txt`.
+- Use a valid minimal template with placeholders.
+
+Single-lecture behavior:
+
+- If `content/lecture.template.md` is missing, create it.
+- If it already exists, refuse to overwrite it unless a future explicit force option is added.
+
+Requirements:
+
+- Generated templates must pass schema validation after authors replace placeholder text with real content.
+- The command must never delete or overwrite existing lecture source files.
+- The command should print the created paths and next commands.
+- The command should be usable by an AI agent without interactive prompts.
+
+## Doctor Command
+
+### `npm run doctor`
+
+Purpose:
+
+Give authors and AI agents a single readiness report for the local project.
+
+The command should report:
+
+- Runtime baseline: Node.js version and npm version.
+- Active mode: `single-lecture` or `collection`.
+- Active template paths.
+- Course metadata path and validation status when present.
+- Lecture count in collection mode.
+- Schema validation result.
+- Raw source evidence status.
+- Latest source-fidelity worksheet path, if available.
+- Latest static review package path, if available.
+- Whether the project appears ready for preview.
+- Whether the project appears ready for source-fidelity review.
+- Whether the project appears ready for static package creation.
+
+Requirements:
+
+- Exit `0` when diagnostics run successfully, even if readiness warnings are found.
+- Exit nonzero only when the doctor command itself cannot inspect the project.
+- Use clear warning labels for missing raw source evidence, invalid templates, missing metadata, stale package output, or unsupported runtime versions.
+- Do not mutate files.
+
+## JSON Validation Output
+
+Purpose:
+
+Let AI agents, scripts, and future tools consume validation results without scraping human terminal text.
+
+Recommended command:
+
+```bash
+npm run validate -- --json
+```
+
+Recommended JSON shape:
+
+```json
+{
+  "mode": "collection",
+  "valid": false,
+  "lectureCount": 2,
+  "courseMetadata": {
+    "path": "lectures/course.yaml",
+    "valid": true,
+    "errors": []
+  },
+  "lectures": [
+    {
+      "slug": "01-introduction",
+      "path": "lectures/01-introduction/lecture.template.md",
+      "valid": true,
+      "errors": []
+    },
+    {
+      "slug": "02-core-concepts",
+      "path": "lectures/02-core-concepts/lecture.template.md",
+      "valid": false,
+      "errors": [
+        {
+          "message": "Missing required section: ## Key Takeaways",
+          "field": "Key Takeaways",
+          "line": null,
+          "hint": "Add a ## Key Takeaways heading after the final section."
+        }
+      ]
+    }
+  ]
+}
+```
+
+Requirements:
+
+- JSON mode must write valid JSON to stdout.
+- JSON mode must avoid extra prose before or after the JSON payload.
+- JSON mode must preserve the same exit-code behavior as human validation: nonzero when validation fails.
+- Every validation error should include `message`, and should include `field`, `line`, `section`, `componentType`, and `hint` when known.
+- The JSON contract should be documented as stable enough for local scripts and AI-agent workflows.
+
+## Experience Requirements
+
+### Collection Landing Page
+
+When valid course metadata exists, the collection landing page should use it:
+
+- Show `course.yaml.title` as the collection title.
+- Show `course.yaml.description` as the collection description.
+- Show audience, level, and duration when present.
+- Preserve lecture cards in authored order.
+- Preserve validation status indicators.
+
+When metadata is absent:
+
+- Continue using the current fallback collection title and description.
+- Do not show a scary warning in the learner-facing page.
+- Let `npm run doctor` recommend metadata as an optional authoring improvement.
+
+### Source Fidelity Worksheet
+
+Worksheet requirements:
+
+- Record course metadata when present.
+- Record metadata validation status.
+- Keep per-lecture source evidence sections unchanged.
+- Do not copy raw source prose into metadata summaries.
+- Clearly mark whether metadata was declared or inferred.
+
+### Static Review Package
+
+Package requirements:
+
+- Include `lectures/course.yaml` under `source/lectures/course.yaml` when present.
+- Include course metadata in `manifest.json`.
+- Include course metadata in `MANIFEST.md`.
+- Use metadata in package `README.md` when present.
+- Block package creation if present metadata is invalid.
+
+## Compatibility Requirements
+
+- Existing single-lecture projects continue to render, validate, review, and package unchanged.
+- Existing collection projects without `lectures/course.yaml` continue to render, validate, review, and package unchanged.
+- Existing valid lecture templates remain valid.
+- Existing invalid fixtures remain invalid for the same schema reasons unless explicitly updated by this feature.
+- `npm run validate` without flags keeps the current human-readable behavior.
+- `npm run package:review` keeps its current validation preflight behavior.
+- Static exports remain local and network-free.
+
+## Documentation Requirements
+
+- Update `README.md` with the course metadata contract.
+- Update `README.md` with scaffold command examples.
+- Update `README.md` with doctor and JSON validation examples.
+- Update `SKILL.md` so AI agents prefer scaffold commands when starting new collections.
+- Update `SKILL.md` so AI agents preserve `course.yaml` and do not invent unsupported metadata fields as product promises.
+- Add an example `lectures/course.yaml` to the multi-lecture example.
+- Document that metadata is optional for backward compatibility.
+- Document that metadata does not replace per-lecture frontmatter.
+
+## Test Requirements
+
+Minimum test coverage:
+
+- Course metadata parser accepts valid P0 metadata.
+- Course metadata parser rejects malformed YAML.
+- Course metadata validation rejects missing required fields when the file exists.
+- Course metadata validation rejects invalid `level` values.
+- Collection landing page renders declared metadata when present.
+- Collection landing page falls back when metadata is absent.
+- `npm run validate -- --json` emits valid JSON for single-lecture mode.
+- `npm run validate -- --json` emits valid JSON for collection mode.
+- JSON validation exits nonzero when any lecture or course metadata is invalid.
+- `npm run new:collection` creates a non-destructive minimal scaffold.
+- `npm run new:lecture` creates the next numbered lecture in collection mode.
+- `npm run doctor` reports active mode, validation state, raw source status, and readiness categories.
+- Static review package manifest includes course metadata when present.
+- Source-fidelity worksheet includes course metadata when present.
+
+## Success Metrics / Quality Gates
+
+Launch-blocking metrics:
+
+- A fresh user can create a new collection scaffold, validate it, and preview it using documented commands.
+- An AI agent can create a new lecture in collection mode without manually choosing the next numeric folder prefix.
+- A reviewer can identify the course title, description, lecture count, and review context from a static review package.
+- JSON validation output is parseable and stable for valid and invalid single-lecture and collection cases.
+- Existing single-lecture and collection fixtures remain backward compatible.
+- `npm run doctor` gives actionable readiness output without mutating files.
+
+Learning metrics that inform product confidence:
+
+- A target technical educator can start a new two-lecture collection from scratch in under 10 minutes after dependencies are installed.
+- An AI-agent workflow can use JSON validation output to fix at least one invalid template without relying on terminal prose.
+- A reviewer reports that course metadata makes the review package easier to understand than an inferred collection title.
+
+## Open Questions
+
+- Should `course.yaml` eventually support explicit ordering overrides, or should folder order remain the only supported order until a later feature?
+- Should scaffold commands accept command-line flags in P0, or should they generate safe placeholders only?
+- Should `npm run doctor` return JSON in P0, or is human-readable output enough until JSON validation proves useful?
+- Should invalid optional metadata block package creation, or should only required metadata fields block?
+- Should course metadata be included in single-lecture mode later through a separate `content/course.yaml`, or is frontmatter enough for single lectures?

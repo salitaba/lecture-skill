@@ -328,6 +328,62 @@ describe("review package helpers", () => {
       "lectures/02-core-concepts/raw-lecture.txt"
     ]);
   });
+
+  it("includes valid course metadata in collection package manifests and copied sources", async () => {
+    writeText("lectures/course.yaml", 'title: "Course Title"\ndescription: "Course description."\naudience: "Engineers"\nlevel: "beginner"\nduration: "2 hours"\n');
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+    const preflight = await runReviewPackagePreflight();
+    writeText("out/index.html", '<a href="/lectures/01-introduction/">Lecture</a>');
+    writeText("out/lectures/01-introduction/index.html", '<a href="/">Home</a>');
+
+    expect(preflight.valid).toBe(true);
+    expect(preflight.courseMetadata?.status).toBe("valid");
+    expect(preflight.courseMetadataSource).toMatchObject({
+      sourcePath: "lectures/course.yaml",
+      packagePath: "source/lectures/course.yaml"
+    });
+
+    const result = await assembleReviewPackage(preflight, {
+      exportedOutDir: path.join(tempRoot, "out"),
+      packagesRoot: path.join(tempRoot, "review-packages"),
+      createdAt: new Date(2026, 6, 4, 1, 30),
+      runtimeMetadata: {
+        gitCommit: "unavailable",
+        gitDirtyStatus: "unavailable",
+        npmVersion: "unavailable"
+      }
+    });
+
+    expect(result.manifest.courseMetadata).toMatchObject({ title: "Course Title" });
+    expect(result.manifest.contents.courseMetadata).toEqual(["source/lectures/course.yaml"]);
+    expect(readFileSync(path.join(result.packageDir, "source/lectures/course.yaml"), "utf8")).toContain('title: "Course Title"');
+    expect(readFileSync(path.join(result.packageDir, "MANIFEST.md"), "utf8")).toContain("## Course Metadata");
+    expect(readFileSync(path.join(result.packageDir, "MANIFEST.md"), "utf8")).toContain("Title: Course Title");
+  });
+
+  it("blocks collection package preflight when course metadata is invalid", async () => {
+    writeText("lectures/course.yaml", "title: ''\ndescription: ''\n");
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+
+    const preflight = await runReviewPackagePreflight();
+
+    expect(preflight.valid).toBe(false);
+    expect(preflight.courseMetadata?.status).toBe("invalid");
+    expect(preflight.validation.stdout).toContain("Course metadata: INVALID lectures/course.yaml");
+  });
+
+  it("fails source snapshot verification when course metadata changes after preflight", async () => {
+    writeText("lectures/course.yaml", 'title: "Course Title"\ndescription: "Course description."\n');
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+    const preflight = await runReviewPackagePreflight();
+
+    writeText("lectures/course.yaml", 'title: "Changed Course"\ndescription: "Course description."\n');
+
+    await expect(verifyReviewPackageSourceSnapshot(preflight)).resolves.toEqual({
+      ok: false,
+      message: expect.stringContaining("Course metadata changed after validation")
+    });
+  });
 });
 
 function copyFixture(sourcePath: string, destinationPath: string) {

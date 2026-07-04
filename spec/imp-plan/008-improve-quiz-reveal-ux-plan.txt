@@ -1,0 +1,239 @@
+Implementation Plan: Improve Quiz Reveal UX
+===========================================
+
+Spec: spec/008-improve-quiz-reveal-ux.txt
+Plan status: finalized after tech-lead review
+
+## Brief Summary
+
+Change the existing `quiz` lecture component from an always-visible static answer key into a lightweight reveal interaction for learner-facing pages.
+
+The authoring schema remains unchanged: authors still provide `question`, `options`, `answer`, and optional `explanation`. The product change is in rendering, styling, tests, examples, and documentation. On initial JavaScript-enabled page render, learners see `Quiz: Knowledge check`, the question, ordered options, and a `Show answer` button. The answer and optional explanation become visible only after activating the button, and the same control toggles back to `Hide answer`.
+
+This is not secure assessment. The answer may still exist in source files, static HTML, review packages, or JavaScript bundles. Tests and documentation must treat reveal as a pacing aid, not source-code protection.
+
+The finalized implementation path is a client React quiz component with local state, a native button, an always-mounted hidden answer region, print CSS that forces hidden answers to print, and a documented `<noscript>` fallback.
+
+## Relevant Existing Files
+
+- `src/components/lecture-kit/Quiz.tsx`: currently renders a visible `Static answer key` region immediately below ordered options. Convert this to a client component using local reveal state.
+- `src/components/lecture-kit/SectionRenderer.tsx`: dispatches `quiz` blocks to `Quiz`; no dispatch change should be needed, but tests must keep covering the branch.
+- `src/app/globals.css`: owns quiz card, answer region, focus, responsive wrapping, and print styles. Current print rules avoid breaks and tweak borders, but they do not force hidden answers to print.
+- `src/lib/lecture-template/types.ts`: defines `QuizComponent`. No schema/model change is expected.
+- `src/lib/lecture-template/validateTemplate.ts`: validates quiz fields and exact answer-to-option matching. Parser and validator behavior should remain unchanged.
+- `tests/lecture-template/lecture-components.test.tsx`: currently uses `renderToStaticMarkup` and asserts stale static-answer behavior, including `Static answer key`, visible answer text, explanation text, and `SectionRenderer` output.
+- `vitest.config.ts` and `package.json`: tests currently run in Node. Add a concrete DOM interaction test stack for quiz reveal.
+- `tests/lecture-template/fixtures.test.ts`, `validateTemplate.test.ts`, `parseTemplate.test.ts`, and CLI tests: should remain mostly unchanged except for stale wording or fixture expectations.
+- `tests/lecture-template/review-package.test.ts`: tests package helper models and URL rewriting, not rendered Next interactivity. Do not claim this proves quiz reveal works unless a slow rendered-package integration test is added.
+- `examples/component-demo.template.md`: stale lines mention "static answer-key behavior", "visible answer key", and explanation text saying the rendered quiz shows a static answer key.
+- `README.md`: quiz docs currently say "the visible static answer key is rendered in the page."
+- `SKILL.md`: agent guidance currently says quizzes render a visible static answer key and are not hidden-answer tests.
+- `scripts/packageReview.ts` and `src/lib/lecture-template/reviewPackage.ts`: package flow runs static build and copies exported `_next/static` assets, so the normal app bundle should carry the client quiz interaction.
+
+## Proposed Implementation Steps
+
+1. Convert `Quiz.tsx` to a concrete client-side disclosure implementation.
+   - Add `"use client"` and use `useState(false)` plus `useId`.
+   - Keep the visible label `Quiz: Knowledge check`, question heading, and ordered options visible in the initial state.
+   - Render a native `<button type="button">` below the options.
+   - Button text is `Show answer` when collapsed and `Hide answer` when expanded.
+   - Set `aria-expanded={revealed}` on the button.
+   - Create separate ids for the answer region and answer label:
+     - `answerRegionId` for the region controlled by the button.
+     - `answerLabelId` for the visible `Answer` label.
+   - Set `aria-controls={answerRegionId}` on the button.
+   - Render `<div id={answerRegionId} className="quiz-answer" hidden={!revealed} aria-labelledby={answerLabelId}>`.
+   - Keep the answer region mounted even when hidden. This avoids source-secrecy claims and lets print CSS force answers visible.
+   - Use the label `Answer`, replacing stale `Static answer key`.
+   - Render optional explanation only inside the answer region.
+   - Keep multiple quiz instances independent through per-instance `useState` and unique `useId` values.
+   - Do not use `dangerouslySetInnerHTML`.
+
+2. Use the finalized no-JavaScript fallback.
+   - Add a `<noscript className="quiz-noscript">` message inside each quiz.
+   - The message should state that the interactive reveal requires JavaScript and that printed output includes the answer and explanation.
+   - Do not render a dead or misleading no-JavaScript button alternative.
+   - Document this exact fallback in `README.md` and `SKILL.md`.
+
+3. Preserve schema, parser, validation, and dispatch contracts.
+   - Do not change `QuizComponent` fields in `src/lib/lecture-template/types.ts`.
+   - Do not change validation rules in `src/lib/lecture-template/validateTemplate.ts`.
+   - Keep exact answer matching against normalized options.
+   - Keep `SectionRenderer` dispatching `quiz` to `Quiz` through the existing switch.
+   - Existing valid quiz templates must remain valid. Existing invalid quiz fixtures must remain invalid for the same schema reasons.
+
+4. Update quiz CSS for collapsed, revealed, responsive, focus, no-JS, and print states.
+   - Keep `.quiz-card`, `.quiz-question`, and `.quiz-options` readable and wrapping cleanly.
+   - Add `.quiz-reveal-button` styling with clear button affordance. The existing global `button:focus-visible` rule should provide a visible focus state; strengthen it only if the button styling weakens it.
+   - Add `.quiz-noscript` styling that is readable but secondary.
+   - Keep `.quiz-answer` visually distinct only when visible on screen.
+   - Avoid empty visual gaps while `.quiz-answer` is hidden.
+   - Ensure long questions, options, answers, and explanations wrap at phone, tablet, and desktop widths.
+   - In `@media print`, hide `.quiz-reveal-button` and `.quiz-noscript`.
+   - In `@media print`, force hidden answers to print with `.quiz-answer[hidden] { display: block !important; }`; `display: block` without `!important` is too weak for the `hidden` attribute.
+   - Keep printed answer/explanation labels clear and avoid dependence on reveal state.
+   - Avoid transitions unless they respect `prefers-reduced-motion`.
+
+5. Add a concrete DOM interaction test stack.
+   - Add dev dependencies: `jsdom`, `@testing-library/react`, `@testing-library/user-event`, and `@testing-library/jest-dom` if useful for matchers.
+   - Prefer a file-level jsdom environment comment in the new quiz interaction test so existing Node tests can remain Node tests.
+   - Create `tests/lecture-template/quiz-interaction.test.tsx`.
+   - Use Testing Library and `userEvent` to verify real button interaction.
+   - Because the answer region stays mounted, do not use `queryByText` as proof that hidden answers are absent. Assert `hidden`, visibility, `aria-expanded`, and accessible relationships.
+
+6. Add focused quiz interaction tests.
+   - Initial render includes `Quiz: Knowledge check`, question, ordered options, and `Show answer`.
+   - Initial state has a real button with `type="button"`, `aria-expanded="false"`, and `aria-controls`.
+   - The answer region id matches `aria-controls`.
+   - The hidden answer region is associated with the visible `Answer` label through `aria-labelledby`.
+   - Initial state does not visibly expose answer or explanation; assert the answer region is hidden rather than absent from the DOM.
+   - Clicking `Show answer` changes the button text to `Hide answer`, sets `aria-expanded="true"`, removes `hidden`, and visibly shows `Answer`, the answer value, and optional explanation.
+   - Clicking `Hide answer` collapses feedback again.
+   - Two quizzes on one page maintain independent expanded/collapsed state.
+   - Two quizzes on one page have distinct answer-region ids.
+   - Keyboard operation can be covered through Testing Library/user-event button activation; native button semantics cover Enter/Space.
+
+7. Update existing static markup tests precisely.
+   - In `tests/lecture-template/lecture-components.test.tsx`, remove stale assertions for `Static answer key`.
+   - Static `renderToStaticMarkup` tests should assert initial SSR markup contains:
+     - `Quiz: Knowledge check`;
+     - the question and ordered options;
+     - a button with `type="button"`;
+     - `aria-expanded="false"`;
+     - `aria-controls` pointing at a matching answer-region `id`;
+     - a hidden answer region labeled `Answer`.
+   - Do not assert absence of the answer string from static markup. Source secrecy is out of scope and the always-mounted hidden region intentionally contains it.
+   - Keep React escaping tests for HTML-like quiz fields.
+   - Keep `SectionRenderer` dispatch coverage and update it to assert the reveal control instead of old visible answer-key wording.
+
+8. Update the component demo and examples.
+   - In `examples/component-demo.template.md`, replace stale wording:
+     - "static answer-key behavior";
+     - "static teaching checks with a visible answer key";
+     - explanation text saying the rendered quiz shows a static answer key;
+     - key takeaway saying quiz is a static teaching check with a visible answer key.
+   - Tell reviewers to click `Show answer`.
+   - Keep the same fenced YAML schema.
+   - Keep long quiz question/options/explanation content so wrapping can be reviewed.
+   - Update key takeaways to describe quiz as a knowledge check with feedback revealed on demand.
+
+9. Update documentation and agent guidance.
+   - In `README.md`, replace the stale quiz paragraph around the current `Quiz (quiz)` section.
+   - In `SKILL.md`, replace the stale quiz guidance around the current quiz component section.
+   - Both docs must state:
+     - schema is unchanged;
+     - interactive pages hide answer and explanation until `Show answer`;
+     - the control toggles to `Hide answer`;
+     - printed output includes answer and explanation by default;
+     - no-JavaScript fallback is the `<noscript>` message plus print availability;
+     - reveal is not secure assessment, grading, tracking, answer encryption, anti-cheating, learner accounts, or analytics.
+   - Search for stale wording before finishing:
+
+```bash
+rg -n "Static answer key|static answer|visible answer key|hidden-answer|Show answer|Hide answer|Quiz: Knowledge check|quiz" README.md SKILL.md docs examples tests src
+```
+
+10. Verify static export and review-package behavior.
+    - Keep `npm run package:review` as the broad review-package verification unless the implementer intentionally adds a slow rendered-package integration test.
+    - Do not add a small helper assertion to `tests/lecture-template/review-package.test.ts` and claim it proves interactivity; that file does not render Next output.
+    - If adding explicit automated package coverage, make it a slow integration test that copies `examples/component-demo.template.md` to `content/lecture.template.md`, runs the package flow, and inspects generated `index.html` for reveal-control markup plus rewritten JS/CSS references.
+    - Manual package verification should open the generated package, click `Show answer`, and confirm the interaction works from local files.
+
+11. Run focused and broad verification.
+    - Focused commands:
+
+```bash
+npm run test -- tests/lecture-template/quiz-interaction.test.tsx
+npm run test -- tests/lecture-template/lecture-components.test.tsx
+npm run test -- tests/lecture-template/fixtures.test.ts
+npm run test -- tests/lecture-template/validateTemplate.test.ts
+npm run validate
+npm run typecheck
+```
+
+    - Before completion, run when practical:
+
+```bash
+npm run test
+npm run lint
+npm run build
+npm run package:review
+```
+
+    - Manual or browser verification:
+      - Save the current `content/lecture.template.md`.
+      - Copy `examples/component-demo.template.md` to `content/lecture.template.md`.
+      - Run `npm run validate` and `npm run dev`.
+      - Check 390px, 768px, and 1280px widths.
+      - Confirm no body-level horizontal overflow:
+
+```js
+document.documentElement.scrollWidth <= document.documentElement.clientWidth
+```
+
+      - Click each quiz reveal control and confirm long content wraps without overlap.
+      - Check print preview and confirm answer/explanation are printed without requiring reveal state.
+      - Build a review package with `npm run package:review`, open the generated package entry file, and confirm `Show answer` works when JavaScript is available.
+      - Restore `content/lecture.template.md`.
+
+## Data Model, API, Persistence, Event, And Domain Changes
+
+- Template schema changes: none.
+- Required fields: none.
+- Supported component types: unchanged.
+- Normalized render model changes: none expected.
+- Parser changes: none expected.
+- Validation changes: none expected.
+- Route/API changes: none.
+- Persistence/event changes: none.
+- External runtime services: none.
+- UI library dependency: none.
+- Runtime network dependency: none.
+- Test dependency changes: add DOM testing dependencies for Vitest interaction coverage.
+- Static export/review package behavior: changes only through the normal rendered app bundle and CSS.
+
+## Test Plan
+
+Automated tests:
+
+- `tests/lecture-template/quiz-interaction.test.tsx`
+  - Use jsdom plus Testing Library.
+  - Verify initial hidden state through `hidden`/visibility and ARIA attributes, not raw text absence.
+  - Verify reveal/hide click behavior.
+  - Verify optional explanation only becomes visible with the answer region.
+  - Verify multiple quiz controls are independent and have unique region ids.
+- `tests/lecture-template/lecture-components.test.tsx`
+  - Continue asserting `Quiz: Knowledge check`.
+  - Assert SSR/static markup includes the collapsed reveal button and hidden answer region labeled `Answer`.
+  - Keep `SectionRenderer` dispatch coverage.
+  - Keep React escaping coverage for HTML-like quiz fields.
+  - Remove or rewrite stale `Static answer key` assertions.
+- `tests/lecture-template/validateTemplate.test.ts`
+  - Confirm valid quiz schema and invalid quiz fixtures remain unchanged.
+  - Keep component-demo validity and supported component-set assertions.
+- `tests/lecture-template/fixtures.test.ts`
+  - Keep fixture sweep green after demo copy updates.
+- Review package checks
+  - Prefer `npm run package:review` plus manual open/click verification.
+  - Add a slow rendered-package integration test only if automated package interactivity coverage is worth the added runtime.
+
+Manual/browser checks:
+
+- In local preview and static review package, verify reveal/hide works with mouse and keyboard.
+- Verify long quiz content wraps at 390px, 768px, and 1280px.
+- Verify no body-level horizontal overflow.
+- Verify print preview always includes answer and explanation with labels.
+- Verify the no-JavaScript fallback shows the documented `<noscript>` message when JavaScript is unavailable.
+
+## Risks, Assumptions, And Open Questions
+
+- Risk: Converting `Quiz.tsx` to a client component could affect static rendering expectations. Mitigation: keep state local, keep authored data serializable, and test `SectionRenderer` plus review package output.
+- Risk: Tests could incorrectly treat source/HTML answer presence as a security failure. Mitigation: tests must assert visible state and accessibility behavior only.
+- Risk: Print CSS may leave `[hidden]` answers hidden. Mitigation: explicitly override with `.quiz-answer[hidden] { display: block !important; }` in `@media print` and manually check print preview.
+- Risk: DOM test dependencies increase project weight. Mitigation: keep them dev-only and scoped to a single interaction test file; do not add a runtime UI library.
+- Risk: No-JavaScript fallback could be misleading if it renders a dead button. Mitigation: use a clear `<noscript>` message and document print availability.
+- Assumption: Existing static package generation includes the client JavaScript bundle needed for local stateful React components.
+- Assumption: React `useId` is acceptable for per-render ids and multiple quiz instances.
+- Assumption: The unchanged quiz schema is sufficient for reveal UX.
+- Assumption: Keeping the hidden region mounted is acceptable because source secrecy is explicitly out of scope.
+- Open question: Should focus stay on the reveal button after activation? The spec lists focus movement as P2 unless user testing suggests otherwise, so the implementation should keep focus behavior simple.

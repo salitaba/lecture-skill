@@ -1,0 +1,300 @@
+Feature: Improve Quiz Reveal UX
+
+## Product Summary
+
+Turn the existing `quiz` lecture component from an always-visible answer key into a lightweight knowledge check that lets learners think before seeing feedback.
+
+Today, quiz cards show the question, options, answer, and optional explanation in one static block. That is useful for reviewers and printed teaching material, but it weakens the learner experience in interactive pages because the correct answer is visible before the learner has a chance to answer mentally.
+
+This feature adds a simple answer reveal interaction. The answer and explanation are hidden on initial render, then shown when the learner activates a visible button. The quiz remains a teaching aid, not a secure assessment system. The answer may still exist in the HTML, JavaScript bundle, or static package source; the product promise is only that it is not visibly shown in the page before the learner asks to reveal it.
+
+## Product Outcome
+
+Learners can use a quiz card as a real comprehension checkpoint inside a lecture:
+
+- They first see the question and ordered options.
+- They can pause and decide on an answer without spoilers.
+- They can reveal the correct answer and explanation when ready.
+- They understand the interaction as lesson pacing, not grading or secure testing.
+
+Educators and reviewers still get reliable static exports, useful printed output, and the same authoring schema they already use.
+
+## Users And Jobs
+
+Primary users:
+
+- Learners reading an interactive lecture page.
+- Educators reviewing whether a lecture teaches the intended concept.
+- AI agents generating valid lecture templates from source material.
+
+Jobs to be done:
+
+- As a learner, I want to see the question and options before the answer so I can check my understanding honestly.
+- As a learner, I want to reveal the answer and explanation when I am ready so I can confirm or correct my understanding.
+- As an educator, I want printed and review-package quizzes to remain useful so I can inspect answer quality without relying on browser interaction.
+- As an authoring agent, I want the existing quiz schema to keep working so I do not need to generate a new component shape.
+
+## Problem
+
+The current quiz UX creates immediate answer spoilers:
+
+- Learners see the answer key before attempting the question.
+- The card feels like review notes instead of an active knowledge check.
+- The answer and explanation take visual space before they are needed.
+- Educators cannot pace question, options, answer, and explanation as separate teaching moments.
+- Documentation correctly describes the current static behavior, but that behavior no longer matches the desired learning experience.
+
+The result is a component that is technically valid but weaker than it should be for comprehension checks.
+
+## Goals
+
+- Add a visible, accessible control that reveals the answer on demand.
+- Hide the answer and optional explanation on initial interactive page render.
+- Preserve the current quiz authoring schema and validation rules.
+- Preserve local preview, static export, review-package, and print workflows.
+- Keep the interaction lightweight, deterministic, local-first, and easy to test.
+- Make reveal state clear to keyboard users and assistive technologies.
+- Update docs, examples, and AI-agent guidance so generated content reflects the new behavior.
+
+## Non-Goals
+
+- No schema changes to the `quiz` component.
+- No new required fields.
+- No scoring, grading, learner accounts, persistence, analytics, or progress tracking.
+- No secure assessment, anti-cheating behavior, answer encryption, or source-code hiding.
+- No randomized options.
+- No new quiz types such as multiple-answer, free text, drag-and-drop, or matching.
+- No remote service, API call, database, or runtime network dependency.
+- No external UI library dependency.
+
+## Product Decisions
+
+- The P0 interaction is an answer reveal, not answer selection.
+- The reveal control should behave as a toggle: `Show answer` before reveal and `Hide answer` after reveal.
+- The answer and explanation should remain in normal reading order below the options.
+- Printed output should include the answer and explanation by default.
+- No-JavaScript behavior must be explicitly documented, but it does not need to match the JavaScript interaction exactly.
+- Tests should verify visible state and accessibility wiring, not treat HTML source presence as a security boundary.
+
+## Priority
+
+### P0: Launch Scope
+
+P0 is the minimum product change needed to make quiz cards usable as learner-facing knowledge checks.
+
+Requirements:
+
+- Every rendered `quiz` component includes a visible reveal button.
+- Initial page state shows:
+  - quiz label, such as `Quiz: Knowledge check`;
+  - question;
+  - ordered options;
+  - reveal button.
+- Initial page state does not visibly show:
+  - answer;
+  - explanation.
+- Activating the reveal button shows:
+  - the answer, clearly labeled;
+  - the explanation, when provided.
+- Activating the button again hides the answer and explanation.
+- The control uses real button semantics and is keyboard operable.
+- The control exposes expanded/collapsed state to assistive technology.
+- The answer region is programmatically associated with the control.
+- Multiple quizzes on one page maintain independent reveal state.
+- Existing quiz templates continue to validate and render without author changes.
+- Documentation clearly states that reveal is a pacing aid, not secure answer protection.
+
+### P1: Quality And Review Support
+
+P1 improves review confidence and non-interactive workflows.
+
+Requirements:
+
+- Print output includes the answer and explanation with clear labels.
+- Print output does not require clicking the reveal button.
+- Static review packages preserve the interactive reveal behavior when JavaScript is available.
+- The component demo includes a quiz example that makes the reveal interaction easy to review.
+- Browser or DOM interaction tests click the button and verify the revealed state.
+- Long questions, options, answers, and explanations wrap cleanly on phone, tablet, and desktop widths.
+
+### P2: Future Learning Interactions
+
+P2 is intentionally outside the launch scope.
+
+Potential enhancements:
+
+- Let learners select an option before revealing the answer.
+- Show visual feedback for selected option versus correct option.
+- Add optional focus management after reveal if usability testing shows it improves navigation.
+- Add deeper quiz variants only after the simple reveal pattern proves useful.
+
+## Experience Requirements
+
+### Quiz Card Structure
+
+The quiz card should keep the existing teaching structure while pacing feedback:
+
+- Visible label: `Quiz: Knowledge check`.
+- Strong question text.
+- Ordered options list.
+- Reveal button below the options.
+- Answer and explanation region below the button.
+
+Initial state:
+
+- The learner sees the label, question, options, and `Show answer` button.
+- The learner does not see answer text or explanation text.
+- The hidden answer region does not create confusing empty visual space.
+
+Revealed state:
+
+- The answer region becomes visible in place.
+- The answer is clearly labeled as `Answer`.
+- Explanation appears as teaching feedback below the answer when available.
+- The button text changes to `Hide answer`.
+- The expanded state is available to assistive technology.
+
+### Interaction And Accessibility
+
+Requirements:
+
+- The reveal control is a `<button type="button">` or an equivalent native button control.
+- The button is reachable and operable by keyboard with Enter and Space.
+- The button has a visible focus state.
+- The button communicates state with `aria-expanded` or an equivalent accessible disclosure pattern.
+- The button is associated with the answer region through `aria-controls` or an equivalent accessible relationship.
+- The answer region has a stable unique id.
+- Hidden answer content is not announced before reveal.
+- Revealed answer content is available in normal reading order.
+- Color is not the only indicator of hidden or revealed state.
+- The component remains readable at 200% browser zoom.
+- Any motion or transition respects `prefers-reduced-motion`.
+
+### Static Export And No-JavaScript
+
+Requirements:
+
+- The feature works in local preview and exported static review packages.
+- The implementation must not require a server, runtime network call, or database.
+- In JavaScript-enabled pages, answer and explanation are not visibly shown before reveal.
+- If JavaScript is unavailable, the page fails gracefully and the chosen fallback is documented.
+
+Acceptable no-JavaScript fallbacks:
+
+- Use a native disclosure pattern that keeps answers hidden until activation.
+- Show a `noscript` message explaining that answers require JavaScript to reveal.
+- Rely on print output for offline answer visibility.
+
+The selected fallback must not introduce inaccessible hidden content, body-level overflow, or a misleading broken control.
+
+### Print Behavior
+
+Requirements:
+
+- Printed lectures include the answer and explanation.
+- Printed answer content is clearly labeled.
+- Printed output does not depend on reveal state.
+- The reveal button may be hidden in print if the answer is always printed.
+
+## Compatibility Requirements
+
+The existing quiz authoring contract must remain unchanged:
+
+- `question`: non-empty string.
+- `options`: at least two non-empty strings.
+- `answer`: non-empty string that exactly matches one option after normalization.
+- `explanation`: optional non-empty string.
+
+Existing valid templates with `quiz` must continue to validate and render. Existing invalid quiz fixtures must remain invalid for the same schema reasons.
+
+## Documentation Requirements
+
+- Update `README.md` quiz documentation to describe reveal behavior.
+- Update `SKILL.md` so AI agents know quiz answers are hidden until the learner clicks the reveal button.
+- Replace stale wording that says quiz renders a visible static answer key by default.
+- State clearly that quiz reveal is not secure assessment.
+- Update component demo text so reviewers know to click `Show answer`.
+- Document the selected no-JavaScript fallback.
+- Document print behavior.
+
+## Test Requirements
+
+Automated tests should cover:
+
+- Initial render includes `Quiz: Knowledge check`, question, ordered options, and `Show answer`.
+- Initial render does not visibly expose the answer or explanation.
+- The reveal button has button semantics and collapsed state.
+- The reveal button is associated with the answer region.
+- Clicking the reveal button changes state to expanded and shows the answer region.
+- Clicking `Hide answer` collapses the answer region again.
+- Optional explanation appears only inside the revealed answer region.
+- Multiple quizzes render independent controls and unique answer region ids.
+- `SectionRenderer` still dispatches `quiz` correctly.
+- Parser and validator tests remain unchanged except for stale static-answer assertions.
+- Static package or fixture tests confirm the component demo still includes quiz.
+
+Suggested focused verification:
+
+```bash
+npm run test -- tests/lecture-template/lecture-components.test.tsx
+npm run test -- tests/lecture-template/fixtures.test.ts
+npm run test -- tests/lecture-template/validateTemplate.test.ts
+npm run validate
+npm run typecheck
+```
+
+Before completion, run the normal project checks when practical:
+
+```bash
+npm run test
+npm run lint
+npm run build
+npm run package:review
+```
+
+## Acceptance Criteria
+
+- A rendered quiz shows question and options without showing answer or explanation.
+- A learner can reveal the answer with a visible keyboard-accessible button.
+- A learner can hide the answer again after revealing it.
+- The answer and explanation are clearly labeled when visible.
+- Multiple quizzes on the same page work independently.
+- Screen reader and keyboard users can understand and operate the reveal state.
+- Printed output includes answer and explanation without requiring interaction.
+- Existing quiz schema, validation, parsing, and authoring examples remain backward compatible.
+- Documentation no longer describes quiz as always showing a static answer key by default.
+- Tests cover initial hidden state, revealed state, accessibility wiring, and backward compatibility.
+
+## Success Measures
+
+Qualitative success:
+
+- Reviewers understand from the rendered page that quiz is an interactive knowledge check.
+- Learners are not exposed to answer spoilers before they choose to reveal feedback.
+- Educators can still inspect answers easily in print and review packages.
+
+Operational success:
+
+- No new required authoring fields.
+- No regressions in static export or review-package generation.
+- No accessibility regressions for keyboard navigation or screen reader disclosure state.
+- No body-level horizontal overflow from long quiz content at common viewport widths.
+
+## Risks And Mitigations
+
+- Risk: Hiding the answer could imply secure assessment.
+  - Mitigation: Document that reveal is only a pacing aid and not answer protection.
+- Risk: Client-side state could reduce static package reliability.
+  - Mitigation: Keep the interaction local, deterministic, and free of server or network dependencies.
+- Risk: No-JavaScript users may lose access to answers.
+  - Mitigation: Define and document an explicit no-JavaScript or print fallback.
+- Risk: Tests may incorrectly fail because answer text exists in the HTML source.
+  - Mitigation: Test visible state and accessibility attributes rather than treating source presence as a security boundary.
+- Risk: Print output could accidentally hide answers.
+  - Mitigation: Add print styling and verification that printed quiz answers are visible.
+
+## Open Questions
+
+- Which no-JavaScript fallback should be used for launch: native disclosure, `noscript` message, or print-only answer visibility?
+- Should the implementation use client-side React state or a native disclosure pattern styled to match the design system?
+- Should focus remain on the button after reveal, or should it move to the answer region after user testing?

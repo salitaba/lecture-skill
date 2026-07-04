@@ -1,0 +1,329 @@
+Implementation Plan: Course Authoring Workflow Foundation
+==========================================================
+
+Spec: spec/009-course-authoring-workflow-foundation.txt
+Plan status: finalized after tech-lead review
+
+## Brief Summary
+
+Add a first-class local authoring workflow around the existing Lecture Site Engine without changing the lecture template schema.
+
+The P0 change introduces optional collection metadata at `lectures/course.yaml`, scaffold commands for creating a collection or new lecture, a doctor/readiness command, and JSON validation output for scripts and AI agents. Existing single-lecture and collection workflows must keep working when `course.yaml` is absent. Human validation output remains the default, while `npm run validate -- --json` returns a stable machine-readable shape.
+
+Course metadata should flow into collection rendering, source-fidelity worksheets, and static review package manifests. Invalid metadata should block validation and package creation, but the Next app should still render an actionable validation screen instead of crashing.
+
+## Relevant Existing Files
+
+- `package.json`: currently exposes `dev`, `build`, `lint`, `test`, `typecheck`, `validate`, `review:source`, and `package:review`; add `new:collection`, `new:lecture`, and `doctor`.
+- `scripts/validate.ts`: currently chooses collection vs single mode and prints human output; add `--json` parsing without changing default output.
+- `scripts/reviewSource.ts` and `scripts/packageReview.ts`: keep existing command behavior while picking up course metadata through shared library models.
+- `src/lib/lecture-template/types.ts`: currently defines lecture metadata, collection entries, validation results, source-review types, and review-package types; add course metadata and metadata-validation result types here or in a closely related module.
+- `src/lib/lecture-template/collection.ts`: currently scans `lectures/<NN-slug>/lecture.template.md`, validates lecture templates, and returns `CollectionValidationResult`; extend it to read and validate optional `lectures/course.yaml`.
+- `src/lib/lecture-template/validateCli.ts`: currently formats human single and collection validation output; add JSON output builders and include course metadata failures in human collection output.
+- `src/lib/lecture-template/sourceReview.ts`: currently builds worksheets from lecture metadata and raw evidence; include course metadata in collection worksheets when present.
+- `src/lib/lecture-template/reviewPackage.ts`: currently creates preflight data, `manifest.json`, `MANIFEST.md`, package README, source snapshots, and review worksheet; include course metadata and block package creation on invalid metadata.
+- `src/app/page.tsx`: currently passes `validateCollection()` to `CollectionLanding` in collection mode; continue to show a collection page when possible, and show validation errors when metadata is malformed in a way that should block readiness.
+- `src/components/lecture-kit/CollectionLanding.tsx`: currently renders inferred `Lecture Collection` text and lecture count/duration; render declared course title, description, audience, level, and duration when valid metadata exists, with existing inferred fallback when absent.
+- `src/components/lecture-kit/ValidationScreen.tsx`: already displays template validation errors; reuse or modestly generalize it for collection/course metadata errors instead of adding a separate UI pattern.
+- `src/lib/lecture-template/readTemplate.ts`: owns repository-relative path helpers and active paths; reuse `repositoryPath()` and path constants.
+- `tests/lecture-template/collection.test.ts`: add metadata parsing/validation coverage.
+- `tests/lecture-template/validate-collection-cli.test.ts` and `tests/lecture-template/validate-cli.test.ts`: add human and JSON validation output coverage.
+- `tests/lecture-template/source-review.test.ts`: add worksheet course metadata coverage.
+- `tests/lecture-template/review-package.test.ts`: add manifest, `MANIFEST.md`, and invalid-metadata preflight coverage.
+- Add focused tests for scaffold and doctor library/CLI behavior, likely under `tests/lecture-template/scaffold.test.ts` and `tests/lecture-template/doctor.test.ts`.
+- `README.md` and `SKILL.md`: document course metadata, scaffold commands, JSON validation, doctor readiness, and AI-agent workflow guidance.
+
+## Proposed Implementation Steps
+
+1. Add a course metadata model and parser.
+   - Create a focused module such as `src/lib/lecture-template/courseMetadata.ts`.
+   - Define `COURSE_METADATA_PATH = "lectures/course.yaml"`.
+   - Define `CourseMetadata` with P0 fields:
+     - required when file is present: `title`, `description`;
+     - optional: `audience`, `level`, `duration`.
+   - Keep the `level` enum aligned with `LectureLevel`: `beginner`, `intermediate`, `advanced`.
+   - Use the existing `yaml` dependency for parsing, not ad hoc string parsing.
+   - Return a discriminated result that can represent:
+     - absent metadata;
+     - valid metadata with parsed values;
+     - invalid metadata with author-locatable `ValidationError[]`.
+   - Reject YAML roots that are not mappings, including scalar and list roots.
+   - Treat required and optional known string fields as invalid when present but empty or whitespace-only.
+   - Unknown fields are allowed and ignored in P0.
+   - Error codes should be stable and specific, for example `COURSE_METADATA_YAML_INVALID`, `COURSE_METADATA_REQUIRED_FIELD`, `COURSE_METADATA_FIELD_TYPE`, and `COURSE_METADATA_INVALID_LEVEL`.
+   - Include `field`, `locator.context`, and actionable `hint` values where practical.
+
+2. Thread metadata through collection scanning and validation.
+   - Extend `LectureCollection` and `CollectionValidationResult` to include a course metadata result.
+   - `scanLectureCollection()` should keep returning ordered lecture entries and also read optional `lectures/course.yaml`.
+   - `validateCollection()` should validate course metadata once, validate every lecture independently, and set `allPassed` only when all lectures pass and metadata is not invalid.
+   - When `lectures/course.yaml` is absent, collection mode continues to work and validation only depends on lectures.
+   - When metadata is invalid, include metadata errors in the collection validation result without preventing lecture validation; this supports complete CLI/app diagnostics.
+   - Preserve current skipped-directory behavior for non-`NN-slug` directories.
+
+3. Render declared course metadata on the collection landing page.
+   - Update `CollectionLanding` props to consume `CollectionValidationResult` with metadata status.
+   - If metadata is valid, render:
+     - `title` as the collection `<h1>`;
+     - `description` in the landing description;
+     - optional `audience`, `level`, and `duration` in a compact course metadata area.
+   - If metadata is absent, preserve the current `Lecture Collection` fallback and inferred lecture count/duration summary.
+   - If metadata is invalid, render a generalized validation display with metadata errors and keep lecture validation details available. Avoid using invalid metadata values as trusted UI labels.
+   - Generalize `ValidationScreen` rather than adding a parallel UI if practical:
+     - accept a subject label such as `Course metadata` or `Lecture template`;
+     - accept a subject path such as `lectures/course.yaml`;
+     - avoid hardcoded copy like `Template validation failed`, `active template`, and `Frontmatter` for metadata errors;
+     - classify course metadata field errors as `Course metadata`, not template frontmatter.
+   - Keep lecture cards based on per-lecture template metadata as they are today.
+   - Add rendering tests for valid metadata, absent fallback, and invalid metadata visibility.
+
+4. Add stable JSON validation output.
+   - Keep `npm run validate` human-readable by default.
+   - Support `npm run validate -- --json`; parse only known flags in `scripts/validate.ts`.
+   - Preserve the optional template path behavior in single-lecture mode: `npm run validate -- path/to/template.md` should still validate that path when not in collection mode.
+   - Reject unknown flags with a nonzero status and a clear stderr message.
+   - Do not treat `--json` as a template path.
+   - Build JSON output in shared library functions rather than in the script body so tests can call it directly.
+   - Ensure JSON stdout is parseable JSON only. Existing skipped-directory warnings from collection scanning must either be suppressed on the JSON path or represented in the JSON payload; do not write warning prose to stdout before/after the JSON document.
+   - Suggested P0 JSON shape:
+
+```json
+{
+  "ok": false,
+  "mode": "collection",
+  "lectureCount": 2,
+  "courseMetadata": {
+    "status": "valid",
+    "path": "lectures/course.yaml",
+    "metadata": {
+      "title": "Course title",
+      "description": "Short course description.",
+      "audience": "Technical educators and learners",
+      "level": "beginner",
+      "duration": "3 hours"
+    },
+    "errors": []
+  },
+  "lectures": [
+    {
+      "slug": "01-introduction",
+      "templatePath": "lectures/01-introduction/lecture.template.md",
+      "valid": true,
+      "errors": []
+    }
+  ],
+  "errors": []
+}
+```
+
+   - For single-lecture mode, include `mode: "single-lecture"`, `templatePath`, `valid`, and normalized `errors`.
+   - Preserve exit status semantics: JSON mode exits `0` when validation passes, nonzero when validation fails.
+   - Keep human output exact enough that existing tests only change where metadata adds new lines.
+   - Add spawned script tests for the real npm-style argument path, especially `npm run validate -- --json`.
+   - Add a JSON-mode test with a skipped directory such as `lectures/notes/` proving stdout remains valid JSON.
+
+5. Update review package preflight and manifests.
+   - Refactor collection preflight around `validateCollection()` or a shared metadata-aware collection validation helper; do not maintain a second lecture-only validation path in `runCollectionPreflight()`.
+   - Add optional `courseMetadata` to `ReviewPackagePreflight` for collection mode.
+   - Invalid course metadata should make preflight invalid and block `npm run package:review`, the same way invalid lecture templates do.
+   - Add optional `courseMetadata` to `ReviewPackageManifest`.
+   - Include course title/description/audience/level/duration in `manifest.json` when metadata is valid.
+   - Include a `## Course Metadata` section in `MANIFEST.md`; when absent, state that the collection used inferred labels.
+   - Copy valid `lectures/course.yaml` into the review package at `source/lectures/course.yaml`.
+   - Model captured metadata as a distinct source record, not as a lecture template source:
+     - include it in source snapshot verification;
+     - write it during package assembly;
+     - expose it separately in `manifest.contents` and `MANIFEST.md`.
+   - Update `renderReviewPackageReadme()` only if needed for P0 to identify source mode, course title, or metadata path; avoid overloading README with long docs.
+   - Keep source snapshot checks scoped to captured files. Since valid course metadata is used in the package, capture its contents and verify it through the same preflight snapshot mechanism so metadata cannot change between validation and package assembly unnoticed.
+
+6. Include course metadata in source-fidelity worksheets.
+   - Refactor collection worksheet creation around `validateCollection()` or the same shared metadata-aware validation helper used by the CLI and review-package preflight.
+   - Extend `SourceReviewWorksheet` with optional collection-level course metadata status/path.
+   - In collection mode, render a `## Course Metadata` section before individual lecture review.
+   - Include title, description, audience, level, duration, source mode, lecture count, validation result, and metadata path/status.
+   - If metadata is absent, explicitly say metadata is absent and inferred collection labels are used.
+   - If metadata is invalid, include metadata errors and make worksheet validation result `failed` while still writing the worksheet.
+   - Preserve per-lecture preview data for invalid lectures while adding metadata errors to `SourceReviewValidation`.
+   - Keep source-review command exit behavior unchanged: worksheet creation exits `0` even when validation fails.
+
+7. Add scaffold helpers and CLI scripts.
+   - Create a library module such as `src/lib/lecture-template/scaffold.ts`.
+   - Add scripts:
+     - `scripts/newCollection.ts`;
+     - `scripts/newLecture.ts`.
+   - Add `package.json` scripts:
+     - `new:collection`;
+     - `new:lecture`.
+   - `new:collection` should:
+     - refuse to overwrite when `lectures/` exists and contains user-authored content;
+     - create `lectures/course.yaml`;
+     - create `lectures/01-introduction/lecture.template.md`;
+     - create `lectures/01-introduction/raw-lecture.txt`;
+     - print created paths and next commands: `npm run validate`, `npm run dev`, `npm run review:source`.
+   - `new:lecture` in collection mode should:
+     - use a scaffold-specific authoring mode detector, not `isCollectionMode()`;
+     - treat the workspace as collection mode when `lectures/` exists, when `lectures/course.yaml` exists, or when numbered lecture directories already exist;
+     - use single-lecture mode only when no collection workspace exists;
+     - inspect numbered lecture directories;
+     - choose the next numeric prefix;
+     - create `lectures/<next-number>-<slug>/lecture.template.md` and `raw-lecture.txt`;
+     - never overwrite existing files.
+   - `new:lecture` in single-lecture mode should:
+     - create `content/lecture.template.md` only when missing;
+     - refuse to overwrite when it exists.
+   - Keep scripts non-interactive. For P0, use deterministic defaults such as `untitled-lecture` or `new-lecture`; optional title/slug flags belong to P1 unless the implementer chooses a tiny safe subset.
+   - Generated lecture templates should be structurally valid placeholders. Make placeholder prose explicit enough that authors know to replace it, but keep schema validation passing.
+
+8. Add doctor/readiness diagnostics.
+   - Create a library module such as `src/lib/lecture-template/doctor.ts`.
+   - Add `scripts/doctor.ts` and `package.json` script `doctor`.
+   - Doctor should inspect and report:
+     - Node.js version and npm version;
+     - the `package.json` `engines.node` requirement and whether the current Node.js version satisfies it;
+     - active mode: `single-lecture` or `collection`;
+     - active template paths;
+     - course metadata path and validation status in collection mode;
+     - lecture count;
+     - schema validation result;
+     - raw source evidence status;
+     - latest source-fidelity worksheet path if any;
+     - latest static review package path if any;
+     - readiness for preview, source-fidelity review, and static package creation.
+   - Exit `0` when diagnostics run successfully, even with readiness warnings.
+   - Exit nonzero only when the command cannot inspect the project.
+   - Use warning labels for invalid templates, invalid metadata, missing raw source evidence, missing worksheets, missing packages, stale packages if simple to detect, and Node versions that do not satisfy `package.json` `engines.node`.
+   - Do not call `npm run validate` as a subprocess; reuse validation helpers so doctor remains deterministic and testable.
+
+9. Update docs and agent guidance.
+   - In `README.md`, add:
+     - `lectures/course.yaml` contract and optional/required P0 fields;
+     - scaffold command usage;
+     - JSON validation mode;
+     - doctor command behavior and exit semantics;
+     - how metadata appears in landing pages, worksheets, and review packages.
+   - In `SKILL.md`, update AI-agent workflow:
+     - prefer `npm run new:collection` or `npm run new:lecture` for new authoring;
+     - use `lectures/course.yaml` in collection mode when course identity is known;
+     - use `npm run validate -- --json` when revising from machine-readable feedback;
+     - use `npm run doctor` before preview/review/package handoff.
+   - Avoid changing the existing lecture template schema docs except to clarify that course metadata is separate from lecture frontmatter.
+
+10. Preserve compatibility and keep scope at P0.
+   - Do not introduce explicit ordering overrides in `course.yaml`; folder names remain ordering.
+   - Do not require existing collections to add metadata.
+   - Do not implement P1 metadata fields unless validation ignores them as unknown fields.
+   - Do not add interactive prompts, browser editors, databases, remote services, LLM calls, or hosted publishing.
+   - Keep paths repository-relative and static-export friendly.
+
+## Data Model, API, Persistence, Event, And Domain Changes
+
+- New file contract: optional `lectures/course.yaml`.
+- New data model: `CourseMetadata` plus metadata validation status.
+- Existing lecture template schema: unchanged.
+- Existing supported component schema: unchanged.
+- Existing collection ordering: unchanged, still numeric folder prefix.
+- Existing routes: unchanged. Root route in collection mode still renders the collection landing page.
+- CLI scripts:
+  - add `npm run new:collection`;
+  - add `npm run new:lecture`;
+  - add `npm run doctor`;
+  - extend `npm run validate -- --json`.
+- Persistence: local filesystem only. No database or remote state.
+- External services: none.
+- Dependencies: use existing `yaml`; avoid adding a CLI framework unless the implementation cost becomes clearly lower.
+
+## Test Plan
+
+Automated tests:
+
+- Course metadata parser tests:
+  - absent `lectures/course.yaml` reports `status: "absent"` and no errors;
+  - valid P0 metadata parses title/description/audience/level/duration;
+  - missing title and missing description fail with field-specific errors;
+  - whitespace-only title and description fail with field-specific errors;
+  - non-string P0 fields fail when known fields are present;
+  - empty or whitespace-only optional known fields such as `audience` and `duration` fail when present;
+  - invalid level fails;
+  - malformed YAML fails with a locatable error;
+  - scalar and list YAML roots fail with a root-shape error;
+  - unknown fields are ignored.
+- Collection tests:
+  - existing collections without metadata still pass;
+  - valid metadata is included in `scanLectureCollection()` and `validateCollection()`;
+  - invalid metadata makes `allPassed` false while lecture-level results are still populated.
+- Collection landing tests:
+  - valid metadata renders declared title/description and optional fields;
+  - absent metadata preserves `Lecture Collection` fallback;
+  - invalid metadata displays actionable validation errors instead of crashing.
+- CLI validation tests:
+  - human output is unchanged for single lectures and metadata-absent collections except where metadata is explicitly present;
+  - invalid course metadata appears in human collection validation output;
+  - `--json` emits parseable JSON for valid single lecture, invalid single lecture, valid collection with metadata, absent metadata, and invalid metadata;
+  - JSON mode exits nonzero on invalid templates or metadata.
+  - `--json` is not treated as a template path.
+  - unknown flags fail with clear stderr.
+  - skipped collection directories do not pollute JSON stdout.
+- Scaffold tests:
+  - `new:collection` creates `course.yaml`, first lecture template, and raw source file in an empty temp repo;
+  - `new:collection` refuses to overwrite an existing `lectures/` workspace;
+  - `new:lecture` treats an empty `lectures/` directory as collection authoring mode;
+  - `new:lecture` treats `lectures/course.yaml` with zero lectures as collection authoring mode;
+  - collection-mode `new:lecture` chooses the next numeric prefix and creates template/source files;
+  - single-lecture `new:lecture` creates `content/lecture.template.md` when missing and refuses to overwrite it when present.
+- Doctor tests:
+  - reports single vs collection mode;
+  - reports runtime versions, active template paths, metadata status, lecture count, validation status, raw source status, worksheet/package paths, and readiness booleans;
+  - reads `package.json` `engines.node` and warns when the current Node.js version does not satisfy it;
+  - exits `0` with warnings for missing raw source or invalid validation;
+  - exits nonzero only for genuine inspection failures.
+- Source review tests:
+  - collection worksheet includes course metadata when valid;
+  - absent metadata is recorded as absent;
+  - invalid metadata appears as validation failure while the worksheet still renders.
+- Review package tests:
+  - preflight and manifest include valid course metadata;
+  - valid `lectures/course.yaml` is copied to `source/lectures/course.yaml` and exposed separately from lecture templates in manifest contents;
+  - `MANIFEST.md` includes a course metadata section;
+  - invalid metadata blocks package preflight;
+  - metadata changes after preflight are caught if the metadata file was captured.
+- Documentation checks:
+  - search for stale guidance that says collection identity is only inferred.
+
+Focused verification commands:
+
+```bash
+npm run test -- tests/lecture-template/collection.test.ts
+npm run test -- tests/lecture-template/validate-collection-cli.test.ts tests/lecture-template/validate-cli.test.ts
+npm run test -- tests/lecture-template/source-review.test.ts tests/lecture-template/review-package.test.ts
+npm run test -- tests/lecture-template/scaffold.test.ts tests/lecture-template/doctor.test.ts
+npm run validate
+npm run validate -- --json
+npm run doctor
+npm run typecheck
+```
+
+Before completion, run when practical:
+
+```bash
+npm run test
+npm run lint
+npm run build
+npm run package:review
+```
+
+Manual checks:
+
+- In a temporary repo copy, run `npm run new:collection`, then `npm run validate`, `npm run validate -- --json`, `npm run doctor`, `npm run review:source`, and `npm run package:review`.
+- Open the dev server in collection mode and confirm the landing page uses `lectures/course.yaml`.
+- Corrupt `lectures/course.yaml` and confirm validation, doctor, app rendering, source worksheet, and package preflight report actionable metadata errors.
+
+## Risks, Assumptions, And Open Questions
+
+- Stable JSON output should be treated as a contract. Keep the initial shape small and explicit rather than mirroring every internal object.
+- Metadata validation should not short-circuit lecture validation. Authors and agents need all actionable errors in one run.
+- `npm run validate -- --json` passes `--json` through npm correctly; tests should cover the script argument path, not only library helpers.
+- Scaffold defaults need to pass schema validation while still making placeholder content obvious. Overly fake instructional prose could pass validation but be accidentally packaged; docs and command output should tell authors to replace placeholders.
+- Doctor freshness checks for worksheets/packages can be basic in P0. A robust stale comparison against all source files is P1 unless it is simple to derive from existing package manifest timestamps.
+- The app should avoid rendering invalid metadata as course identity. It can still show the collection validation screen with lecture results.
+- Existing `lectures/` in this repository means local default mode is collection. Tests that assume single-lecture mode must use temp directories or remove `lectures/` in their temp fixture setup.

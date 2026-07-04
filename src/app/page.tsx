@@ -9,6 +9,19 @@ import { validateTemplateSource } from "@/lib/lecture-template/validateTemplate"
 export default async function Home() {
   if (await isCollectionMode()) {
     const validation = await validateCollection();
+    if (validation.courseMetadata.status === "invalid") {
+      return (
+        <ValidationScreen
+          errors={validation.courseMetadata.errors}
+          templatePath={validation.courseMetadata.path}
+          subjectLabel="Course metadata"
+          subjectPathLabel="Course metadata"
+          activePathLabel="Active path"
+          eyebrow="Course metadata validation failed"
+          heading="Fix the course metadata to preview this collection"
+        />
+      );
+    }
 
     return (
       <PageShell>

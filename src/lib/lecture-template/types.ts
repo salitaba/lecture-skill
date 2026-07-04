@@ -118,6 +118,32 @@ export interface LectureMetadata {
   level: LectureLevel;
 }
 
+export interface CourseMetadata {
+  title: string;
+  description: string;
+  audience?: string;
+  level?: LectureLevel;
+  duration?: string;
+}
+
+export type CourseMetadataValidationResult =
+  | {
+      status: "absent";
+      path: string;
+      errors: [];
+    }
+  | {
+      status: "valid";
+      path: string;
+      metadata: CourseMetadata;
+      errors: [];
+    }
+  | {
+      status: "invalid";
+      path: string;
+      errors: ValidationError[];
+    };
+
 export interface LectureCollectionEntry {
   slug: string;
   order: number;
@@ -127,6 +153,7 @@ export interface LectureCollectionEntry {
 export interface LectureCollection {
   basePath: string;
   entries: LectureCollectionEntry[];
+  courseMetadata: CourseMetadataValidationResult;
 }
 
 export interface LectureValidationResult {
@@ -140,6 +167,7 @@ export interface LectureValidationResult {
 export interface CollectionValidationResult {
   lectureCount: number;
   results: LectureValidationResult[];
+  courseMetadata: CourseMetadataValidationResult;
   allPassed: boolean;
 }
 

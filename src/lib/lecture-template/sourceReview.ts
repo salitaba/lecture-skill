@@ -1,9 +1,9 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { buildLecturePreviewTemplate, isCollectionMode, scanLectureCollection } from "./collection";
+import { buildLecturePreviewTemplate, isCollectionMode, validateCollection } from "./collection";
 import { parseLectureTemplate } from "./parseTemplate";
 import { ACTIVE_TEMPLATE_PATH, LECTURES_DIR, repositoryPath } from "./readTemplate";
-import type { LectureMetadata, LectureTemplate, ValidationError } from "./types";
+import type { CourseMetadataValidationResult, LectureMetadata, LectureTemplate, ValidationError } from "./types";
 import { formatError } from "./validateCli";
 import { validateTemplateSource } from "./validateTemplate";
 
@@ -61,6 +61,7 @@ export interface SourceReviewWorksheet {
   validation: SourceReviewValidation;
   lectureCount: number;
   collectionLandingRoute?: string;
+  courseMetadata?: CourseMetadataValidationResult;
   sharedSource?: SourceReviewSourceEvidence;
   packageContext?: SourceReviewPackageContext;
   lectures: SourceReviewLecture[];
@@ -152,6 +153,7 @@ export function renderSourceReviewWorksheetMarkdown(worksheet: SourceReviewWorks
     lines.push("## Lecture Review", "");
     appendLectureSection(lines, worksheet.lectures[0]);
   } else {
+    appendCourseMetadataSection(lines, worksheet);
     lines.push("## Collection Review", "");
     for (const lecture of worksheet.lectures) {
       lines.push(`### ${lecture.slug ?? lecture.metadata?.title ?? lecture.templatePath}`, "");
@@ -195,14 +197,14 @@ async function createCollectionWorksheet(
   createdAt: string,
   packageContext?: SourceReviewPackageContext
 ): Promise<SourceReviewWorksheet> {
-  const collection = await scanLectureCollection();
+  const collection = await validateCollection();
   const sharedSource = await readEvidence(COLLECTION_SHARED_RAW_SOURCE_PATH, "shared");
   const lectures: SourceReviewLecture[] = [];
 
-  for (const entry of collection.entries) {
-    const primarySource = await readEvidence(collectionRawSourcePath(entry.slug), "primary", entry.slug);
-    const lecture = await buildLecture(entry.templatePath, `/lectures/${entry.slug}`, primarySource, {
-      slug: entry.slug,
+  for (const result of collection.results) {
+    const primarySource = await readEvidence(collectionRawSourcePath(result.slug), "primary", result.slug);
+    const lecture = await buildLecture(result.templatePath, `/lectures/${result.slug}`, primarySource, {
+      slug: result.slug,
       additionalSources: sharedSource.status === "present" ? [{ ...sharedSource }] : []
     });
     lectures.push(lecture);
@@ -212,9 +214,10 @@ async function createCollectionWorksheet(
     projectName,
     createdAt,
     mode: "collection",
-    validation: buildCollectionValidation(lectures),
+    validation: buildCollectionValidation(lectures, collection.courseMetadata),
     lectureCount: lectures.length,
     collectionLandingRoute: "/",
+    courseMetadata: collection.courseMetadata,
     sharedSource,
     packageContext,
     lectures
@@ -299,8 +302,17 @@ function buildSingleValidation(lecture: SourceReviewLecture): SourceReviewValida
   };
 }
 
-function buildCollectionValidation(lectures: SourceReviewLecture[]): SourceReviewValidation {
+function buildCollectionValidation(lectures: SourceReviewLecture[], courseMetadata?: CourseMetadataValidationResult): SourceReviewValidation {
   const lines = [`Collection validation: ${lectures.length} lectures found`, ""];
+  if (courseMetadata?.status === "valid") {
+    lines.push(`Course metadata: VALID ${courseMetadata.path}`, `  Title: ${courseMetadata.metadata.title}`, "");
+  } else if (courseMetadata?.status === "invalid") {
+    lines.push(`Course metadata: INVALID ${courseMetadata.path}`);
+    for (const error of courseMetadata.errors) {
+      lines.push(`  - ${error.code}: ${error.message}`);
+    }
+    lines.push("");
+  }
   for (const lecture of lectures) {
     lines.push(`  [${lecture.validationStatus === "passed" ? "PASS" : "FAIL"}] ${lecture.slug}/lecture.template.md`);
     for (const error of lecture.validationErrors) {
@@ -311,13 +323,48 @@ function buildCollectionValidation(lectures: SourceReviewLecture[]): SourceRevie
   const passingCount = lectures.filter((lecture) => lecture.validationStatus === "passed").length;
   lines.push("", `${passingCount} of ${lectures.length} lectures passed validation.`);
 
+  const metadataPassed = courseMetadata?.status !== "invalid";
+  const passed = passingCount === lectures.length && metadataPassed;
+
   return {
     command: validationCommand,
-    status: passingCount === lectures.length ? 0 : 1,
-    result: passingCount === lectures.length ? "passed" : "failed",
+    status: passed ? 0 : 1,
+    result: passed ? "passed" : "failed",
     stdout: `${lines.join("\n")}\n`,
     stderr: ""
   };
+}
+
+function appendCourseMetadataSection(lines: string[], worksheet: SourceReviewWorksheet) {
+  lines.push("## Course Metadata", "");
+  const metadata = worksheet.courseMetadata;
+  if (!metadata || metadata.status === "absent") {
+    lines.push(
+      "Status: absent",
+      `Path: ${metadata?.path ?? "lectures/course.yaml"}`,
+      "Collection labels are inferred from lecture folders.",
+      `Source mode: ${worksheet.mode}`,
+      `Lecture count: ${worksheet.lectureCount}`,
+      `Validation result: ${worksheet.validation.result}`,
+      ""
+    );
+    return;
+  }
+
+  lines.push(`Status: ${metadata.status}`, `Path: ${metadata.path}`, `Source mode: ${worksheet.mode}`, `Lecture count: ${worksheet.lectureCount}`, `Validation result: ${worksheet.validation.result}`);
+  if (metadata.status === "valid") {
+    lines.push(
+      `Title: ${metadata.metadata.title}`,
+      `Description: ${metadata.metadata.description}`,
+      `Audience: ${metadata.metadata.audience ?? "(not specified)"}`,
+      `Level: ${metadata.metadata.level ?? "(not specified)"}`,
+      `Duration: ${metadata.metadata.duration ?? "(not specified)"}`,
+      ""
+    );
+    return;
+  }
+
+  lines.push("", "Metadata validation errors:", ...metadata.errors.map((error) => `- ${error.code}: ${error.message}`), "");
 }
 
 function appendLectureSection(lines: string[], lecture: SourceReviewLecture) {

@@ -1,14 +1,30 @@
 import type { ValidationError } from "@/lib/lecture-template/types";
 
-export function ValidationScreen({ errors, templatePath }: { errors: ValidationError[]; templatePath: string }) {
+export function ValidationScreen({
+  errors,
+  templatePath,
+  subjectLabel = "Template",
+  subjectPathLabel = "Template",
+  activePathLabel = "Active template",
+  heading = "Fix the lecture template to preview this page",
+  eyebrow = "Template validation failed"
+}: {
+  errors: ValidationError[];
+  templatePath: string;
+  subjectLabel?: string;
+  subjectPathLabel?: string;
+  activePathLabel?: string;
+  heading?: string;
+  eyebrow?: string;
+}) {
   return (
     <main className="page-shell validation-screen">
       <section className="validation-panel" aria-labelledby="validation-heading">
-        <p className="eyebrow">Template validation failed</p>
-        <h1 id="validation-heading">Fix the lecture template to preview this page</h1>
+        <p className="eyebrow">{eyebrow}</p>
+        <h1 id="validation-heading">{heading}</h1>
         <p className="validation-summary">
-          The active template has {errors.length} blocking {errors.length === 1 ? "error" : "errors"}.
-          <span> Active template: {templatePath}</span>
+          The active {subjectLabel.toLowerCase()} has {errors.length} blocking {errors.length === 1 ? "error" : "errors"}.
+          <span> {activePathLabel}: {templatePath}</span>
         </p>
         <ol className="validation-list">
           {errors.map((error, index) => (
@@ -17,7 +33,7 @@ export function ValidationScreen({ errors, templatePath }: { errors: ValidationE
               <h2>{error.message}</h2>
               <dl>
                 <div>
-                  <dt>Template</dt>
+                  <dt>{subjectPathLabel}</dt>
                   <dd>{templatePath}</dd>
                 </div>
                 <div>
@@ -26,7 +42,7 @@ export function ValidationScreen({ errors, templatePath }: { errors: ValidationE
                 </div>
                 <div>
                   <dt>Source area</dt>
-                  <dd>{sourceArea(error)}</dd>
+                  <dd>{sourceArea(error, subjectLabel)}</dd>
                 </div>
                 {formatLocation(error) ? (
                   <div>
@@ -84,7 +100,8 @@ function formatLocation(error: ValidationError): string | undefined {
     .join(", ");
 }
 
-function sourceArea(error: ValidationError): string {
+function sourceArea(error: ValidationError, subjectLabel: string): string {
+  if (subjectLabel.toLowerCase().includes("course")) return "Course metadata";
   if (error.componentType) return "Component";
   if (error.field) return "Frontmatter";
   if (error.sectionTitle !== undefined) return "Section content";

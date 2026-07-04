@@ -7,19 +7,44 @@ export interface CollectionLandingProps {
 export function CollectionLanding({ validation }: CollectionLandingProps) {
   const totalMinutes = validation.results.reduce((sum, result) => sum + parseDurationMinutes(result), 0);
   const passingCount = validation.results.filter((result) => result.valid).length;
+  const courseMetadata = validation.courseMetadata.status === "valid" ? validation.courseMetadata.metadata : undefined;
+  const title = courseMetadata?.title ?? "Lecture Collection";
+  const description =
+    courseMetadata?.description ??
+    `${validation.lectureCount} ${validation.lectureCount === 1 ? "lecture" : "lectures"} in authored order.`;
 
   return (
     <section className="collection-landing" aria-labelledby="collection-title">
       <header className="collection-header">
         <p className="eyebrow">Collection</p>
-        <h1 id="collection-title">Lecture Collection</h1>
-        <p className="description">
-          {validation.lectureCount} {validation.lectureCount === 1 ? "lecture" : "lectures"} in authored order.
-        </p>
+        <h1 id="collection-title">{title}</h1>
+        <p className="description">{description}</p>
         <p className="collection-summary">
           {validation.lectureCount} {validation.lectureCount === 1 ? "lecture" : "lectures"} • {formatMinutes(totalMinutes)} total
           • {passingCount} passing
         </p>
+        {courseMetadata ? (
+          <dl className="lecture-list-meta" aria-label="Course metadata">
+            {courseMetadata.audience ? (
+              <div>
+                <dt>Audience</dt>
+                <dd>{courseMetadata.audience}</dd>
+              </div>
+            ) : null}
+            {courseMetadata.level ? (
+              <div>
+                <dt>Level</dt>
+                <dd>{courseMetadata.level}</dd>
+              </div>
+            ) : null}
+            {courseMetadata.duration ? (
+              <div>
+                <dt>Duration</dt>
+                <dd>{courseMetadata.duration}</dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
       </header>
 
       <ol className="lecture-list">

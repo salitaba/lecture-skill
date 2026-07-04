@@ -3,6 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isCollectionMode, scanLectureCollection, validateCollection } from "../../src/lib/lecture-template/collection";
+import { parseCourseMetadata } from "../../src/lib/lecture-template/courseMetadata";
 
 const repoRoot = process.cwd();
 const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz"];
@@ -86,6 +87,83 @@ describe("collection scanning", () => {
     });
     expect(validation.results[1].template?.metadata.title).toBe("Invalid Level");
     expect(validation.results[1].errors.map((error) => error.code)).toContain("INVALID_LEVEL");
+  });
+
+  it("parses valid course metadata and ignores unknown fields", () => {
+    const result = parseCourseMetadata(
+      [
+        'title: "Course Title"',
+        'description: "Course description."',
+        'audience: "Technical educators"',
+        'level: "intermediate"',
+        'duration: "3 hours"',
+        'extra_field: "ignored"',
+        ""
+      ].join("\n")
+    );
+
+    expect(result.status).toBe("valid");
+    expect(result.status === "valid" ? result.metadata : undefined).toEqual({
+      title: "Course Title",
+      description: "Course description.",
+      audience: "Technical educators",
+      level: "intermediate",
+      duration: "3 hours"
+    });
+  });
+
+  it("reports field-specific course metadata errors", () => {
+    const result = parseCourseMetadata(["title: '   '", "description: 42", "level: expert", ""].join("\n"));
+
+    expect(result.status).toBe("invalid");
+    expect(result.errors.map((error) => error.code)).toEqual([
+      "COURSE_METADATA_REQUIRED_FIELD",
+      "COURSE_METADATA_FIELD_TYPE",
+      "COURSE_METADATA_INVALID_LEVEL"
+    ]);
+    expect(result.errors.map((error) => error.field)).toEqual(["title", "description", "level"]);
+  });
+
+  it("rejects non-mapping course metadata roots", () => {
+    const result = parseCourseMetadata("- title");
+
+    expect(result.status).toBe("invalid");
+    expect(result.errors[0]).toMatchObject({
+      code: "COURSE_METADATA_ROOT_TYPE"
+    });
+  });
+
+  it("threads valid course metadata through scan and validation", async () => {
+    writeText(
+      "lectures/course.yaml",
+      ['title: "Course Title"', 'description: "Course description."', 'audience: "Technical learners"', 'level: "beginner"', ""].join("\n")
+    );
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+
+    const collection = await scanLectureCollection();
+    const validation = await validateCollection();
+
+    expect(collection.courseMetadata.status).toBe("valid");
+    expect(validation.courseMetadata.status).toBe("valid");
+    expect(validation.allPassed).toBe(true);
+  });
+
+  it("makes invalid course metadata fail collection validation without hiding lecture results", async () => {
+    writeText("lectures/course.yaml", "title: ''\ndescription: ''\n");
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+
+    const validation = await validateCollection();
+
+    expect(validation.lectureCount).toBe(1);
+    expect(validation.results[0]).toMatchObject({ valid: true });
+    expect(validation.courseMetadata.status).toBe("invalid");
+    expect(validation.allPassed).toBe(false);
   });
 
   it("validates collection lectures that contain learning components", async () => {

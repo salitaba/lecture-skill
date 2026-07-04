@@ -120,6 +120,41 @@ describe("source fidelity review worksheet", () => {
     ]);
   });
 
+  it("renders valid collection course metadata in worksheets", async () => {
+    writeText("lectures/course.yaml", 'title: "Course Title"\ndescription: "Course description."\naudience: "Engineers"\nlevel: "beginner"\nduration: "90 minutes"\n');
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+
+    const worksheet = await createSourceReviewWorksheet();
+    const markdown = renderSourceReviewWorksheetMarkdown(worksheet);
+
+    expect(worksheet.courseMetadata?.status).toBe("valid");
+    expect(markdown).toContain("## Course Metadata");
+    expect(markdown).toContain("Title: Course Title");
+    expect(markdown).toContain("Audience: Engineers");
+  });
+
+  it("records absent collection metadata in worksheets", async () => {
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+
+    const markdown = renderSourceReviewWorksheetMarkdown(await createSourceReviewWorksheet());
+
+    expect(markdown).toContain("Status: absent");
+    expect(markdown).toContain("Collection labels are inferred from lecture folders.");
+  });
+
+  it("marks invalid collection metadata as worksheet validation failure", async () => {
+    writeText("lectures/course.yaml", "title: ''\ndescription: ''\n");
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+
+    const worksheet = await createSourceReviewWorksheet();
+    const markdown = renderSourceReviewWorksheetMarkdown(worksheet);
+
+    expect(worksheet.validation.result).toBe("failed");
+    expect(worksheet.courseMetadata?.status).toBe("invalid");
+    expect(markdown).toContain("Metadata validation errors:");
+    expect(markdown).toContain("COURSE_METADATA_REQUIRED_FIELD");
+  });
+
   it("includes valid and invalid collection lectures and marks missing primary sources", async () => {
     copyFixture(
       "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
