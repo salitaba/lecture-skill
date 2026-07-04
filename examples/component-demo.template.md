@@ -128,9 +128,71 @@ answer: "npm run validate"
 explanation: "Validation checks the active template or collection and exits nonzero on blocking errors; the rendered quiz reveals this feedback only when the learner clicks Show answer."
 ```
 
+## Section: Diagram Components
+
+Use Diagram components to render Mermaid.js diagrams inline within lecture sections. Diagrams are useful for architecture overviews, process flows, sequence interactions, state machines, data models, and timelines.
+
+```lecture-component
+type: diagram
+diagram_type: flowchart
+title: "Data flow from source to render"
+code: "graph LR\n  A[Author] -->|writes| B[Markdown]\n  B -->|parsed| C[Template]\n  C -->|rendered| D[HTML]"
+direction: LR
+```
+
+```lecture-component
+type: diagram
+diagram_type: sequence
+title: "Client-server request lifecycle"
+code: "sequenceDiagram\n  participant C as Client\n  participant S as Server\n  C->>S: GET /lecture\n  S-->>C: 200 OK + HTML"
+```
+
+```lecture-component
+type: diagram
+diagram_type: class
+title: "Component class hierarchy"
+code: "classDiagram\n  class LectureComponent {\n    +type\n    +title\n  }\n  class Callout {\n    +variant\n    +body\n  }\n  LectureComponent <|-- Callout"
+```
+
+```lecture-component
+type: diagram
+diagram_type: state
+title: "Validation state machine"
+code: "stateDiagram-v2\n  [*] --> Pending\n  Pending --> Validating\n  Validating --> Valid\n  Validating --> Invalid"
+```
+
+```lecture-component
+type: diagram
+diagram_type: er
+title: "Lecture data model"
+code: "erDiagram\n  LECTURE ||--o{ SECTION : contains\n  SECTION ||--o{ COMPONENT : has\n  LECTURE {\n    string title\n    string level\n  }"
+```
+
+```lecture-component
+type: diagram
+diagram_type: gantt
+title: "Project timeline"
+code: "gantt\n  title Implementation Plan\n  section Phase 1\n    Types :a1, 2024-01-01, 3d\n    Validation :a2, after a1, 2d\n  section Phase 2\n    Components :b1, after a2, 4d"
+```
+
+```lecture-component
+type: diagram
+diagram_type: pie
+title: "Component usage distribution"
+code: "pie\n  title Component Usage\n  \"Callout\" : 30\n  \"Code Block\" : 25\n  \"Quiz\" : 20\n  \"Other\" : 25"
+```
+
+```lecture-component
+type: diagram
+diagram_type: mindmap
+title: "Lecture skill architecture"
+code: "mindmap\n  root((Lecture Skill))\n    Parser\n      YAML\n      Markdown\n    Components\n      Callout\n      Quiz\n      Diagram\n    Renderer\n      Static\n      Interactive"
+```
+
 ## Key Takeaways
 
-- The engine supports callout, concept_card, step_list, code_block, comparison, summary, quote, and quiz components.
+- The engine supports callout, concept_card, step_list, code_block, comparison, summary, quote, quiz, and diagram components.
 - Components must use fenced YAML with the lecture-component language tag.
 - Quiz is a knowledge check whose answer and explanation are revealed on demand.
+- Diagram renders Mermaid.js diagrams with a static fallback for no-JS environments.
 - The component demo is valid visual-gallery content but should be restored after previewing.

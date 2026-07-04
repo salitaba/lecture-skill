@@ -1,0 +1,192 @@
+Implementation Plan: Interactive Diagrams and Flowcharts (spec/010-interactive-diagrams-flowcharts.txt)
+
+## Summary
+
+Add a new `diagram` component type to the Lecture Site Engine that renders Mermaid.js diagrams inline within lecture sections. This is purely additive: no existing components change, no schema changes to existing templates, and the new type follows the established component pattern exactly.
+
+## Relevant Existing Files
+
+### Types and schema
+- `src/lib/lecture-template/types.ts` — Add `DiagramComponent` interface, `DiagramType`/`DiagramDirection`/`DiagramTheme` union types, add `"diagram"` to `LectureComponentType` union, add to `LectureComponent` union
+
+### Validation
+- `src/lib/lecture-template/validateTemplate.ts` — Add `"diagram"` to `supportedComponents`, add diagram-specific validation in `validateComponent`, add `normalizeComponent` case for diagram, define `allowedDiagramTypes` and `allowedDiagramThemes`
+
+### Parsing
+- `src/lib/lecture-template/parseTemplate.ts` — No changes needed; the parser is type-agnostic and handles lecture-component blocks generically
+
+### Rendering
+- `src/components/lecture-kit/SectionRenderer.tsx` — Add `"diagram"` case to the component switch, import `Diagram` component
+- `src/components/lecture-kit/Diagram.tsx` — New file: the diagram React component
+
+### Styling
+- `src/app/globals.css` — Add `.diagram-card`, `.diagram-svg-container`, `.diagram-fallback`, `.diagram-error`, print styles
+
+### Documentation
+- `SKILL.md` — Add diagram component to supported components list with usage guidance
+
+### Examples
+- `examples/component-demo.template.md` — Add diagram entries to the component gallery
+
+### Tests
+- `tests/lecture-template/validateTemplate.test.ts` — Add diagram validation tests, update hardcoded `supportedComponentTypes` array
+- `tests/lecture-template/lecture-components.test.tsx` — Add diagram rendering tests (static fallback, accessible markup, figcaption, source details)
+
+### Package and dependencies
+- `package.json` — Add `mermaid` as a dependency (`^10.x`)
+
+## Implementation Steps
+
+### Step 1: Add Mermaid.js dependency
+- Run `npm install mermaid@^10`
+- Verify it appears in `package.json` dependencies
+
+### Step 2: Add DiagramComponent type and union types
+In `src/lib/lecture-template/types.ts`:
+- Define `type DiagramType = "flowchart" | "sequence" | "class" | "state" | "er" | "gantt" | "pie" | "mindmap"`
+- Define `type DiagramDirection = "TB" | "LR" | "BT" | "RL"`
+- Define `type DiagramTheme = "default" | "dark" | "forest" | "neutral" | "base"`
+- Add `DiagramComponent` interface:
+  ```typescript
+  export interface DiagramComponent {
+    type: "diagram";
+    diagram_type: DiagramType;
+    title: string;
+    code: string;
+    direction?: DiagramDirection;
+    theme?: DiagramTheme;
+  }
+  ```
+- Add `"diagram"` to the `LectureComponentType` union
+- Add `DiagramComponent` to the `LectureComponent` union
+
+### Step 3: Add diagram validation
+In `src/lib/lecture-template/validateTemplate.ts`:
+- Add `"diagram"` to `supportedComponents` array
+- Define `allowedDiagramTypes: DiagramType[] = ["flowchart", "sequence", "class", "state", "er", "gantt", "pie", "mindmap"]`
+- Define `allowedDiagramDirections: DiagramDirection[] = ["TB", "LR", "BT", "RL"]`
+- Define `allowedDiagramThemes: DiagramTheme[] = ["default", "dark", "forest", "neutral", "base"]`
+- In `validateComponent`, add a block for `type === "diagram"` that:
+  - Calls `requireStringFields(block, sectionTitle, errors, ["title", "code"])`
+  - Validates `diagram_type` is present and in `allowedDiagramTypes`
+  - Validates `code` is non-empty after trimming
+  - Validates `direction` if present: must be in `allowedDiagramDirections` and only valid when `diagram_type === "flowchart"`
+  - Validates `theme` if present: must be in `allowedDiagramThemes`
+- In `normalizeComponent`, add a case for `data.type === "diagram"` that returns the normalized `DiagramComponent`
+
+### Step 4: Create Diagram component
+Create `src/components/lecture-kit/Diagram.tsx`:
+
+- Accept `{ component: DiagramComponent }` props (matches Callout pattern)
+- Use `useId()` for a stable diagram element ID
+- Server / initial client render:
+  ```
+  <figure role="img" aria-label={component.title} className="lecture-component diagram-card">
+    <p className="component-label">Diagram</p>
+    <div className="diagram-svg-container">
+      <pre><code>{component.code}</code></pre>  // no-JS fallback, always present
+    </div>
+    <figcaption>{component.title}</figcaption>
+    <details>
+      <summary>Diagram source code</summary>
+      <pre><code>{component.code}</code></pre>
+    </details>
+  </figure>
+  ```
+- `useEffect` on mount:
+  - Dynamically import `mermaid` (catch import error → show load failure note)
+  - If `window.mermaid` already initialized, skip init; else call `mermaid.initialize({ startOnLoad: false })` — do NOT pass theme to initialize (it's global)
+  - Call `const { svg } = await mermaid.render(diagramId, component.code, { theme: component.theme || 'default' })` — theme passed per-render
+  - On success: replace the `<pre>` inside `.diagram-svg-container` with the SVG via `dangerouslySetInnerHTML` or a ref
+  - On error: leave `<pre>` in place, show `<p className="diagram-error">Diagram could not be rendered. Showing source code.</p>`
+- Use `useRef` for the container div to enable imperative SVG replacement
+- The `diagramId` passed to `mermaid.render()` must be the `useId()` value
+
+### Step 5: Wire Diagram into SectionRenderer
+In `src/components/lecture-kit/SectionRenderer.tsx`:
+- Import `Diagram` from `./Diagram`
+- Add `case "diagram":` returning `<Diagram key={index} component={component} />`
+
+### Step 6: Add CSS styles
+In `src/app/globals.css`:
+- `.diagram-card` — inherits `.lecture-component` styling; add `contain: inline-size` for overflow containment (same as CodeBlock)
+- `.diagram-svg-container` — `width: 100%; max-width: 100%; overflow-x: auto` for responsive SVG
+- `.diagram-svg-container svg` — `width: 100%; height: auto` for responsive scaling
+- `.diagram-error` — error note styling (muted color, small font)
+- Print styles: `@media print` rules for `.diagram-card` (`break-inside: avoid`)
+
+### Step 7: Update component demo gallery
+In `examples/component-demo.template.md`:
+- Add a new section "Diagram Components" with valid examples for each supported type (flowchart, sequence, class, state, er, gantt, pie, mindmap)
+- Update the key takeaways to mention diagram support
+- Place diagram entries in a new section after "Check Understanding Components"
+
+### Step 8: Update SKILL.md
+In `SKILL.md`:
+- Add `diagram` to the supported components list
+- Include authoring syntax example
+- Add "When to use diagram" guidance: architecture, process flow, sequence interaction, state machine, data model, timeline
+- Add "When NOT to use diagram" guidance: simple lists, short text comparisons, single-step processes, content better suited to code blocks or step lists
+
+### Step 9: Write tests
+In `tests/lecture-template/validateTemplate.test.ts`:
+- Add `"diagram"` to the hardcoded `supportedComponentTypes` array at line 5
+- Test valid diagram with each supported type
+- Test missing `diagram_type` error
+- Test invalid `diagram_type` error
+- Test missing `code` error
+- Test empty `code` error
+- Test invalid `direction` error
+- Test `direction` on non-flowchart error
+- Test invalid `theme` error
+- Test normalization of diagram components with defaults and optional fields
+- Test diagram component outside section is invalid
+
+In `tests/lecture-template/lecture-components.test.tsx`:
+- Test Diagram component renders accessible markup (`role="img"`, `aria-label`, `<figcaption>`)
+- Test Diagram component renders raw source in `<pre>` fallback
+- Test Diagram component renders `<details>` with source code
+- Test Diagram component through SectionRenderer dispatch
+- Test HTML escaping in diagram fields
+
+### Step 10: Run verification
+- Run `npm run lint` to check code quality
+- Run `npm run typecheck` to verify TypeScript
+- Run `npm run test` to ensure all tests pass
+
+## Data Model Changes
+
+The `LectureComponent` union type gains one new member:
+
+```typescript
+type DiagramType = "flowchart" | "sequence" | "class" | "state" | "er" | "gantt" | "pie" | "mindmap";
+type DiagramDirection = "TB" | "LR" | "BT" | "RL";
+type DiagramTheme = "default" | "dark" | "forest" | "neutral" | "base";
+
+export interface DiagramComponent {
+  type: "diagram";
+  diagram_type: DiagramType;
+  title: string;
+  code: string;
+  direction?: DiagramDirection;
+  theme?: DiagramTheme;
+}
+```
+
+No changes to existing component types, frontmatter schema, or heading structure.
+
+## Test Plan
+
+- Unit tests for schema validation of all 8 diagram types and optional fields
+- Unit tests for invalid diagram type, missing fields, empty code
+- Rendering tests for static fallback markup, accessible attributes, figcaption, source details
+- Integration test for SectionRenderer dispatching diagram components
+- Backward compatibility verified by existing fixture tests in `validateTemplate.test.ts`
+
+## Risks and Mitigations
+
+1. **Mermaid.js bundle size** — Dynamic import mitigates this; it only loads when a diagram is present on the page.
+2. **Mermaid.js SSR compatibility** — Mermaid requires DOM APIs. The component renders the `<pre>` fallback on the server and initializes Mermaid only in a `useEffect` on the client.
+3. **Mermaid per-instance theme** — Theme is passed via `mermaid.render(id, code, config)`, not via global `initialize()`. This ensures each diagram instance uses its own theme.
+4. **SVG ID collisions** — Each diagram uses `useId()` as the diagram ID passed to `mermaid.render()`, ensuring unique IDs.
+5. **Source code rendered twice** — The `<details>` section is the single source of truth for source code accessibility. The `<pre>` inside `.diagram-svg-container` is the no-JS fallback; the `<details>` is always present for screen readers and keyboard users.

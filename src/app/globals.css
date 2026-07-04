@@ -589,6 +589,27 @@ summary .nav-summary-count {
   overflow-wrap: anywhere;
 }
 
+.diagram-card {
+  contain: inline-size;
+}
+
+.diagram-svg-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.diagram-svg-container svg {
+  width: 100%;
+  height: auto;
+}
+
+.diagram-error {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
 pre {
   contain: inline-size paint;
   width: 100%;
@@ -966,7 +987,8 @@ td {
   .comparison-row,
   .quote-card,
   .quiz-card,
-  .quiz-answer {
+  .quiz-answer,
+  .diagram-card {
     break-inside: avoid;
     page-break-inside: avoid;
   }

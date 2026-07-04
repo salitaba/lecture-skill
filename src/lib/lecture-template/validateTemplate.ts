@@ -1,5 +1,8 @@
 import { parseLectureTemplate } from "./parseTemplate";
 import type {
+  DiagramDirection,
+  DiagramTheme,
+  DiagramType,
   LectureComponent,
   LectureComponentType,
   LectureLevel,
@@ -22,8 +25,13 @@ const supportedComponents = [
   "comparison",
   "summary",
   "quote",
-  "quiz"
+  "quiz",
+  "diagram"
 ] as const satisfies readonly LectureComponentType[];
+
+const allowedDiagramTypes: DiagramType[] = ["flowchart", "sequence", "class", "state", "er", "gantt", "pie", "mindmap"];
+const allowedDiagramDirections: DiagramDirection[] = ["TB", "LR", "BT", "RL"];
+const allowedDiagramThemes: DiagramTheme[] = ["default", "dark", "forest", "neutral", "base"];
 
 export function validateTemplateSource(source: string): ValidationResult {
   return validateParsedTemplate(parseLectureTemplate(source));
@@ -321,6 +329,71 @@ function validateComponent(block: ParsedComponentBlock, errors: ValidationError[
       });
     }
   }
+
+  if (type === "diagram") {
+    requireStringFields(block, sectionTitle, errors, ["title", "code"]);
+    if (!isRecord(block.data)) return;
+    const diagramType = block.data.diagram_type;
+    if (typeof diagramType !== "string" || !allowedDiagramTypes.includes(diagramType as DiagramType)) {
+      errors.push({
+        code: "INVALID_COMPONENT_FIELD",
+        message: "diagram_type must be one of: flowchart, sequence, class, state, er, gantt, pie, mindmap.",
+        locator: block.locator,
+        sectionTitle,
+        componentType: "diagram",
+        field: "diagram_type",
+        hint: "Set diagram_type: to one of the supported diagram types."
+      });
+    }
+    const code = block.data.code;
+    if (typeof code === "string" && code.trim() === "") {
+      errors.push({
+        code: "INVALID_COMPONENT_FIELD",
+        message: "diagram code field must not be empty.",
+        locator: block.locator,
+        sectionTitle,
+        componentType: "diagram",
+        field: "code",
+        hint: "Provide non-empty Mermaid diagram source code."
+      });
+    }
+    const direction = block.data.direction;
+    if (direction !== undefined) {
+      if (typeof direction !== "string" || !allowedDiagramDirections.includes(direction as DiagramDirection)) {
+        errors.push({
+          code: "INVALID_COMPONENT_FIELD",
+          message: "direction must be one of: TB, LR, BT, RL.",
+          locator: block.locator,
+          sectionTitle,
+          componentType: "diagram",
+          field: "direction",
+          hint: "Set direction: to TB, LR, BT, or RL."
+        });
+      } else if (typeof diagramType === "string" && diagramType !== "flowchart") {
+        errors.push({
+          code: "INVALID_COMPONENT_FIELD",
+          message: "direction field is only valid for flowchart diagram_type.",
+          locator: block.locator,
+          sectionTitle,
+          componentType: "diagram",
+          field: "direction",
+          hint: "Remove the direction field or set diagram_type: flowchart."
+        });
+      }
+    }
+    const theme = block.data.theme;
+    if (theme !== undefined && (typeof theme !== "string" || !allowedDiagramThemes.includes(theme as DiagramTheme))) {
+      errors.push({
+        code: "INVALID_COMPONENT_FIELD",
+        message: "theme must be one of: default, dark, forest, neutral, base.",
+        locator: block.locator,
+        sectionTitle,
+        componentType: "diagram",
+        field: "theme",
+        hint: "Set theme: to one of the supported theme values."
+      });
+    }
+  }
 }
 
 function requireStringFields(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[], fields: string[]) {
@@ -535,6 +608,18 @@ function normalizeComponent(block: ParsedComponentBlock): LectureComponent | und
       options: Array.isArray(data.options) ? data.options.map(stringValue) : [],
       answer: stringValue(data.answer),
       ...(explanation ? { explanation } : {})
+    };
+  }
+  if (data.type === "diagram") {
+    const direction = typeof data.direction === "string" ? (data.direction as DiagramDirection) : undefined;
+    const theme = typeof data.theme === "string" ? (data.theme as DiagramTheme) : undefined;
+    return {
+      type: "diagram",
+      diagram_type: stringValue(data.diagram_type) as DiagramType,
+      title: stringValue(data.title),
+      code: stringValue(data.code),
+      ...(direction ? { direction } : {}),
+      ...(theme ? { theme } : {})
     };
   }
   return undefined;

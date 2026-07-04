@@ -6,7 +6,7 @@ import { isCollectionMode, scanLectureCollection, validateCollection } from "../
 import { parseCourseMetadata } from "../../src/lib/lecture-template/courseMetadata";
 
 const repoRoot = process.cwd();
-const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz"];
+const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz", "diagram"];
 let tempRoot = "";
 
 describe("collection scanning", () => {

@@ -1,0 +1,241 @@
+Feature: Interactive Diagrams and Flowcharts
+
+## Product Summary
+
+Add a new `diagram` component type to the Lecture Site Engine that renders Mermaid.js diagrams inline within lecture sections. This enables educators to teach architecture, processes, data flows, state machines, and relationships using visual diagrams without leaving the supported schema.
+
+The engine currently supports text-based teaching components (callouts, comparisons, step lists, code blocks, quizzes, etc.), but technical education frequently requires visual representations: system architecture, sequence interactions, state transitions, entity relationships, and process flows. Without a diagram component, educators must either embed static images (not source-controlled, not responsive, not accessible) or describe complex relationships in text alone.
+
+The primary product outcome is: an educator or AI agent can author a diagram using a simple Mermaid syntax inside a `lecture-component` block, and the rendered page displays a responsive, accessible, print-friendly diagram that integrates seamlessly with the existing lecture-kit design system.
+
+This feature is about adding a new component type to the engine. It is not a review workflow, hosted publishing workflow, analytics dashboard, or browser-based diagram editor.
+
+## Problem
+
+The Lecture Site Engine lacks visual diagram support despite being designed for technical education. This creates several friction points:
+
+- Educators teaching system architecture must describe multi-component systems in text, which is harder to understand and slower to teach.
+- Sequence diagrams, state machines, entity-relationship diagrams, and flowcharts are common patterns in computer science and software engineering lectures.
+- Without native diagram support, educators either use external tools (Lucidchart, draw.io) and embed screenshots, or skip visual explanations entirely.
+- Screenshots are not responsive, not accessible, not source-controlled, and degrade when printed or reviewed.
+- AI agents cannot generate visual diagrams from raw lecture material because no supported component type accepts diagram syntax.
+- The existing `code_block` component can display Mermaid syntax, but it renders as code text, not as a rendered diagram.
+
+The result is that visually-rich technical lectures require workarounds or remain less teachable than they should be.
+
+## Goals
+
+- Add a `diagram` component type that renders Mermaid.js diagrams inside lecture sections.
+- Support the most common diagram types for technical education: flowchart, sequence, class, state, ER, and gantt.
+- Validate diagram syntax and provide clear error messages for malformed diagrams.
+- Render diagrams responsively across phone, tablet, and desktop widths.
+- Provide a static HTML fallback when JavaScript is unavailable.
+- Integrate with the existing lecture-kit visual system and design principles.
+- Preserve static review package compatibility.
+- Update examples, docs, and AI-agent instructions so the component is used correctly.
+
+## Priority
+
+P0 requirements:
+
+- Add `diagram` as a supported component type in the validator.
+- Define the authoring schema with `type`, `diagram_type`, `title`, and `code` fields.
+- Validate `diagram_type` against supported types: `flowchart`, `sequence`, `class`, `state`, `er`, `gantt`, `pie`, `mindmap`.
+- Render diagrams using Mermaid.js in the browser.
+- Add a static `<pre>` fallback for no-JavaScript environments showing the raw Mermaid code.
+- Ensure diagrams scale responsively and do not cause horizontal overflow at 390px, 768px, and 1280px.
+- Add accessible markup: `role="img"` on the diagram container, `aria-label` from the title, and a `<figcaption>` element.
+- Add valid and invalid examples for every supported diagram type.
+- Add focused tests for parsing, validation, rendering, and backward compatibility.
+
+P1 requirements:
+
+- Add light/dark theme support that matches the page color scheme.
+- Add print-friendly styling that renders diagrams as crisp SVG or high-contrast images.
+- Add a "copy diagram source" button so learners can paste Mermaid code into their own editor.
+- Add optional `direction` field for flowcharts only (`TB`, `LR`, `BT`, `RL`). Validator rejects `direction` on non-flowchart types.
+- Add optional `theme` field to override the diagram color palette per instance. Valid values: `default`, `dark`, `forest`, `neutral`, `base`.
+- Add a component gallery entry showing each supported diagram type.
+
+P2 requirements:
+
+- Add zoom/pan interaction for large diagrams on touch devices.
+- Add a "full-screen" toggle for complex diagrams that benefit from more space.
+- Add diagram-specific anchors for deep linking.
+- Add a "download SVG" action for offline use.
+
+## Non-Goals
+
+- No browser-based diagram editor or visual diagram builder.
+- No real-time collaboration or multi-user diagram editing.
+- No external hosting of diagram assets or CDN dependency.
+- No arbitrary JavaScript execution in diagram code.
+- No support for Mermaid.js plugins or extensions beyond the core set.
+- No grading, scoring, analytics, or learner tracking.
+- No database, backend service, authentication, or hosted publishing.
+- No change to the required lecture heading structure.
+- No support for embedding external diagram services (Lucidchart, draw.io, Excalidraw).
+- No automatic diagram generation from lecture text content.
+
+## Design Principles
+
+- Teaching value over decoration. Diagrams should clarify architecture, process, or relationship, not add visual noise.
+- Static first. Diagrams must render useful fallback content without JavaScript.
+- Accessible by default. Diagrams must have text alternatives, semantic markup, and keyboard-accessible controls.
+- Consistent with the existing engine. The diagram component should feel like a natural addition to lecture-kit, not a separate design system.
+- Strict schema, clear errors. Every field should be predictable enough for humans and AI agents to author reliably.
+- Minimal dependencies. Mermaid.js is the only new runtime dependency, and it should be loaded only when a diagram is present on the page.
+
+## Dependencies
+
+- **Mermaid.js**: Pin to `^10.x`. Loaded via dynamic import only when at least one `diagram` component is present on the page.
+- **Loading strategy**: Bundle Mermaid.js as a static asset (not CDN). This ensures offline support, print reliability, and no external network dependency.
+- **Fallback on load failure**: If Mermaid.js fails to load (network error, script error), all diagrams on the page fall back to the static `<pre>` code view with a note: "Diagram library failed to load. Showing source code."
+
+## Recommended Experience Direction
+
+### Authoring Schema
+
+The `diagram` component uses this authoring shape:
+
+````markdown
+```lecture-component
+type: diagram
+diagram_type: flowchart
+title: "Request Processing Pipeline"
+code: |
+  graph LR
+    A[Client Request] --> B[Load Balancer]
+    B --> C[API Gateway]
+    C --> D[Auth Service]
+    D --> E[Business Logic]
+    E --> F[Database]
+    F --> G[Response]
+```
+````
+
+Required fields:
+
+- `type`: Always `diagram`.
+- `diagram_type`: One of `flowchart`, `sequence`, `class`, `state`, `er`, `gantt`, `pie`, `mindmap`.
+- `title`: A human-readable title for the diagram. Used for `aria-label` and `<figcaption>`.
+- `code`: The Mermaid.js syntax for the diagram. Pipe-delimited for multi-line content.
+
+Optional fields:
+
+- `direction`: Flowchart direction (`TB`, `LR`, `BT`, `RL`). Defaults to `TB`.
+- `theme`: Override the diagram color palette. Valid values: `default`, `dark`, `forest`, `neutral`, `base`. Defaults to the page theme.
+
+### Supported Diagram Types
+
+| `diagram_type` | Mermaid Syntax | Use Case |
+|----------------|----------------|----------|
+| `flowchart` | `graph TD` / `graph LR` | Process flows, decision trees, architecture |
+| `sequence` | `sequenceDiagram` | API interactions, message flows |
+| `class` | `classDiagram` | Object-oriented design, type hierarchies |
+| `state` | `stateDiagram-v2` | State machines, lifecycle models |
+| `er` | `erDiagram` | Database schema, data models |
+| `gantt` | `gantt` | Project timelines, schedules |
+| `pie` | `pie` | Distribution data, proportions |
+| `mindmap` | `mindmap` | Concept maps, idea organization |
+
+### Rendering Behavior
+
+**With JavaScript enabled:**
+
+1. The component renders a `<figure>` with `role="img"` and `aria-label` set to the title.
+2. Mermaid.js initializes the diagram and replaces the `<pre>` block with an SVG.
+3. The diagram scales to fit the container width without horizontal overflow.
+4. A `<figcaption>` below the diagram displays the title.
+5. A `<details>` section below the figcaption contains the raw Mermaid source code, collapsed by default. This ensures the source is always accessible to screen readers and keyboard users.
+
+**Without JavaScript (static fallback):**
+
+1. The component renders a `<figure>` with the same accessible markup.
+2. The Mermaid code appears inside a styled `<pre><code>` block.
+3. A note indicates: "Interactive diagram requires JavaScript. Showing source code."
+4. The fallback is still useful for review packages and print.
+
+**Print behavior:**
+
+1. The diagram renders as-is from the SVG (Mermaid renders to SVG by default).
+2. Print styles ensure the diagram is crisp, not cut off, and uses high contrast.
+3. Long diagrams may wrap or scale down proportionally.
+
+### Visual Treatment
+
+The diagram component follows the existing lecture-kit card system:
+
+- Consistent card radius, border treatment, and internal spacing matching other components.
+- A visible "Diagram" label in the component header, consistent with other component labels.
+- The title appears prominently below the label.
+- The diagram itself occupies the full card width.
+- A figcaption appears below the diagram in muted text.
+
+At different widths:
+
+- **Phone (390px):** Diagram scales to fit width. No tap-to-zoom in P0; zoom/pan is a P2 feature.
+- **Tablet (768px):** Diagram scales to fit width with comfortable padding.
+- **Desktop (1280px):** Diagram uses available width up to a max-width to maintain readability.
+
+### Error Handling
+
+Validation errors for the diagram component:
+
+- Missing `diagram_type`: "diagram component requires a diagram_type field."
+- Invalid `diagram_type`: "diagram_type must be one of: flowchart, sequence, class, state, er, gantt, pie, mindmap."
+- Missing `code`: "diagram component requires a code field with Mermaid syntax."
+- Empty `code`: "diagram code field must not be empty."
+- Invalid `direction`: "direction must be one of: TB, LR, BT, RL."
+- Invalid `theme`: "theme must be one of: default, dark, forest, neutral, base."
+- `direction` on non-flowchart type: "direction field is only valid for flowchart diagram_type."
+
+At render time, if Mermaid fails to parse the diagram syntax:
+
+- The component falls back to showing the raw code in a `<pre>` block.
+- An error note appears: "Diagram could not be rendered. Showing source code."
+- The page does not break or show a blank area.
+
+If Mermaid.js fails to load (network error, script error):
+
+- All diagram components fall back to the static `<pre>` code view.
+- An error note appears: "Diagram library failed to load. Showing source code."
+- The page continues to function normally; only diagram rendering is affected.
+
+## Accessibility Requirements
+
+- The diagram container uses `role="img"` and `aria-label` set to the title.
+- A `<figcaption>` provides the visible title for sighted users.
+- The raw Mermaid code is available in a `<details>` expandable section (collapsed by default) for screen readers and keyboard users. This section is always present, in both JS-enabled and fallback modes.
+- The "copy source" button (P1) is keyboard-accessible with a visible focus ring.
+- No color-only meaning: diagrams use patterns or labels in addition to color where possible (Mermaid default behavior).
+- Print output includes the diagram title and source code as text.
+
+## Testing Strategy
+
+- Unit tests for schema validation of all supported diagram types and optional fields.
+- Unit tests for invalid diagram type, missing fields, and empty code.
+- Rendering tests for static fallback markup, accessible attributes, and figcaption.
+- Integration tests for Mermaid.js initialization and SVG rendering.
+- Responsive tests at 390px, 768px, and 1280px widths.
+- Print test to verify diagram does not break across pages.
+- Backward compatibility test to ensure existing components are unaffected.
+- Component gallery test (P1) to verify the diagram entry renders all supported types.
+
+## Migration and Backward Compatibility
+
+- This feature adds a new component type. Existing components are unchanged.
+- No schema changes to existing component YAML.
+- No changes to required lecture heading structure.
+- No changes to the validation pass/fail contract for existing templates.
+- The new `diagram` type is additive: existing templates remain valid without modification.
+- AI agents must be updated via `SKILL.md` to know about the new component type and when to use it.
+
+## Documentation Updates
+
+- Update `README.md` to document the `diagram` component type, supported diagram types, and authoring examples.
+- Update `SKILL.md` to include the `diagram` component in the supported components list with usage guidance.
+- Add valid and invalid diagram examples to `examples/`.
+- Add a diagram entry to the component gallery demo.
+- Add a "When to use diagram" guidance section: architecture, process flow, sequence interaction, state machine, data model, timeline.
+- Add a "When NOT to use diagram" guidance section: simple lists, short text comparisons, single-step processes, content better suited to code blocks or step lists.

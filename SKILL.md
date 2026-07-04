@@ -222,6 +222,19 @@ explanation: "Validation checks the active template or collection."
 
 Rendered label: `Quiz: Knowledge check`. Use `quiz` for lightweight knowledge checks with feedback revealed on demand. The schema is unchanged: `question`, `options`, `answer`, and optional `explanation`; the `answer` must exactly match one option after trimming whitespace. Interactive pages initially show the question, options, and a `Show answer` button, then toggle to `Hide answer` after reveal. Printed output includes the answer and explanation by default. If JavaScript is unavailable, the rendered quiz shows a `<noscript>` message explaining that interactive reveal requires JavaScript and that printed output includes the answer and explanation. Quiz reveal is a pacing aid, not secure assessment, grading, learner tracking, answer encryption, anti-cheating, learner accounts, analytics, or source-code secrecy.
 
+````markdown
+```lecture-component
+type: diagram
+diagram_type: flowchart
+title: "Data flow overview"
+code: "graph LR\n  A[Input] --> B[Process]\n  B --> C[Output]"
+direction: LR
+theme: default
+```
+````
+
+Rendered label: `Diagram`. Use `diagram` for visual representations of architecture, process flows, sequence interactions, state machines, data models, and timelines using Mermaid.js syntax. Required fields: `diagram_type`, `title`, and `code`. Supported `diagram_type` values: `flowchart`, `sequence`, `class`, `state`, `er`, `gantt`, `pie`, `mindmap`. Optional fields: `direction` (flowchart only: `TB`, `LR`, `BT`, `RL`) and `theme` (`default`, `dark`, `forest`, `neutral`, `base`). The `code` field contains valid Mermaid.js diagram source. On the client, Mermaid.js renders the diagram as SVG; without JavaScript, the raw source code is shown as a fallback. Use diagrams when visual representations clarify architecture, processes, interactions, or data relationships. Do not use diagrams for simple lists, short text comparisons, single-step processes, or content better suited to code blocks or step lists.
+
 Do not invent custom component types. Unsupported component types fail validation.
 
 ## Validation Checklist Before Finishing

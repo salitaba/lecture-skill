@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
 import { errorCodes, fixture, validationErrors } from "./testUtils";
 
-const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz"];
+const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz", "diagram"];
 
 describe("validateTemplateSource", () => {
   it("accepts the active valid template", () => {
@@ -256,6 +256,133 @@ Section content.
       expect(result.template.takeaways).toEqual(["Remember that wrapped takeaway text remains complete."]);
     }
   });
+
+  it("accepts valid diagram components for all supported types", () => {
+    const types = ["flowchart", "sequence", "class", "state", "er", "gantt", "pie", "mindmap"];
+    for (const diagramType of types) {
+      const result = validateTemplateSource(diagramTemplate(diagramType));
+      expect(result.valid, `diagram_type ${diagramType} should be valid`).toBe(true);
+    }
+  });
+
+  it("normalizes diagram components with optional fields", () => {
+    const result = validateTemplateSource(diagramTemplateWithOptionals());
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const components = result.template.sections.flatMap((section) =>
+        section.blocks.flatMap((block) => (block.kind === "component" ? [block.component] : []))
+      );
+      expect(components).toContainEqual({
+        type: "diagram",
+        diagram_type: "flowchart",
+        title: "Flow",
+        code: "graph LR\n  A --> B",
+        direction: "LR",
+        theme: "dark"
+      });
+      expect(components).toContainEqual({
+        type: "diagram",
+        diagram_type: "sequence",
+        title: "Sequence",
+        code: "sequenceDiagram\n  A->>B: msg"
+      });
+    }
+  });
+
+  it("reports missing diagram_type error", () => {
+    const result = validateTemplateSource(diagramTemplateMissingField("diagram_type"));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.message.includes("diagram_type must be one of"))).toBe(true);
+    }
+  });
+
+  it("reports invalid diagram_type error", () => {
+    const result = validateTemplateSource(diagramTemplateWithInvalidField("diagram_type", "invalid_type"));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.message.includes("diagram_type must be one of"))).toBe(true);
+    }
+  });
+
+  it("reports missing code error", () => {
+    const result = validateTemplateSource(diagramTemplateMissingField("code"));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.message.includes("diagram component requires a code field") || e.message.includes('is missing required field "code"'))).toBe(true);
+    }
+  });
+
+  it("reports empty code error", () => {
+    const result = validateTemplateSource(diagramTemplateWithInvalidField("code", ""));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.message.includes("diagram code field must not be empty"))).toBe(true);
+    }
+  });
+
+  it("reports invalid direction error", () => {
+    const result = validateTemplateSource(diagramTemplateWithInvalidField("direction", "XX"));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.message.includes("direction must be one of: TB, LR, BT, RL"))).toBe(true);
+    }
+  });
+
+  it("reports direction on non-flowchart error", () => {
+    const result = validateTemplateSource(diagramTemplateDirectionOnNonFlowchart());
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.message.includes("direction field is only valid for flowchart diagram_type"))).toBe(true);
+    }
+  });
+
+  it("reports invalid theme error", () => {
+    const result = validateTemplateSource(diagramTemplateWithInvalidField("theme", "neon"));
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.message.includes("theme must be one of: default, dark, forest, neutral, base"))).toBe(true);
+    }
+  });
+
+  it("keeps diagram components outside section blocks invalid", () => {
+    const result = validateTemplateSource(`---
+title: "Outside Diagram"
+description: "Diagram outside section."
+audience: "Engineers"
+duration: "20 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+\`\`\`lecture-component
+type: diagram
+diagram_type: flowchart
+title: "Outside"
+code: "graph LR\n  A --> B"
+\`\`\`
+
+## Learning Objectives
+
+- Learn placement.
+
+## Section: Valid Section
+
+Section content.
+
+## Key Takeaways
+
+- Keep components inside sections.
+`);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const outsideErrors = result.errors.filter((e) => e.code === "COMPONENT_OUTSIDE_SECTION");
+      expect(outsideErrors.some((e) => e.componentType === "diagram")).toBe(true);
+    }
+  });
 });
 
 function validLearningComponentsTemplate(): string {
@@ -333,6 +460,182 @@ explanation: " The answer matches a trimmed option. "
 ## Key Takeaways
 
 - Learning components validate.
+`;
+}
+
+function diagramTemplate(diagramType: string): string {
+  return `---
+title: "Diagram Test"
+description: "Diagram component test."
+audience: "Engineers"
+duration: "20 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn diagrams.
+
+## Section: Diagrams
+
+\`\`\`lecture-component
+type: diagram
+diagram_type: ${diagramType}
+title: "Test diagram"
+code: "graph LR\\n  A --> B"
+\`\`\`
+
+## Key Takeaways
+
+- Diagrams validate.
+`;
+}
+
+function diagramTemplateWithOptionals(): string {
+  return `---
+title: "Diagram Optionals"
+description: "Diagram with optional fields."
+audience: "Engineers"
+duration: "20 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn diagrams.
+
+## Section: Diagrams
+
+\`\`\`lecture-component
+type: diagram
+diagram_type: flowchart
+title: "Flow"
+code: "graph LR\\n  A --> B"
+direction: LR
+theme: dark
+\`\`\`
+
+\`\`\`lecture-component
+type: diagram
+diagram_type: sequence
+title: "Sequence"
+code: "sequenceDiagram\\n  A->>B: msg"
+\`\`\`
+
+## Key Takeaways
+
+- Diagrams validate.
+`;
+}
+
+function diagramTemplateMissingField(field: string): string {
+  const codeField = field === "code" ? "" : '"graph LR\\n  A --> B"';
+  const diagramTypeField = field === "diagram_type" ? "" : "flowchart";
+  return `---
+title: "Diagram Missing"
+description: "Missing field test."
+audience: "Engineers"
+duration: "20 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn diagrams.
+
+## Section: Diagrams
+
+\`\`\`lecture-component
+type: diagram
+${field === "diagram_type" ? "" : `diagram_type: ${diagramTypeField}`}
+title: "Test"
+code: ${codeField}
+\`\`\`
+
+## Key Takeaways
+
+- Diagrams validate.
+`;
+}
+
+function diagramTemplateWithInvalidField(field: string, value: string): string {
+  const diagramType = field === "diagram_type" ? value : "flowchart";
+  const code = field === "code" ? value : "graph LR\\n  A --> B";
+  const extraField = field !== "diagram_type" && field !== "code" ? `${field}: "${value}"` : "";
+  return `---
+title: "Diagram Invalid"
+description: "Invalid field test."
+audience: "Engineers"
+duration: "20 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn diagrams.
+
+## Section: Diagrams
+
+\`\`\`lecture-component
+type: diagram
+diagram_type: ${diagramType}
+title: "Test"
+code: "${code}"
+${extraField}
+\`\`\`
+
+## Key Takeaways
+
+- Diagrams validate.
+`;
+}
+
+function diagramTemplateDirectionOnNonFlowchart(): string {
+  return `---
+title: "Diagram Direction"
+description: "Direction on non-flowchart."
+audience: "Engineers"
+duration: "20 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn diagrams.
+
+## Section: Diagrams
+
+\`\`\`lecture-component
+type: diagram
+diagram_type: sequence
+title: "Test"
+code: "sequenceDiagram\\n  A->>B: msg"
+direction: LR
+\`\`\`
+
+## Key Takeaways
+
+- Diagrams validate.
 `;
 }
 

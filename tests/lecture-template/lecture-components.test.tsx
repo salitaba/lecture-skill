@@ -4,6 +4,7 @@ import { Callout } from "../../src/components/lecture-kit/Callout";
 import { CodeBlock } from "../../src/components/lecture-kit/CodeBlock";
 import { Comparison } from "../../src/components/lecture-kit/Comparison";
 import { ConceptCard } from "../../src/components/lecture-kit/ConceptCard";
+import { Diagram } from "../../src/components/lecture-kit/Diagram";
 import { LectureHeader } from "../../src/components/lecture-kit/LectureHeader";
 import { Quiz } from "../../src/components/lecture-kit/Quiz";
 import { Quote } from "../../src/components/lecture-kit/Quote";
@@ -229,6 +230,14 @@ describe("lecture component UX contracts", () => {
             answer: "<script>alert(5)</script>"
           }}
         />
+        <Diagram
+          component={{
+            type: "diagram",
+            diagram_type: "flowchart",
+            title: "Diagram <script>alert(6)</script>",
+            code: "graph LR\n  A --> B"
+          }}
+        />
       </>
     );
 
@@ -236,6 +245,7 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
     expect(html).toContain("&lt;script&gt;alert(5)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(6)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert");
     expect(html).not.toContain("<img src=x");
   });
@@ -295,7 +305,12 @@ describe("lecture component UX contracts", () => {
               locator: { line: 9 },
               component: { type: "quiz", question: "Question?", options: ["Yes", "No"], answer: "Yes" }
             },
-            { kind: "paragraph", text: "After components.", locator: { line: 10 } }
+            {
+              kind: "component",
+              locator: { line: 10 },
+              component: { type: "diagram", diagram_type: "flowchart", title: "Diagram", code: "graph LR\n  A --> B" }
+            },
+            { kind: "paragraph", text: "After components.", locator: { line: 11 } }
           ]
         }}
       />
@@ -312,7 +327,64 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("Quiz: Knowledge check");
     expect(html).toContain("Show answer");
     expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Diagram");
+    expect(html).toContain("diagram-card");
+    expect(html).toContain("diagram-svg-container");
+    expect(html).toContain("Diagram source code");
     expect(html).toContain("After components.");
+  });
+
+  it("renders Diagram accessible markup with role, aria-label, and figcaption", () => {
+    const html = renderToStaticMarkup(
+      <Diagram
+        component={{
+          type: "diagram",
+          diagram_type: "flowchart",
+          title: "Data flow",
+          code: "graph LR\n  A --> B"
+        }}
+      />
+    );
+
+    expect(html).toContain('role="img"');
+    expect(html).toContain('aria-label="Data flow"');
+    expect(html).toContain("<figcaption>Data flow</figcaption>");
+    expect(html).toContain("Diagram");
+    expect(html).toContain("diagram-card");
+  });
+
+  it("renders Diagram raw source in pre fallback", () => {
+    const html = renderToStaticMarkup(
+      <Diagram
+        component={{
+          type: "diagram",
+          diagram_type: "sequence",
+          title: "Sequence",
+          code: "sequenceDiagram\n  A->>B: msg"
+        }}
+      />
+    );
+
+    expect(html).toContain("sequenceDiagram");
+    expect(html).toContain("A-&gt;&gt;B: msg");
+    expect(html).toContain("diagram-svg-container");
+  });
+
+  it("renders Diagram details with source code", () => {
+    const html = renderToStaticMarkup(
+      <Diagram
+        component={{
+          type: "diagram",
+          diagram_type: "flowchart",
+          title: "Flow",
+          code: "graph TD\n  X --> Y"
+        }}
+      />
+    );
+
+    expect(html).toContain("<summary>Diagram source code</summary>");
+    expect(html).toContain("graph TD");
+    expect(html).toContain("X --&gt; Y");
   });
 });
 

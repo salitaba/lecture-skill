@@ -20,6 +20,7 @@
     "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts"
   },
   "dependencies": {
+    "mermaid": "^10.9.6",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7",

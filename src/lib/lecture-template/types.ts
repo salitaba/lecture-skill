@@ -1,5 +1,8 @@
 export type LectureLevel = "beginner" | "intermediate" | "advanced";
 export type CalloutVariant = "note" | "warning" | "insight";
+export type DiagramType = "flowchart" | "sequence" | "class" | "state" | "er" | "gantt" | "pie" | "mindmap";
+export type DiagramDirection = "TB" | "LR" | "BT" | "RL";
+export type DiagramTheme = "default" | "dark" | "forest" | "neutral" | "base";
 export type LectureComponentType =
   | "callout"
   | "concept_card"
@@ -8,7 +11,8 @@ export type LectureComponentType =
   | "comparison"
   | "summary"
   | "quote"
-  | "quiz";
+  | "quiz"
+  | "diagram";
 
 export interface SourceLocator {
   line?: number;
@@ -231,6 +235,15 @@ export interface QuizComponent {
   explanation?: string;
 }
 
+export interface DiagramComponent {
+  type: "diagram";
+  diagram_type: DiagramType;
+  title: string;
+  code: string;
+  direction?: DiagramDirection;
+  theme?: DiagramTheme;
+}
+
 export type LectureComponent =
   | CalloutComponent
   | ConceptCardComponent
@@ -239,7 +252,8 @@ export type LectureComponent =
   | ComparisonComponent
   | SummaryComponent
   | QuoteComponent
-  | QuizComponent;
+  | QuizComponent
+  | DiagramComponent;
 
 export type RenderBlock =
   | Exclude<MarkdownBlock, ParsedComponentBlock>
