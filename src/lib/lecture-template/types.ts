@@ -12,6 +12,9 @@ export type LectureComponentType =
   | "summary"
   | "quote"
   | "quiz"
+  | "question_set"
+  | "free_response"
+  | "practice_task"
   | "diagram";
 
 export interface SourceLocator {
@@ -229,10 +232,59 @@ export interface QuoteComponent {
 
 export interface QuizComponent {
   type: "quiz";
+  anchor: string;
   question: string;
   options: string[];
   answer: string;
   explanation?: string;
+}
+
+export interface QuestionSetQuestion {
+  question: string;
+  options: string[];
+  answer: string;
+  feedback?: string;
+}
+
+export interface QuestionSetComponent {
+  type: "question_set";
+  anchor: string;
+  title: string;
+  instructions?: string;
+  questions: QuestionSetQuestion[];
+  shuffle_options?: boolean;
+}
+
+export interface FreeResponseComponent {
+  type: "free_response";
+  anchor: string;
+  title: string;
+  prompt: string;
+  guidance?: string;
+  placeholder?: string;
+}
+
+export interface StarterCode {
+  language: string;
+  code: string;
+}
+
+export interface PracticeRubricItem {
+  criterion: string;
+  expected: string;
+}
+
+export interface PracticeTaskComponent {
+  type: "practice_task";
+  anchor: string;
+  title: string;
+  scenario?: string;
+  task: string;
+  steps?: string[];
+  hints?: string[];
+  starter_code?: StarterCode;
+  solution?: string;
+  rubric?: PracticeRubricItem[];
 }
 
 export interface DiagramComponent {
@@ -253,6 +305,9 @@ export type LectureComponent =
   | SummaryComponent
   | QuoteComponent
   | QuizComponent
+  | QuestionSetComponent
+  | FreeResponseComponent
+  | PracticeTaskComponent
   | DiagramComponent;
 
 export type RenderBlock =

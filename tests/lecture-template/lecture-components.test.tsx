@@ -1,11 +1,16 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { AnswerKeyAppendix } from "../../src/components/lecture-kit/AnswerKeyAppendix";
 import { Callout } from "../../src/components/lecture-kit/Callout";
 import { CodeBlock } from "../../src/components/lecture-kit/CodeBlock";
+import { CollectionLanding } from "../../src/components/lecture-kit/CollectionLanding";
 import { Comparison } from "../../src/components/lecture-kit/Comparison";
 import { ConceptCard } from "../../src/components/lecture-kit/ConceptCard";
 import { Diagram } from "../../src/components/lecture-kit/Diagram";
+import { FreeResponse } from "../../src/components/lecture-kit/FreeResponse";
 import { LectureHeader } from "../../src/components/lecture-kit/LectureHeader";
+import { PracticeTask } from "../../src/components/lecture-kit/PracticeTask";
+import { QuestionSet } from "../../src/components/lecture-kit/QuestionSet";
 import { Quiz } from "../../src/components/lecture-kit/Quiz";
 import { Quote } from "../../src/components/lecture-kit/Quote";
 import { SectionNavigation } from "../../src/components/lecture-kit/SectionNavigation";
@@ -107,10 +112,43 @@ describe("lecture component UX contracts", () => {
         <Quiz
           component={{
             type: "quiz",
+            anchor: "quiz-command",
             question: "Which command validates?",
             options: ["npm run validate", "npm run dev"],
             answer: "npm run validate",
             explanation: "Validation checks the template."
+          }}
+        />
+        <QuestionSet
+          component={{
+            type: "question_set",
+            anchor: "question-set",
+            title: "Check",
+            instructions: "Try these.",
+            questions: [
+              { question: "First?", options: ["Yes", "No"], answer: "Yes", feedback: "Correct." },
+              { question: "Second?", options: ["One", "Two"], answer: "Two" }
+            ]
+          }}
+        />
+        <FreeResponse
+          component={{
+            type: "free_response",
+            anchor: "free-response",
+            title: "Explain",
+            prompt: "Explain the tradeoff.",
+            guidance: "Compare against this guidance."
+          }}
+        />
+        <PracticeTask
+          component={{
+            type: "practice_task",
+            anchor: "practice-task",
+            title: "Apply",
+            task: "Fix the issue.",
+            hints: ["Read the field path."],
+            solution: "Repair the YAML.",
+            rubric: [{ criterion: "Valid", expected: "Validation passes." }]
           }}
         />
       </>
@@ -127,6 +165,9 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("Section summary");
     expect(html).toContain("Source quote");
     expect(html).toContain("Quiz: Knowledge check");
+    expect(html).toContain("Assessment: Question set");
+    expect(html).toContain("Assessment: Free response");
+    expect(html).toContain("Practice task");
     expect(html).toContain("&lt;unsafe&gt;");
   });
 
@@ -171,6 +212,7 @@ describe("lecture component UX contracts", () => {
         <Quiz
           component={{
             type: "quiz",
+            anchor: "quiz-command",
             question: "Which command validates?",
             options: ["npm run validate", "npm run dev"],
             answer: "npm run validate",
@@ -225,9 +267,46 @@ describe("lecture component UX contracts", () => {
         <Quiz
           component={{
             type: "quiz",
+            anchor: "quiz-unsafe",
             question: "Run <script>alert(4)</script>?",
             options: ["<script>alert(5)</script>", "No"],
             answer: "<script>alert(5)</script>"
+          }}
+        />
+        <QuestionSet
+          component={{
+            type: "question_set",
+            anchor: "question-set-unsafe",
+            title: "Set <script>alert(7)</script>",
+            questions: [
+              {
+                question: "Question <script>alert(8)</script>",
+                options: ["<script>alert(9)</script>", "No"],
+                answer: "<script>alert(9)</script>",
+                feedback: "<img src=x onerror=alert(10)>"
+              },
+              { question: "Second?", options: ["Yes", "No"], answer: "Yes" }
+            ]
+          }}
+        />
+        <FreeResponse
+          component={{
+            type: "free_response",
+            anchor: "free-response-unsafe",
+            title: "Free <script>alert(11)</script>",
+            prompt: "<img src=x onerror=alert(12)>",
+            placeholder: "<script>alert(13)</script>",
+            guidance: "<script>alert(14)</script>"
+          }}
+        />
+        <PracticeTask
+          component={{
+            type: "practice_task",
+            anchor: "practice-task-unsafe",
+            title: "Practice <script>alert(15)</script>",
+            task: "<img src=x onerror=alert(16)>",
+            starter_code: { language: "html", code: "<script>alert(17)</script>" },
+            rubric: [{ criterion: "<script>alert(18)</script>", expected: "<img src=x onerror=alert(19)>" }]
           }}
         />
         <Diagram
@@ -246,6 +325,9 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
     expect(html).toContain("&lt;script&gt;alert(5)&lt;/script&gt;");
     expect(html).toContain("&lt;script&gt;alert(6)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(9)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(14)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(17)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert");
     expect(html).not.toContain("<img src=x");
   });
@@ -303,14 +385,47 @@ describe("lecture component UX contracts", () => {
             {
               kind: "component",
               locator: { line: 9 },
-              component: { type: "quiz", question: "Question?", options: ["Yes", "No"], answer: "Yes" }
+              component: { type: "quiz", anchor: "learning-components-quiz-question", question: "Question?", options: ["Yes", "No"], answer: "Yes" }
             },
             {
               kind: "component",
               locator: { line: 10 },
+              component: {
+                type: "question_set",
+                anchor: "learning-components-question-set",
+                title: "Set",
+                questions: [
+                  { question: "First?", options: ["Yes", "No"], answer: "Yes" },
+                  { question: "Second?", options: ["One", "Two"], answer: "Two" }
+                ]
+              }
+            },
+            {
+              kind: "component",
+              locator: { line: 11 },
+              component: {
+                type: "free_response",
+                anchor: "learning-components-free-response",
+                title: "Write",
+                prompt: "Explain."
+              }
+            },
+            {
+              kind: "component",
+              locator: { line: 12 },
+              component: {
+                type: "practice_task",
+                anchor: "learning-components-practice-task",
+                title: "Practice",
+                task: "Apply it."
+              }
+            },
+            {
+              kind: "component",
+              locator: { line: 13 },
               component: { type: "diagram", diagram_type: "flowchart", title: "Diagram", code: "graph LR\n  A --> B" }
             },
-            { kind: "paragraph", text: "After components.", locator: { line: 11 } }
+            { kind: "paragraph", text: "After components.", locator: { line: 14 } }
           ]
         }}
       />
@@ -325,6 +440,9 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("Recap");
     expect(html).toContain("<blockquote>");
     expect(html).toContain("Quiz: Knowledge check");
+    expect(html).toContain("Assessment: Question set");
+    expect(html).toContain("Assessment: Free response");
+    expect(html).toContain("Practice task");
     expect(html).toContain("Show answer");
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("Diagram");
@@ -385,6 +503,43 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("<summary>Diagram source code</summary>");
     expect(html).toContain("graph TD");
     expect(html).toContain("X --&gt; Y");
+  });
+
+  it("renders answer-key appendix with assessment anchors and guidance", () => {
+    const lecture = validLecture("examples/component-demo.template.md");
+    const html = renderToStaticMarkup(<AnswerKeyAppendix lecture={lecture} />);
+
+    expect(html).toContain("answer-key-appendix");
+    expect(html).toContain('class="lecture-panel answer-key-appendix" open=""');
+    expect(html).toContain("Answer key appendix");
+    expect(html).toContain('href="#check-understanding-components-quiz-quiz-which-command-validates-the-active-lecture-or-collection-before-previewing-the-component-gallery-at-narrow-tablet-and-desktop-viewport-widths"');
+    expect(html).toContain("Component Review Questions");
+    expect(html).toContain("Explain Reveal Pacing");
+    expect(html).toContain("Repair An Invalid Assessment");
+    expect(html).toContain("Validation checks the active template or collection");
+    expect(html).toContain("A drafted answer makes the learner commit");
+    expect(html).toContain("Schema correctness");
+  });
+
+  it("renders collection assessment index links for valid lectures only", () => {
+    const lecture = validLecture("examples/component-demo.template.md");
+    const html = renderToStaticMarkup(
+      <CollectionLanding
+        validation={{
+          lectureCount: 2,
+          allPassed: false,
+          courseMetadata: { status: "absent", path: "lectures/course.yaml", errors: [] },
+          results: [
+            { slug: "01-demo", templatePath: "lectures/01-demo/lecture.template.md", valid: true, errors: [], template: lecture },
+            { slug: "02-invalid", templatePath: "lectures/02-invalid/lecture.template.md", valid: false, errors: [] }
+          ]
+        }}
+      />
+    );
+
+    expect(html).toContain("Assessment index");
+    expect(html).toContain('/lectures/01-demo#check-understanding-components-question-set-component-review-questions');
+    expect(html).not.toContain("/lectures/02-invalid#");
   });
 });
 

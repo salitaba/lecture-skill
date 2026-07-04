@@ -2,7 +2,20 @@ import { describe, expect, it } from "vitest";
 import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
 import { errorCodes, fixture, validationErrors } from "./testUtils";
 
-const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz", "diagram"];
+const supportedComponentTypes = [
+  "callout",
+  "concept_card",
+  "step_list",
+  "code_block",
+  "comparison",
+  "summary",
+  "quote",
+  "quiz",
+  "question_set",
+  "free_response",
+  "practice_task",
+  "diagram"
+];
 
 describe("validateTemplateSource", () => {
   it("accepts the active valid template", () => {
@@ -80,6 +93,7 @@ describe("validateTemplateSource", () => {
       });
       expect(components).toContainEqual({
         type: "quiz",
+        anchor: "learning-models-quiz-which-option-is-correct",
         question: "Which option is correct?",
         options: ["First", "Second"],
         answer: "First",
@@ -213,6 +227,84 @@ Section content.
     if (!result.valid) {
       const outsideErrors = result.errors.filter((error) => error.code === "COMPONENT_OUTSIDE_SECTION");
       expect(outsideErrors.map((error) => error.componentType)).toEqual(["comparison", "summary", "quote", "quiz"]);
+    }
+  });
+
+  it("accepts stronger assessment components with trimmed values and stable anchors", () => {
+    const result = validateTemplateSource(validAssessmentTemplate());
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const components = result.template.sections.flatMap((section) =>
+        section.blocks.flatMap((block) => (block.kind === "component" ? [block.component] : []))
+      );
+      expect(components).toContainEqual({
+        type: "question_set",
+        anchor: "assessment-practice-question-set-section-check",
+        title: "Section Check",
+        instructions: "Answer before reveal.",
+        shuffle_options: true,
+        questions: [
+          {
+            question: "What validates templates?",
+            options: ["npm run validate", "npm run dev"],
+            answer: "npm run validate",
+            feedback: "Validation reports schema problems."
+          },
+          {
+            question: "What should answer match?",
+            options: ["A trimmed option", "Any synonym"],
+            answer: "A trimmed option"
+          }
+        ]
+      });
+      expect(components).toContainEqual({
+        type: "free_response",
+        anchor: "assessment-practice-free-response-explain-the-tradeoff",
+        title: "Explain the tradeoff",
+        prompt: "Why reveal guidance later?",
+        guidance: "Delayed reveal supports retrieval practice.",
+        placeholder: "Write a short answer."
+      });
+      expect(components).toContainEqual({
+        type: "practice_task",
+        anchor: "assessment-practice-practice-task-debug-the-template",
+        title: "Debug the template",
+        scenario: "A generated lecture fails validation.",
+        task: "Find and fix the invalid assessment.",
+        steps: ["Run validation", "Inspect field paths"],
+        hints: ["Start with the first INVALID_COMPONENT_FIELD."],
+        starter_code: { language: "yaml", code: "type: question_set" },
+        solution: "Fix the empty option and mismatched answer.",
+        rubric: [{ criterion: "Validation", expected: "All errors are resolved." }]
+      });
+    }
+  });
+
+  it("reports stronger assessment nested field paths with context", () => {
+    const result = validateTemplateSource(invalidAssessmentTemplate());
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const byField = new Map(result.errors.filter((error) => error.code === "INVALID_COMPONENT_FIELD").map((error) => [error.field, error]));
+      for (const field of [
+        "questions[0].question",
+        "questions[0].mode",
+        "questions[0].options[1]",
+        "questions[0].answer",
+        "questions[2].options",
+        "shuffle_options",
+        "guidance",
+        "starter_code.language",
+        "rubric[0].expected"
+      ]) {
+        expect(byField.has(field), field).toBe(true);
+        expect(byField.get(field)?.sectionTitle).toBe("Assessment Problems");
+        expect(byField.get(field)?.locator?.line).toBeGreaterThan(0);
+      }
+      expect(byField.get("questions[0].options[1]")?.componentType).toBe("question_set");
+      expect(byField.get("guidance")?.componentType).toBe("free_response");
+      expect(byField.get("rubric[0].expected")?.componentType).toBe("practice_task");
     }
   });
 
@@ -460,6 +552,140 @@ explanation: " The answer matches a trimmed option. "
 ## Key Takeaways
 
 - Learning components validate.
+`;
+}
+
+function validAssessmentTemplate(): string {
+  return `---
+title: "Assessments"
+description: "Valid assessment components."
+audience: "Engineers"
+duration: "30 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Practice assessment components.
+
+## Section: Assessment Practice
+
+\`\`\`lecture-component
+type: question_set
+title: " Section Check "
+instructions: " Answer before reveal. "
+shuffle_options: true
+questions:
+  - question: " What validates templates? "
+    options:
+      - " npm run validate "
+      - " npm run dev "
+    answer: "npm run validate"
+    feedback: " Validation reports schema problems. "
+  - question: "What should answer match?"
+    options:
+      - "A trimmed option"
+      - "Any synonym"
+    answer: "A trimmed option"
+\`\`\`
+
+\`\`\`lecture-component
+type: free_response
+title: " Explain the tradeoff "
+prompt: " Why reveal guidance later? "
+guidance: " Delayed reveal supports retrieval practice. "
+placeholder: " Write a short answer. "
+\`\`\`
+
+\`\`\`lecture-component
+type: practice_task
+title: " Debug the template "
+scenario: " A generated lecture fails validation. "
+task: " Find and fix the invalid assessment. "
+steps:
+  - " Run validation "
+  - " Inspect field paths "
+hints:
+  - " Start with the first INVALID_COMPONENT_FIELD. "
+starter_code:
+  language: " yaml "
+  code: " type: question_set "
+solution: " Fix the empty option and mismatched answer. "
+rubric:
+  - criterion: " Validation "
+    expected: " All errors are resolved. "
+\`\`\`
+
+## Key Takeaways
+
+- Stronger assessments validate.
+`;
+}
+
+function invalidAssessmentTemplate(): string {
+  return `---
+title: "Assessment Problems"
+description: "Invalid assessment fields."
+audience: "Engineers"
+duration: "30 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Practice validation.
+
+## Section: Assessment Problems
+
+\`\`\`lecture-component
+type: question_set
+title: "Broken"
+shuffle_options: sometimes
+questions:
+  - question: ""
+    mode: multiple_answer
+    options:
+      - "Valid option"
+      - ""
+    answer: "Missing option"
+  - "not a mapping"
+  - question: "Duplicate options?"
+    options:
+      - "Same"
+      - "Same"
+    answer: "Same"
+\`\`\`
+
+\`\`\`lecture-component
+type: free_response
+title: "Written"
+prompt: "Explain."
+guidance: ""
+\`\`\`
+
+\`\`\`lecture-component
+type: practice_task
+title: "Practice"
+task: "Do the task."
+starter_code:
+  language: ""
+  code: "const value = true;"
+rubric:
+  - criterion: "Correctness"
+    expected: ""
+\`\`\`
+
+## Key Takeaways
+
+- Invalid fields fail.
 `;
 }
 

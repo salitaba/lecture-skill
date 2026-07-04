@@ -1,0 +1,328 @@
+Feature: Progress Tracking
+
+## Product Summary
+
+Add local-first progress tracking to the Lecture Site Engine so learners can mark sections as complete, track their position within a lecture or collection, and resume where they left off without requiring accounts, databases, or remote services. Progress data persists in browser localStorage and is never synced, exported, or shared.
+
+The primary product outcome is: a learner visiting a lecture page can mark sections as completed, see a visual progress indicator showing how much of the lecture they have finished, and return later to find their progress preserved. In collection mode, progress spans the full course with per-lecture completion status visible on the landing page.
+
+This feature is about learner progress awareness and session continuity. It is not a grading system, analytics platform, LMS integration, learner account system, or collaborative progress dashboard.
+
+## Problem
+
+Learners currently have no way to:
+
+- Track which sections they have completed within a lecture.
+- See overall progress through a multi-lecture course.
+- Resume a lecture where they left off after closing the browser.
+- Distinguish unread content from content they have already studied.
+
+The result is that learners lose context between sessions, cannot gauge how much material remains, and have no lightweight way to pace themselves through longer lectures or multi-lecture collections.
+
+## Users And Jobs
+
+Primary users:
+
+- Learners reading interactive lecture pages in a browser.
+- Technical educators who want students to have a self-paced reading experience.
+- Reviewers validating that progress tracking works correctly across modes.
+
+Jobs to be done:
+
+- As a learner, I want to mark a section complete so I can see what I have finished.
+- As a learner, I want a progress bar that shows my completion percentage so I know how much remains.
+- As a learner, I want my progress to persist when I close and reopen the browser so I can resume where I left off.
+- As a learner, I want collection-level progress so I can see which lectures I have completed in a course.
+- As an educator, I want progress tracking to work offline so students without reliable internet can still track their work.
+- As a reviewer, I want progress data to be inspectable in browser developer tools so I can verify correctness.
+
+## Non-Goals
+
+- No learner accounts, login, or authentication.
+- No server-side progress storage, sync, or backup.
+- No multi-device progress synchronization.
+- No progress analytics, dashboards, or educator-facing reporting.
+- No grading, scoring, or assessment-linked progress rules.
+- No progress export, import, or file-based persistence.
+- No collaborative or shared progress views.
+- No progress-based content gating or conditional rendering.
+- No notification or reminder system for incomplete lectures.
+
+## Goals
+
+- Let learners mark individual sections as complete within a lecture.
+- Show a progress bar or percentage indicator on lecture pages.
+- Persist progress in browser localStorage across sessions.
+- Show per-lecture completion status on collection landing pages.
+- Respect privacy by keeping all data local and user-controlled.
+- Work without JavaScript by degrading to a no-tracking state.
+- Provide clear visual feedback without disrupting the reading flow.
+- Validate progress data integrity and recover from corrupted storage.
+
+## Design Principles
+
+- **Local-first and private.** All progress data stays in the browser. No data leaves the device.
+- **Low friction.** Marking a section complete should be a single click, not a workflow.
+- **Non-disruptive.** Progress indicators should be visible but not dominate the reading experience.
+- **Graceful degradation.** Without JavaScript, the page remains fully readable. Progress tracking simply does not activate.
+- **Forgiving storage.** Corrupted or missing localStorage data should reset cleanly, not break the page.
+- **Consistent with existing design.** Progress UI should feel like part of the lecture-kit system, not a bolt-on overlay.
+
+## Priority
+
+### P0: Launch Scope
+
+P0 delivers the minimum viable progress tracking for single lectures and collections.
+
+Requirements:
+
+- Add a `ProgressProvider` React context that manages progress state for the current page.
+- Store progress in `localStorage` under a namespaced key: `lecture-progress:{lectureId}` for single lectures, `lecture-progress:collection:{collectionId}` for collections.
+- Each lecture stores an object mapping section anchors to completion status: `{ "section-anchor": true, ... }`.
+- Add a visual progress bar at the top of lecture pages showing percentage of sections completed.
+- Add a clickable completion toggle next to each `## Section: <section title>` heading.
+- The toggle is a checkbox or button with accessible label: "Mark section complete" / "Mark section incomplete".
+- Completed sections show a subtle visual indicator: muted checkmark, dimmed border, or background tint.
+- Progress persists across page reloads and browser restarts via localStorage.
+- Progress resets when the user clears browser data or manually resets progress.
+- Add a "Reset Progress" control in the lecture header or footer that clears stored data for the current lecture with a confirmation prompt.
+- Add a lecture-level summary: "X of Y sections completed" displayed near the progress bar.
+- In collection mode, the landing page shows per-lecture completion status: lecture title, completion percentage, and a small progress indicator.
+- Collection-level progress aggregates per-lecture completion into an overall course percentage.
+- Progress data validates on load: malformed JSON resets to empty state and logs a warning to console.
+- Progress updates debounce at 300ms to avoid excessive localStorage writes during rapid interactions.
+- The `ProgressProvider` exposes `{ progress, toggleSection, resetProgress, totalSections, completedSections, percentComplete }` to consuming components.
+
+### P1: Quality and Polish
+
+P1 improves the experience and edge-case handling.
+
+Requirements:
+
+- Add smooth CSS transitions for progress bar updates (width transition, color shift at milestones).
+- Add milestone indicators at 25%, 50%, 75%, and 100% completion with subtle visual feedback.
+- Add keyboard shortcuts: `Alt+M` to toggle current section, `Alt+R` to reset progress.
+- Add a "Resume where you left off" prompt on page load when the user has partially completed a lecture.
+- Add a "Mark all complete" and "Mark all incomplete" bulk control for collection landing pages.
+- Add progress state to the `doctor` command output: report whether localStorage is available and current completion status.
+- Add progress data validation in `package:review` output: note whether progress tracking is functional in the exported package.
+- Add print styles that show completion status next to section headings in parentheses.
+- Add ARIA live region announcements when progress changes: "Section marked complete. 3 of 7 sections finished."
+- Add a small animation or toast when a section is marked complete, visible for 1.5 seconds, then dismissed.
+
+### P2: Future Enhancements
+
+- Add time-based progress: estimate reading time remaining based on section word counts.
+- Add session history: store timestamps of section completion for a simple activity log.
+- Add per-section notes that persist in localStorage alongside completion status.
+- Add export progress as JSON for user backup.
+- Add import progress from JSON file.
+- Add progress-based reading suggestions: "Continue from where you left off" with a direct anchor link.
+
+## Recommended Experience Direction
+
+### Progress Bar Placement
+
+The progress bar sits at the top of the page, below the navigation header and above the lecture title. It is a thin horizontal bar spanning the full content width.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ [Navigation]                                             │
+├─────────────────────────────────────────────────────────┤
+│ ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░  3 of 8       │
+├─────────────────────────────────────────────────────────┤
+│ [Lecture Title]                                          │
+│ [Audience · Duration · Level]                            │
+└─────────────────────────────────────────────────────────┘
+```
+
+Visual treatment:
+
+- Default bar color: muted blue or theme accent color.
+- Completed portion: filled bar in accent color.
+- Remaining portion: light gray background.
+- Bar height: 4px on desktop, 3px on mobile.
+- Corner radius: 2px.
+- No text inside the bar. Text label below or beside the bar.
+- The bar animates smoothly when progress changes.
+
+### Section Completion Toggle
+
+Each `## Section: <section title>` heading has a completion toggle aligned to the right.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ ## Section: Define The Boundary                    [✓]  │
+├─────────────────────────────────────────────────────────┤
+│ Section content...                                       │
+└─────────────────────────────────────────────────────────┘
+```
+
+Visual treatment:
+
+- Toggle is a small checkbox or circular button (20px on desktop, 24px on mobile for touch targets).
+- Default state: empty circle with dashed border, muted color.
+- Completed state: filled circle with checkmark icon, accent color.
+- Hover state: slight scale increase (1.05x) and color intensify.
+- Focus state: visible focus ring matching theme accent color.
+- Active state: brief scale-down (0.95x) on click for tactile feedback.
+- The toggle does not interfere with section anchor links or heading hierarchy.
+
+### Section Visual State
+
+When a section is marked complete:
+
+- The section heading gets a subtle left border accent (2px, accent color, 0.3 opacity).
+- The section body text remains unchanged (no dimming or strikethrough).
+- A small "Completed" label appears next to the toggle in muted text.
+- The visual change is subtle enough to not distract from reading but clear enough to indicate status.
+
+### Collection Landing Page Progress
+
+On the collection landing page, each lecture entry shows a compact progress indicator.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ Course: Technical Writing Fundamentals                   │
+│ ████████████████████░░░░░░░░░░░░░░░░░░░░  45% complete │
+├─────────────────────────────────────────────────────────┤
+│ 01-introduction                          [████████░░]   │
+│ 02-core-concepts                         [████░░░░░░]   │
+│ 03-advanced-topics                       [░░░░░░░░░░]   │
+└─────────────────────────────────────────────────────────┘
+```
+
+Visual treatment:
+
+- Each lecture row has a mini progress bar (8px height, 120px width).
+- Completed lectures show 100% fill.
+- Partial lectures show proportional fill.
+- Unstarted lectures show empty bar.
+- Course-level progress aggregates all lectures.
+
+### Reset Progress Interaction
+
+A "Reset Progress" button appears in the lecture footer or under the progress bar.
+
+- Default state: text link, muted color, labeled "Reset progress".
+- Click: opens a confirmation prompt: "Reset all progress for this lecture? This cannot be undone."
+- Confirm: clears localStorage for the current lecture, updates UI, announces "Progress reset."
+- Cancel: dismisses prompt, no change.
+- The button is keyboard accessible with visible focus state.
+
+### Resume Prompt
+
+On page load, if the user has partial progress (1-99% complete), a non-intrusive banner appears below the progress bar.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ You left off at "Section: Build The Schema".            │
+│ [Jump to section] [Dismiss]                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+- The banner auto-dismisses after 10 seconds or on scroll.
+- "Jump to section" scrolls to the section anchor.
+- "Dismiss" hides the banner and does not show it again for this session.
+- The banner uses `role="status"` and `aria-live="polite"` for screen readers.
+
+## Accessibility Requirements
+
+- The progress bar has `role="progressbar"` with `aria-valuenow`, `aria-valuemin="0"`, `aria-valuemax="100"`, and `aria-label="Lecture progress"`.
+- Section completion toggles are `<button>` elements with accessible labels: "Mark [section title] complete" / "Mark [section title] incomplete".
+- Toggle state is exposed via `aria-pressed="true"` or `aria-pressed="false"`.
+- Progress changes trigger `aria-live` announcements for screen reader users.
+- All interactive elements are keyboard reachable and operable.
+- Focus states are visible and match the theme accent color.
+- Progress indicators do not rely solely on color to convey state; they use icons (checkmark) and text labels.
+- Print output includes section completion status in parentheses after section headings.
+- Progress bar is visible at 200% browser zoom.
+- The resume prompt uses `role="alert"` or `role="status"` to announce itself to assistive technology.
+- All animations respect `prefers-reduced-motion`.
+
+## Validation Requirements
+
+- Progress data in localStorage must be valid JSON.
+- Progress data must be an object with string keys and boolean values.
+- Malformed data (non-object, missing keys, non-boolean values) resets to empty state.
+- localStorage unavailability (private browsing, storage quota exceeded) degrades silently: UI shows no progress indicators, page remains fully functional.
+- The `ProgressProvider` logs a console warning when localStorage is unavailable or data is corrupted.
+- Progress keys are namespaced to avoid collision with other localStorage users.
+
+## Storage Schema
+
+```typescript
+// Single lecture progress
+interface LectureProgress {
+  [sectionAnchor: string]: boolean;
+}
+
+// Collection progress
+interface CollectionProgress {
+  [lectureSlug: string]: {
+    [sectionAnchor: string]: boolean;
+  };
+}
+
+// localStorage keys
+const SINGLE_LECTURE_KEY = 'lecture-progress:{lectureId}';
+const COLLECTION_KEY = 'lecture-progress:collection:{collectionId}';
+```
+
+Example stored data:
+
+```json
+{
+  "section-define-the-boundary": true,
+  "section-make-the-smallest-useful-change": true,
+  "section-key-takeaways": false
+}
+```
+
+## Testing Strategy
+
+- Unit tests for `ProgressProvider` state management: toggle, reset, persistence, corruption recovery.
+- Unit tests for localStorage read/write operations with mocked storage.
+- Unit tests for progress calculation: total sections, completed sections, percentage.
+- Unit tests for debounce behavior on rapid toggles.
+- Rendering tests for progress bar markup, ARIA attributes, and visual states.
+- Rendering tests for section toggle markup, checked/unchecked states, and labels.
+- Interaction tests for toggle click, reset confirmation, and resume prompt.
+- Integration tests for cross-reload persistence: toggle section, reload page, verify state preserved.
+- Integration tests for collection mode: per-lecture progress aggregation.
+- Accessibility tests: keyboard navigation, focus management, screen reader announcements.
+- Edge-case tests: localStorage full, localStorage disabled, corrupted data, empty sections, duplicate anchors.
+- Backward compatibility tests: existing templates render without progress UI unless ProgressProvider is mounted.
+
+## Migration and Backward Compatibility
+
+- This feature adds progress tracking as an optional layer. Existing templates and components are unchanged.
+- Progress tracking activates only when the `ProgressProvider` wraps the page layout.
+- Templates without section headings degrade gracefully: progress bar shows 0% or is hidden.
+- No changes to the lecture template schema.
+- No changes to validation rules.
+- No changes to component rendering.
+- No changes to static review packages (progress is runtime-only).
+
+## Documentation Requirements
+
+- Update `README.md` to document progress tracking: what it does, how it works, privacy implications.
+- Update `SKILL.md` to note that progress tracking is automatic and requires no authoring changes.
+- Document the localStorage keys and data schema for developers.
+- Document the graceful degradation behavior for no-JavaScript environments.
+- Document the reset progress workflow.
+- Add a "Progress Tracking" section to the README covering: storage mechanism, privacy model, reset workflow, and collection mode behavior.
+- Document keyboard shortcuts (P1) in the README.
+
+## Metrics For Product Review
+
+- A learner can mark a section complete with a single click.
+- A learner can see their overall progress percentage on a lecture page.
+- A learner can close the browser, reopen it, and find their progress preserved.
+- A learner can see per-lecture completion status on a collection landing page.
+- A learner can reset progress and confirm the action.
+- Progress tracking does not interfere with the reading experience.
+- Progress tracking degrades gracefully when JavaScript is disabled.
+- Progress data remains consistent across page reloads.
+- The feature works on desktop and mobile viewports.
+- Accessibility requirements are met for screen reader and keyboard users.

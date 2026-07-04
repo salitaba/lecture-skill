@@ -207,6 +207,7 @@ describe("review package helpers", () => {
     const html = [
       '<a href="/">Home</a>',
       '<a href="/lectures/01-introduction/">Lecture</a>',
+      '<a href="/lectures/01-introduction#assessment-anchor">Assessment</a>',
       '<link rel="stylesheet" href="/_next/static/css/app.css">',
       '<link rel="modulepreload" href="/_next/static/chunks/app.js">',
       '<script src="/_next/static/chunks/main.js"></script>',
@@ -224,6 +225,7 @@ describe("review package helpers", () => {
 
     expect(rewritten).toContain('href="index.html"');
     expect(rewritten).toContain('href="lectures/01-introduction/index.html"');
+    expect(rewritten).toContain('href="lectures/01-introduction/index.html#assessment-anchor"');
     expect(rewritten).toContain('href="_next/static/css/app.css"');
     expect(rewritten).toContain('href="_next/static/chunks/app.js"');
     expect(rewritten).toContain('src="_next/static/chunks/main.js"');
@@ -249,6 +251,22 @@ describe("review package helpers", () => {
     expect(rewritten).toContain('href="../../index.html"');
     expect(rewritten).toContain('href="../02-core-concepts/index.html"');
     expect(rewritten).toContain('src="../../_next/static/chunks/main.js"');
+  });
+
+  it("preserves hash fragments in package link rewriting", () => {
+    const packageRoot = path.join(tempRoot, "package");
+    const htmlPath = path.join(packageRoot, "lectures", "01-introduction", "index.html");
+    const html = [
+      '<a href="/lectures/02-core-concepts#question-set">Assessment</a>',
+      '<a href="#same-page-assessment">Same page</a>',
+      '<a href="/#answer-key-appendix">Root answer key</a>'
+    ].join("");
+
+    const rewritten = rewriteExportedHtmlForFileProtocol(html, htmlPath, packageRoot);
+
+    expect(rewritten).toContain('href="../02-core-concepts/index.html#question-set"');
+    expect(rewritten).toContain('href="#same-page-assessment"');
+    expect(rewritten).toContain('href="../../index.html#answer-key-appendix"');
   });
 
   it("assembles a package from exported output and captured sources", async () => {

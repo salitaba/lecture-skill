@@ -47,6 +47,31 @@ describe("validation CLI", () => {
     expect(quizResult.stderr).toContain("field=answer");
   });
 
+  it("prints precise fields for nested assessment failures", async () => {
+    const questionSetResult = await validateTemplateFile("examples/invalid/question-set-field-errors.template.md");
+    const freeResponseResult = await validateTemplateFile("examples/invalid/free-response-field-errors.template.md");
+    const practiceTaskResult = await validateTemplateFile("examples/invalid/practice-task-field-errors.template.md");
+
+    expect(questionSetResult.status).not.toBe(0);
+    expect(questionSetResult.stderr).toContain("component=question_set");
+    expect(questionSetResult.stderr).toContain("section=Question Set Problems");
+    expect(questionSetResult.stderr).toContain("field=questions[0].mode");
+    expect(questionSetResult.stderr).toContain("field=questions[0].options[1]");
+    expect(questionSetResult.stderr).toContain("field=questions[0].answer");
+    expect(questionSetResult.stderr).toContain("field=questions[2].options");
+
+    expect(freeResponseResult.status).not.toBe(0);
+    expect(freeResponseResult.stderr).toContain("component=free_response");
+    expect(freeResponseResult.stderr).toContain("section=Free Response Problems");
+    expect(freeResponseResult.stderr).toContain("field=guidance");
+
+    expect(practiceTaskResult.status).not.toBe(0);
+    expect(practiceTaskResult.stderr).toContain("component=practice_task");
+    expect(practiceTaskResult.stderr).toContain("section=Practice Task Problems");
+    expect(practiceTaskResult.stderr).toContain("field=starter_code.language");
+    expect(practiceTaskResult.stderr).toContain("field=rubric[0].expected");
+  });
+
   it("emits single-lecture JSON output", async () => {
     const result = await validateTemplateFileJson("examples/invalid/unsupported-component-type.template.md");
     const json = JSON.parse(result.stdout);
@@ -59,6 +84,21 @@ describe("validation CLI", () => {
       valid: false
     });
     expect(json.errors[0].code).toBe("UNSUPPORTED_COMPONENT_TYPE");
+  });
+
+  it("emits assessment nested fields in JSON output", async () => {
+    const result = await validateTemplateFileJson("examples/invalid/practice-task-field-errors.template.md");
+    const json = JSON.parse(result.stdout);
+
+    expect(result.status).toBe(1);
+    const expectedError = json.errors.find((error: { field?: string }) => error.field === "rubric[0].expected");
+    expect(expectedError).toMatchObject({
+      code: "INVALID_COMPONENT_FIELD",
+      componentType: "practice_task",
+      sectionTitle: "Practice Task Problems",
+      field: "rubric[0].expected"
+    });
+    expect(expectedError.locator.line).toBeGreaterThan(0);
   });
 
   it("script rejects unknown flags", () => {

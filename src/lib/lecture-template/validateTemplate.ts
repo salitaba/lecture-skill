@@ -1,4 +1,5 @@
 import { parseLectureTemplate } from "./parseTemplate";
+import { uniqueAnchors } from "./anchors";
 import type {
   DiagramDirection,
   DiagramTheme,
@@ -26,6 +27,9 @@ const supportedComponents = [
   "summary",
   "quote",
   "quiz",
+  "question_set",
+  "free_response",
+  "practice_task",
   "diagram"
 ] as const satisfies readonly LectureComponentType[];
 
@@ -67,7 +71,7 @@ export function validateParsedTemplate(parsed: ParsedLectureTemplate): Validatio
       sections: parsed.sections.map((section) => ({
         title: section.title.trim(),
         anchor: section.anchor,
-        blocks: normalizeBlocks(section.blocks)
+        blocks: normalizeBlocks(section.blocks, section.anchor)
       })),
       takeaways: collectBulletItems(parsed.takeaways?.blocks ?? [])
     }
@@ -330,6 +334,33 @@ function validateComponent(block: ParsedComponentBlock, errors: ValidationError[
     }
   }
 
+  if (type === "question_set") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    optionalStringFields(block, sectionTitle, errors, ["instructions"]);
+    if (block.data.shuffle_options !== undefined && typeof block.data.shuffle_options !== "boolean") {
+      errors.push(componentFieldError(block, sectionTitle, "shuffle_options", "question_set.shuffle_options must be true or false when present."));
+    }
+    validateQuestionSetQuestions(block, sectionTitle, errors);
+  }
+
+  if (type === "free_response") {
+    requireStringFields(block, sectionTitle, errors, ["title", "prompt"]);
+    optionalStringFields(block, sectionTitle, errors, ["guidance", "placeholder"]);
+  }
+
+  if (type === "practice_task") {
+    requireStringFields(block, sectionTitle, errors, ["title", "task"]);
+    optionalStringFields(block, sectionTitle, errors, ["scenario", "solution"]);
+    if (block.data.steps !== undefined) {
+      validateStringListField(block, sectionTitle, errors, "steps", { minimumItems: 1 });
+    }
+    if (block.data.hints !== undefined) {
+      validateStringListField(block, sectionTitle, errors, "hints", { minimumItems: 1 });
+    }
+    validateStarterCode(block, sectionTitle, errors);
+    validatePracticeRubric(block, sectionTitle, errors);
+  }
+
   if (type === "diagram") {
     requireStringFields(block, sectionTitle, errors, ["title", "code"]);
     if (!isRecord(block.data)) return;
@@ -394,6 +425,131 @@ function validateComponent(block: ParsedComponentBlock, errors: ValidationError[
       });
     }
   }
+}
+
+function validateQuestionSetQuestions(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data)) return;
+  const questions = block.data.questions;
+  if (!Array.isArray(questions) || questions.length < 2) {
+    errors.push(componentFieldError(block, sectionTitle, "questions", "question_set.questions must be a YAML list with at least 2 items."));
+    return;
+  }
+
+  questions.forEach((question, questionIndex) => {
+    if (!isRecord(question)) {
+      errors.push(componentFieldError(block, sectionTitle, `questions[${questionIndex}]`, `question_set.questions[${questionIndex}] must be a YAML mapping.`));
+      return;
+    }
+
+    if ("mode" in question) {
+      errors.push(
+        componentFieldError(
+          block,
+          sectionTitle,
+          `questions[${questionIndex}].mode`,
+          "question_set question mode is not supported in P0."
+        )
+      );
+    }
+    requireNestedStringField(block, sectionTitle, errors, question, `questions[${questionIndex}]`, "question");
+    const options = validateNestedStringList(block, sectionTitle, errors, question, `questions[${questionIndex}]`, "options", 2);
+    if (new Set(options).size !== options.length) {
+      errors.push(
+        componentFieldError(
+          block,
+          sectionTitle,
+          `questions[${questionIndex}].options`,
+          `question_set.questions[${questionIndex}].options must not contain duplicate option text.`
+        )
+      );
+    }
+    const answer = requireNestedStringField(block, sectionTitle, errors, question, `questions[${questionIndex}]`, "answer");
+    if ("feedback" in question) {
+      requireNestedStringField(block, sectionTitle, errors, question, `questions[${questionIndex}]`, "feedback");
+    }
+    if (answer && options.length > 0 && !options.includes(answer)) {
+      errors.push(
+        componentFieldError(
+          block,
+          sectionTitle,
+          `questions[${questionIndex}].answer`,
+          `question_set.questions[${questionIndex}].answer must exactly match one option.`
+        )
+      );
+    }
+  });
+}
+
+function validateStarterCode(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data) || block.data.starter_code === undefined) return;
+  const starterCode = block.data.starter_code;
+  if (!isRecord(starterCode)) {
+    errors.push(componentFieldError(block, sectionTitle, "starter_code", "practice_task.starter_code must be a YAML mapping."));
+    return;
+  }
+  requireNestedStringField(block, sectionTitle, errors, starterCode, "starter_code", "language");
+  requireNestedStringField(block, sectionTitle, errors, starterCode, "starter_code", "code");
+}
+
+function validatePracticeRubric(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data) || block.data.rubric === undefined) return;
+  const rubric = block.data.rubric;
+  if (!Array.isArray(rubric) || rubric.length === 0) {
+    errors.push(componentFieldError(block, sectionTitle, "rubric", "practice_task.rubric must be a non-empty YAML list of mappings."));
+    return;
+  }
+
+  rubric.forEach((item, index) => {
+    if (!isRecord(item)) {
+      errors.push(componentFieldError(block, sectionTitle, `rubric[${index}]`, `practice_task.rubric[${index}] must be a YAML mapping.`));
+      return;
+    }
+    requireNestedStringField(block, sectionTitle, errors, item, `rubric[${index}]`, "criterion");
+    requireNestedStringField(block, sectionTitle, errors, item, `rubric[${index}]`, "expected");
+  });
+}
+
+function validateNestedStringList(
+  block: ParsedComponentBlock,
+  sectionTitle: string,
+  errors: ValidationError[],
+  record: Record<string, unknown>,
+  prefix: string,
+  field: string,
+  minimumItems: number
+): string[] {
+  const value = record[field];
+  const fieldPath = `${prefix}.${field}`;
+  if (!Array.isArray(value) || value.length < minimumItems) {
+    errors.push(componentFieldError(block, sectionTitle, fieldPath, `${fieldPath} must be a YAML list with at least ${minimumItems} items.`));
+    return [];
+  }
+  const trimmed: string[] = [];
+  value.forEach((item, index) => {
+    if (typeof item !== "string" || item.trim() === "") {
+      errors.push(componentFieldError(block, sectionTitle, `${fieldPath}[${index}]`, `${fieldPath}[${index}] must be a non-empty string.`));
+      return;
+    }
+    trimmed.push(item.trim());
+  });
+  return trimmed;
+}
+
+function requireNestedStringField(
+  block: ParsedComponentBlock,
+  sectionTitle: string,
+  errors: ValidationError[],
+  record: Record<string, unknown>,
+  prefix: string,
+  field: string
+): string {
+  const value = record[field];
+  const fieldPath = `${prefix}.${field}`;
+  if (typeof value !== "string" || value.trim() === "") {
+    errors.push(componentFieldError(block, sectionTitle, fieldPath, `${fieldPath} must be a non-empty string.`));
+    return "";
+  }
+  return value.trim();
 }
 
 function requireStringFields(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[], fields: string[]) {
@@ -541,15 +697,31 @@ function collectBulletItems(blocks: MarkdownBlock[]): string[] {
   return blocks.flatMap((block) => (block.kind === "bullet_list" ? block.items.filter((item) => item.trim()) : []));
 }
 
-function normalizeBlocks(blocks: MarkdownBlock[]): RenderBlock[] {
+function normalizeBlocks(blocks: MarkdownBlock[], sectionAnchor?: string): RenderBlock[] {
+  const assessmentAnchors = sectionAnchor ? buildAssessmentAnchors(blocks, sectionAnchor) : new Map<ParsedComponentBlock, string>();
   return blocks.flatMap((block): RenderBlock[] => {
     if (block.kind !== "component") return [block];
-    const component = normalizeComponent(block);
+    const component = normalizeComponent(block, assessmentAnchors.get(block));
     return component ? [{ kind: "component", component, locator: block.locator }] : [];
   });
 }
 
-function normalizeComponent(block: ParsedComponentBlock): LectureComponent | undefined {
+function buildAssessmentAnchors(blocks: MarkdownBlock[], sectionAnchor: string): Map<ParsedComponentBlock, string> {
+  const assessmentBlocks = blocks.filter((block): block is ParsedComponentBlock => {
+    if (block.kind !== "component" || !isRecord(block.data)) return false;
+    return ["quiz", "question_set", "free_response", "practice_task"].includes(String(block.data.type));
+  });
+  const labels = assessmentBlocks.map((block) => {
+    if (!isRecord(block.data)) return sectionAnchor;
+    const type = stringValue(block.data.type);
+    const label = stringValue(block.data.title) || stringValue(block.data.question) || stringValue(block.data.prompt) || type || "assessment";
+    return `${sectionAnchor}-${type}-${label}`;
+  });
+  const anchors = uniqueAnchors(labels, `${sectionAnchor}-assessment`);
+  return new Map(assessmentBlocks.map((block, index) => [block, anchors[index] ?? `${sectionAnchor}-assessment`]));
+}
+
+function normalizeComponent(block: ParsedComponentBlock, anchor?: string): LectureComponent | undefined {
   if (!isRecord(block.data)) return undefined;
   const data = block.data;
   if (data.type === "callout") {
@@ -604,10 +776,70 @@ function normalizeComponent(block: ParsedComponentBlock): LectureComponent | und
     const explanation = stringValue(data.explanation);
     return {
       type: "quiz",
+      anchor: anchor ?? "quiz",
       question: stringValue(data.question),
       options: Array.isArray(data.options) ? data.options.map(stringValue) : [],
       answer: stringValue(data.answer),
       ...(explanation ? { explanation } : {})
+    };
+  }
+  if (data.type === "question_set") {
+    const instructions = stringValue(data.instructions);
+    return {
+      type: "question_set",
+      anchor: anchor ?? "question-set",
+      title: stringValue(data.title),
+      ...(instructions ? { instructions } : {}),
+      questions: Array.isArray(data.questions)
+        ? data.questions.filter(isRecord).map((question) => {
+            const feedback = stringValue(question.feedback);
+            return {
+              question: stringValue(question.question),
+              options: Array.isArray(question.options) ? question.options.map(stringValue) : [],
+              answer: stringValue(question.answer),
+              ...(feedback ? { feedback } : {})
+            };
+          })
+        : [],
+      ...(typeof data.shuffle_options === "boolean" ? { shuffle_options: data.shuffle_options } : {})
+    };
+  }
+  if (data.type === "free_response") {
+    const guidance = stringValue(data.guidance);
+    const placeholder = stringValue(data.placeholder);
+    return {
+      type: "free_response",
+      anchor: anchor ?? "free-response",
+      title: stringValue(data.title),
+      prompt: stringValue(data.prompt),
+      ...(guidance ? { guidance } : {}),
+      ...(placeholder ? { placeholder } : {})
+    };
+  }
+  if (data.type === "practice_task") {
+    const scenario = stringValue(data.scenario);
+    const solution = stringValue(data.solution);
+    const starterCode = isRecord(data.starter_code)
+      ? { language: stringValue(data.starter_code.language), code: stringValue(data.starter_code.code) }
+      : undefined;
+    return {
+      type: "practice_task",
+      anchor: anchor ?? "practice-task",
+      title: stringValue(data.title),
+      ...(scenario ? { scenario } : {}),
+      task: stringValue(data.task),
+      ...(Array.isArray(data.steps) ? { steps: data.steps.map(stringValue) } : {}),
+      ...(Array.isArray(data.hints) ? { hints: data.hints.map(stringValue) } : {}),
+      ...(starterCode ? { starter_code: starterCode } : {}),
+      ...(solution ? { solution } : {}),
+      ...(Array.isArray(data.rubric)
+        ? {
+            rubric: data.rubric.filter(isRecord).map((item) => ({
+              criterion: stringValue(item.criterion),
+              expected: stringValue(item.expected)
+            }))
+          }
+        : {})
     };
   }
   if (data.type === "diagram") {

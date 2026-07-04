@@ -324,6 +324,72 @@ explanation: "Validation checks the active template or collection."
 
 Rendered label: `Quiz: Knowledge check`. The authoring schema is unchanged: `question`, `options`, `answer`, and optional `explanation`. In interactive pages, the learner initially sees the question, options, and a `Show answer` button; the answer and explanation stay hidden until the learner clicks it. The same control toggles to `Hide answer` after reveal. Printed output includes the answer and explanation by default, and the no-JavaScript fallback is a `<noscript>` message that explains interactive reveal requires JavaScript while print remains available. Quiz reveal is a pacing aid, not secure assessment, grading, tracking, answer encryption, anti-cheating, learner accounts, analytics, or source-code secrecy.
 
+Question set (`question_set`):
+
+````markdown
+```lecture-component
+type: question_set
+title: "Check Your Understanding"
+instructions: "Answer each item before revealing feedback."
+shuffle_options: true
+questions:
+  - question: "Which command validates the active lecture or collection?"
+    options:
+      - "npm run validate"
+      - "npm run dev"
+    answer: "npm run validate"
+    feedback: "Validation catches schema and structure errors before preview or handoff."
+  - question: "What does print output include?"
+    options:
+      - "Answers and feedback"
+      - "Saved learner responses"
+    answer: "Answers and feedback"
+```
+````
+
+Rendered label: `Assessment: Question set`. Use `question_set` for grouped single-answer recall or comprehension checks. It requires a non-empty `title` and at least two questions. Each question requires non-empty `question`, at least two non-empty `options`, and an `answer` that exactly matches one option after trimming. Optional `feedback` is revealed per question. `shuffle_options` is preview-only after mount; authored order remains in source, static HTML, print output, and review packages. Multiple-answer mode is not supported in P0.
+
+Free response (`free_response`):
+
+````markdown
+```lecture-component
+type: free_response
+title: "Explain The Tradeoff"
+prompt: "Why should learners answer before revealing guidance?"
+placeholder: "Draft your response here..."
+guidance: "A drafted response makes comparison with model guidance more useful."
+```
+````
+
+Rendered label: `Assessment: Free response`. Use `free_response` for short written reasoning, prediction, reflection, or design tradeoff prompts. It requires non-empty `title` and `prompt`; `guidance` and `placeholder` are optional. The textarea is local-only browser state. It is not saved, submitted, graded, tracked, or included as learner state in packages.
+
+Practice task (`practice_task`):
+
+````markdown
+```lecture-component
+type: practice_task
+title: "Repair An Invalid Assessment"
+scenario: "A generated template has a mismatched question_set answer."
+task: "Use validation output to find and fix the invalid YAML."
+steps:
+  - "Run npm run validate."
+  - "Inspect the reported field path."
+hints:
+  - "Look for questions[index].answer."
+starter_code:
+  language: "yaml"
+  code: "type: question_set"
+solution: "Make the answer exactly match one option."
+rubric:
+  - criterion: "Validation"
+    expected: "The template validates without assessment field errors."
+```
+````
+
+Rendered label: `Practice task`. Use `practice_task` for applied exercises, debugging tasks, coding/design scenarios, or self-evaluation. It requires non-empty `title` and `task`; optional fields are `scenario`, `steps`, `hints`, `starter_code`, `solution`, and `rubric`. Rubrics are visible by default. Hints and solutions are reveal controls on screen and visible in print. Hidden assessment content is a pacing aid only; it remains present in source templates, static HTML, print output, and review packages.
+
+Lecture pages include assessment anchors and a printable answer-key appendix after Key Takeaways. Collection landing pages include an assessment index linking to `/lectures/<slug>#<assessment-anchor>` for valid lectures.
+
 Unsupported custom component types still fail validation.
 
 ## Complete Synthetic Template

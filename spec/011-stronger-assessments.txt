@@ -1,0 +1,500 @@
+Feature: Stronger Assessments
+
+## Product Summary
+
+Extend the Lecture Site Engine from lightweight knowledge checks into a stronger local practice and assessment surface. The engine currently supports a single `quiz` component: one question, ordered options, one exact answer, and optional explanation revealed on demand. That is useful for quick recall, but technical education often needs more than one multiple-choice check. Learners need prompts that support retrieval, applied practice, reflection, debugging, design tradeoffs, and self-evaluation.
+
+The primary product outcome is: an educator or AI agent can author richer assessment moments inside a lecture section using strict, source-controlled schema components, and a learner can attempt the work before revealing guidance, solution notes, or a rubric. The experience remains local-first, static-export friendly, accessible, printable, and intentionally non-secure.
+
+This feature is about improving teaching and practice depth. It is not a grading platform, exam system, learner analytics product, LMS, hosted classroom workflow, or AI tutoring service.
+
+## Product Outcome
+
+Learners should leave a lecture with opportunities to do something, not only read and reveal an answer:
+
+- Recall core facts and concepts through short checks.
+- Apply a concept to a realistic task or code/design scenario.
+- Explain reasoning in their own words before seeing model guidance.
+- Compare their work against a checklist or rubric.
+- Review complete answer guidance in print or static handoff packages.
+
+Educators and reviewers should be able to inspect assessment quality without running a server or using a remote service:
+
+- Assessment prompts, solution guidance, and rubric criteria live in the template.
+- The rendered page hides guidance until the learner asks for it in interactive preview.
+- Printed output and review packages expose guidance clearly for review and teaching preparation.
+- Validation catches incomplete, ambiguous, or malformed assessment blocks before handoff.
+
+## Users And Jobs
+
+Primary users:
+
+- Learners reading interactive lecture pages.
+- Technical educators converting notes, transcripts, workshops, or training material into teachable pages.
+- AI coding agents generating valid lecture templates from raw source material.
+- Reviewers checking whether practice material is useful, source-grounded, and clear.
+
+Jobs to be done:
+
+- As a learner, I want to attempt practice before seeing guidance so I can test understanding honestly.
+- As a learner, I want feedback that explains reasoning, not only the final answer.
+- As an educator, I want to add applied exercises without leaving the supported lecture schema.
+- As an educator, I want rubrics or checklists that help learners self-evaluate their answers.
+- As an authoring agent, I want explicit component shapes so I can generate stronger assessments without inventing unsupported types.
+- As a reviewer, I want review packages and print output to include all prompts, solutions, and rubrics without relying on browser state.
+
+## Problem
+
+The current assessment surface is too narrow:
+
+- `quiz` supports only one question with one correct option.
+- There is no supported way to group several related questions into a practice set.
+- There is no supported short-answer prompt for concept explanation, design reasoning, or prediction.
+- There is no supported applied exercise for coding, debugging, architecture, or process tasks.
+- There is no supported rubric or checklist for self-evaluation.
+- Educators must either force every assessment into `quiz`, use plain Markdown with inconsistent structure, or invent unsupported component types.
+- AI agents lack a clear contract for when to use recall checks versus applied practice.
+
+The result is that lectures can check recognition, but they do not yet support enough retrieval, transfer, or practice to feel like a complete learning experience.
+
+## Goals
+
+- Add structured assessment components beyond the existing single-question `quiz`.
+- Preserve the current `quiz` schema and behavior for lightweight knowledge checks.
+- Keep all new assessment authoring inside `lecture-component` fenced YAML blocks within `## Section:` blocks.
+- Provide learner-facing reveal interactions for guidance, solutions, or rubrics.
+- Preserve static export, package review, and print behavior.
+- Make assessment components accessible, keyboard operable, responsive, and readable at narrow widths.
+- Provide strict validation with actionable error messages and stable JSON output.
+- Update examples, README, and `SKILL.md` so educators and AI agents know when to use each assessment type.
+
+## Non-Goals
+
+- No automatic grading, scoring, persistence, learner accounts, analytics, or progress tracking.
+- No secure exams, answer encryption, anti-cheating, randomized question banks, or source-code secrecy.
+- No remote API, database, LMS integration, classroom roster, or hosted workflow.
+- No browser-based rich assessment editor in this feature.
+- No AI-generated feedback at runtime.
+- No file upload answers, audio/video answers, drag-and-drop, or complex simulation widgets.
+- No arbitrary custom assessment plugin system.
+- No breaking changes to existing valid `quiz` templates.
+
+## Product Decisions
+
+- The existing `quiz` component remains the smallest assessment unit for simple multiple-choice recall.
+- Stronger assessment components should emphasize self-checking and practice, not grading.
+- Hidden content is a pacing mechanism only. Guidance and solutions may remain present in static HTML, source templates, packages, and print output.
+- P0 should add a small set of high-value components instead of a broad assessment framework.
+- Assessment components should be easy for AI agents to generate deterministically from source material.
+- Solution and rubric content should be optional only where an assessment is still useful without it.
+- Print output should include all learner prompts and all educator/reviewer guidance by default.
+
+## UX Designer Notes
+
+The assessment experience should feel like a learning pause, not a test wall. Every component should help the learner stop, think, act, and then compare their reasoning against guidance. The page should never imply that the system is grading, saving answers, or judging the learner.
+
+Design priorities:
+
+- Keep the learner's immediate task visually obvious: question, prompt, or practice task first; metadata and controls second.
+- Use reveal controls to pace feedback, but avoid hiding essential instructions needed to attempt the task.
+- Make selected options feel temporary and local. Selection should help the learner commit before reveal, not imply submission.
+- Treat guidance, hints, solutions, and rubrics as separate regions with clear labels.
+- Use language like `Compare your answer`, `Reveal guidance`, `Show hint`, and `Show solution` instead of language that suggests grading.
+- Prefer one strong action per region. Avoid a cluster of buttons that competes with the prompt.
+- On mobile, assessment cards should read top-to-bottom without side-by-side dependencies.
+- For long practice tasks, preserve scannability with short region headings: `Scenario`, `Task`, `Steps`, `Hints`, `Solution`, `Rubric`.
+- Printed output should look like an instructor handout: prompts and answer guidance visible, clearly labeled, and easy to review.
+- Empty states should be avoided by validation, but render-time fallbacks should explain missing optional content plainly.
+
+The interaction model should stay calm and predictable. These assessments are for self-checking and practice inside a lecture, not for high-stakes testing.
+
+## Priority
+
+### P0: Launch Scope
+
+P0 adds the minimum stronger-assessment vocabulary needed for real practice while keeping implementation and authoring predictable.
+
+Requirements:
+
+- Add `question_set` for grouped recall and comprehension checks.
+- Add `free_response` for short written self-check prompts.
+- Add `practice_task` for applied exercises with optional steps, starter code, hints, solution, and rubric.
+- Keep the existing `quiz` component unchanged and documented as the lightweight single-question option.
+- Render guidance, model answers, hints, solutions, and rubrics behind explicit reveal controls in interactive pages.
+- Print output includes hidden guidance and solution material with clear labels.
+- Static review packages preserve all assessment content.
+- Validation rejects empty prompts, empty lists, incomplete rubrics, invalid answer references, and unsupported assessment modes.
+- Add valid and invalid examples for every new assessment component.
+- Add component demo examples that show recall, written response, and applied practice use cases.
+- Update `README.md` and `SKILL.md` with usage guidance and non-goal warnings.
+- Add focused tests for parsing, validation, rendering, reveal interactions, print hooks, and backward compatibility.
+- Let learners select options locally before revealing feedback.
+- Let learners type temporary local answers without saving them.
+- Add local-only answer comparison helpers that do not send data anywhere.
+- Add assessment-level anchors and deep links.
+- Add optional shuffle behavior for non-review preview only.
+- Add course-level assessment index across lectures.
+- Add printable answer-key appendix for a full course.
+
+### P1: Quality And Authoring Support
+
+P1 improves the quality of generated assessments and makes review easier.
+
+Requirements:
+
+- Add optional `difficulty` field: `quick`, `standard`, or `challenge`.
+- Add optional `estimated_time` field for assessment components.
+- Add optional `learning_objective` field to connect an assessment to a lecture objective.
+- Add optional `source_note` field for reviewer-facing source fidelity context.
+- Add per-question hints in `question_set`.
+- Add multiple-answer support in `question_set` when a question explicitly declares `mode: multiple_answer`.
+- Add answer quality guidance for `free_response`, including acceptable points and common misconceptions.
+- Add richer rubric levels for `practice_task`: `needs_work`, `meets`, and `strong`.
+- Add a review-package assessment summary listing assessment count, types, and missing solution/rubric warnings.
+
+## Recommended Experience Direction
+
+### Existing Component: Quiz
+
+Use `quiz` for one lightweight multiple-choice knowledge check with one exact answer.
+
+Keep the current authoring shape:
+
+````markdown
+```lecture-component
+type: quiz
+question: "Which command validates the active lecture or collection?"
+options:
+  - "npm run validate"
+  - "npm run dev"
+answer: "npm run validate"
+explanation: "Validation checks the active template or collection."
+```
+````
+
+Product guidance:
+
+- Use `quiz` for quick recall or comprehension.
+- Do not use `quiz` for multi-step practice, written explanations, or rubrics.
+- Keep answer reveal behavior unchanged.
+
+### New Component: Question Set
+
+Use `question_set` when a section needs several related checks in one assessment block.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: question_set
+title: "Check Your Understanding"
+instructions: "Answer these before revealing the feedback."
+questions:
+  - question: "What problem does validation solve?"
+    options:
+      - "It catches malformed templates before preview or package handoff."
+      - "It deploys the course to production."
+      - "It rewrites raw source files."
+    answer: "It catches malformed templates before preview or package handoff."
+    feedback: "Validation protects the authoring loop by reporting schema and structure errors early."
+  - question: "Why should raw lecture notes be preserved?"
+    options:
+      - "They are review evidence for source fidelity."
+      - "They replace the rendered lecture page."
+      - "They are required by Next.js."
+    answer: "They are review evidence for source fidelity."
+    feedback: "Raw sources help reviewers compare generated templates against source material."
+```
+````
+
+Required fields:
+
+- `type`: `question_set`
+- `title`: non-empty string
+- `questions`: list of at least two questions
+- Each question requires:
+  - `question`: non-empty string
+  - `options`: list of at least two non-empty strings
+  - `answer`: non-empty string that exactly matches one option after trimming
+
+Optional fields:
+
+- `instructions`: non-empty string
+- Each question may include `feedback`: non-empty string
+
+Rendering requirements:
+
+- Render as one assessment card with a visible label such as `Assessment: Question set`.
+- Show the title and instructions before the questions.
+- Show every question and its options initially.
+- Hide each answer and feedback until the learner reveals it.
+- Support either one reveal control for the full set or per-question reveal controls. P0 should choose the simpler interaction after implementation design review.
+- Multiple question sets on one page maintain independent state.
+- Printed output includes all answers and feedback.
+
+Design guidance:
+
+- Avoid making a question set feel like a formal exam.
+- Use compact spacing so three to five questions remain scannable.
+- At phone width, each question should stack without horizontal scrolling.
+
+### New Component: Free Response
+
+Use `free_response` for written self-checks where the learner should explain, predict, or reason before seeing model guidance.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: free_response
+title: "Explain The Tradeoff"
+prompt: "In two or three sentences, explain why a static review package is useful even when local preview works."
+guidance: "A strong answer mentions handoff, repeatable review, offline inspection, and preserving the rendered result plus source evidence."
+```
+````
+
+Required fields:
+
+- `type`: `free_response`
+- `title`: non-empty string
+- `prompt`: non-empty string
+
+Optional fields:
+
+- `guidance`: non-empty string
+- `placeholder`: non-empty string for a non-persistent local textarea, if P0 includes answer drafting
+
+P0 rendering requirements:
+
+- Render as an assessment card with a visible label such as `Assessment: Free response`.
+- Show title and prompt initially.
+- Provide a reveal control for model guidance when `guidance` exists.
+- Do not store learner input.
+- If a textarea is included, it is local-only, does not persist, and is not included in review package state.
+- Printed output includes the prompt and guidance.
+
+Design guidance:
+
+- Prefer prompts that ask for explanation, prediction, or reasoning.
+- Keep guidance framed as "Compare your answer" rather than "Correct answer" when there is no single exact answer.
+- Avoid implying that the system evaluates the learner's text.
+
+### New Component: Practice Task
+
+Use `practice_task` for applied work: coding, debugging, architecture design, command-line workflow, data modeling, or process exercises.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: practice_task
+title: "Validate And Fix A Template"
+scenario: "A lecture template fails validation because a component appears before the first section."
+task: "Move the component into the correct section and explain why validation rejected the original structure."
+steps:
+  - "Find the component fence before `## Overview`."
+  - "Move it under a `## Section:` heading."
+  - "Run `npm run validate` again."
+hints:
+  - "Components are allowed only inside section blocks."
+solution: "The component must be moved under a `## Section: <title>` heading because the schema reserves Overview, Learning Objectives, and Key Takeaways for regular Markdown content."
+rubric:
+  - criterion: "Correct placement"
+    expected: "The component is inside a section block."
+  - criterion: "Explanation"
+    expected: "The answer explains the component placement rule."
+```
+````
+
+Required fields:
+
+- `type`: `practice_task`
+- `title`: non-empty string
+- `task`: non-empty string
+
+Optional fields:
+
+- `scenario`: non-empty string
+- `steps`: non-empty list of non-empty strings
+- `hints`: non-empty list of non-empty strings
+- `starter_code`: object with `language` and `code`
+- `solution`: non-empty string
+- `rubric`: non-empty list of rubric items
+- Each rubric item requires:
+  - `criterion`: non-empty string
+  - `expected`: non-empty string
+
+Rendering requirements:
+
+- Render as an applied practice card with a visible label such as `Practice task`.
+- Show scenario, task, steps, and starter code initially.
+- Hide hints behind a reveal control when present.
+- Hide solution behind a separate reveal control when present.
+- Show rubric either initially as self-evaluation criteria or behind a reveal control. P0 should default to visible rubric when it does not reveal the solution.
+- Printed output includes hints, solution, and rubric.
+- Long starter code must scroll inside the component rather than widening the page.
+
+Design guidance:
+
+- Make the task feel actionable, not decorative.
+- Put the learner's job in one strong prompt before optional steps.
+- Keep hints less prominent than the main task.
+- Keep solution and rubric visually distinct so learners can compare their work.
+
+## Assessment Authoring Guidance
+
+Use the smallest component that matches the learning job:
+
+- Use `quiz` for one quick multiple-choice check.
+- Use `question_set` for a short group of related multiple-choice checks.
+- Use `free_response` when learners should explain, predict, or reason.
+- Use `practice_task` when learners should perform a concrete task or solve an applied problem.
+
+Assessment quality requirements:
+
+- Every prompt should map to source material or clearly introduced lecture content.
+- Avoid trivia that does not support a learning objective.
+- Avoid trick questions unless the misconception is explicitly taught.
+- Feedback should explain why an answer is right, not only repeat the answer.
+- Rubrics should describe observable qualities of a good response.
+- Keep assessments short enough to fit naturally inside a lecture section.
+
+## Interaction Requirements
+
+Reveal controls:
+
+- Use native button semantics.
+- Use `aria-expanded` and `aria-controls` or an equivalent accessible disclosure pattern.
+- Each reveal region has a stable unique id.
+- Hidden guidance is not visually shown before reveal in JavaScript-enabled pages.
+- Revealed content appears in normal reading order.
+- Multiple assessment components on one page maintain independent state.
+
+No-JavaScript behavior:
+
+- The page must remain useful without JavaScript.
+- A no-JavaScript message may explain that interactive reveal requires JavaScript.
+- Print output must include all hidden assessment guidance.
+- Fallback behavior must not create a broken-looking empty card.
+
+Print behavior:
+
+- Hide interactive buttons in print.
+- Include answers, feedback, guidance, hints, solutions, and rubrics.
+- Clearly label material that was hidden on screen.
+- Avoid splitting a short assessment card across pages when possible.
+
+## Visual Design Requirements
+
+Assessment cards should feel related to existing lecture-kit components but distinct enough that learners recognize practice moments.
+
+Requirements:
+
+- Use a visible component label: `Assessment`, `Assessment: Question set`, `Assessment: Free response`, or `Practice task`.
+- Keep title, prompt, options, guidance, and solution regions visually separated.
+- Do not use color as the only indicator of feedback or solution state.
+- Use compact but readable spacing for multi-question sets.
+- Avoid nested cards. Use dividers, sections, or subtle region headers inside a single assessment card.
+- Ensure all text wraps at 390px, 768px, and desktop widths.
+- Code and long command examples scroll inside their own blocks.
+- Maintain readable contrast in default and print styles.
+
+## Accessibility Requirements
+
+- All interactive controls are keyboard reachable and operable.
+- Focus states are visible.
+- Reveal state is exposed to assistive technology.
+- Answer, guidance, hint, and solution regions are programmatically associated with their controls.
+- Ordered and unordered lists use semantic list markup.
+- Questions use headings or labelled regions that make scanning possible for screen reader users.
+- Free-response drafting, if included, uses a labelled textarea and clearly states that input is not saved.
+- Printed output does not rely on color or interactive state to communicate answers.
+- Components remain readable at 200% browser zoom.
+- Any transition respects `prefers-reduced-motion`.
+
+## Validation Requirements
+
+General:
+
+- Unsupported assessment types fail validation with a hint listing supported component types.
+- Empty strings fail validation for all required string fields.
+- Empty lists fail validation for required list fields.
+- Nested validation errors include `componentType`, `field`, `sectionTitle`, locator, and useful hints.
+- JSON validation output includes assessment errors in the same stable shape as existing component errors.
+
+`question_set`:
+
+- `title` is required and non-empty.
+- `questions` must contain at least two entries.
+- Each question requires non-empty `question`, at least two options, and non-empty `answer`.
+- Each option must be a non-empty string.
+- `answer` must exactly match one trimmed option.
+- Optional `feedback`, when present, must be non-empty.
+
+`free_response`:
+
+- `title` is required and non-empty.
+- `prompt` is required and non-empty.
+- Optional `guidance`, when present, must be non-empty.
+- Optional `placeholder`, when present, must be non-empty.
+
+`practice_task`:
+
+- `title` is required and non-empty.
+- `task` is required and non-empty.
+- Optional `scenario`, when present, must be non-empty.
+- Optional `steps` and `hints`, when present, must be non-empty lists of non-empty strings.
+- Optional `starter_code`, when present, requires non-empty `language` and `code`.
+- Optional `solution`, when present, must be non-empty.
+- Optional `rubric`, when present, must be a non-empty list.
+- Each rubric item requires non-empty `criterion` and `expected`.
+
+## Compatibility Requirements
+
+- Existing valid single-lecture and collection templates continue to validate.
+- Existing `quiz` fixtures continue to pass or fail for the same reasons.
+- Existing review package behavior remains compatible with static export.
+- Existing component render order and section rules remain unchanged.
+- New assessment components are allowed only inside `## Section:` blocks.
+- No change is required to course metadata.
+
+## Documentation Requirements
+
+- Update `README.md` supported components with `question_set`, `free_response`, and `practice_task`.
+- Update `SKILL.md` with when to use each assessment type.
+- Add examples to `examples/component-demo.template.md`.
+- Add invalid fixtures for common assessment mistakes.
+- Document that hidden answers and guidance are pacing aids, not security.
+- Document print behavior and review-package behavior.
+- Document that learner input, if supported locally, is not saved.
+
+## Test Requirements
+
+- Validation tests for every valid new assessment component.
+- Validation tests for missing and malformed nested fields.
+- Rendering tests for static markup, labels, lists, guidance regions, and print hooks.
+- Interaction tests for reveal controls and independent state across multiple components.
+- Backward compatibility tests for existing `quiz` behavior.
+- Collection validation tests proving new assessment components work in multi-lecture mode.
+- CLI tests proving invalid fixtures report actionable field paths.
+
+## Metrics For Product Review
+
+This local product should be judged by review quality and educator usefulness, not analytics.
+
+Suggested manual review signals:
+
+- An educator can add at least one applied practice task without custom React code.
+- A generated lecture includes at least one assessment that requires reasoning or application, not only recall.
+- A reviewer can inspect all answers, solutions, and rubrics in a static package.
+- A learner-facing preview lets users attempt before revealing guidance.
+- Assessment components remain readable at phone width and in print.
+- AI agents stop inventing unsupported assessment component types for common practice patterns.
+
+## Open Questions
+
+- Should `question_set` use one reveal button for the whole set or per-question reveal controls in P0?
+- Should `free_response` include a local textarea in P0, or should it remain a prompt plus guidance reveal?
+- Should `practice_task.rubric` be visible by default as self-evaluation criteria, or hidden until the learner reveals solution guidance?
+- Should `question_set` support multiple correct answers in P0, or wait until P1?
+- Should review packages include an assessment summary in P0 or wait until P1?

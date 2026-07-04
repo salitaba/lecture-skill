@@ -5,6 +5,9 @@ import { CodeBlock } from "./CodeBlock";
 import { Comparison } from "./Comparison";
 import { ConceptCard } from "./ConceptCard";
 import { Diagram } from "./Diagram";
+import { FreeResponse } from "./FreeResponse";
+import { PracticeTask } from "./PracticeTask";
+import { QuestionSet } from "./QuestionSet";
 import { Quiz } from "./Quiz";
 import { Quote } from "./Quote";
 import { StepList } from "./StepList";
@@ -46,6 +49,12 @@ export function RenderBlocks({ blocks }: { blocks: RenderBlock[] }) {
             return <Quote key={index} component={component} />;
           case "quiz":
             return <Quiz key={index} component={component} />;
+          case "question_set":
+            return <QuestionSet key={index} component={component} />;
+          case "free_response":
+            return <FreeResponse key={index} component={component} />;
+          case "practice_task":
+            return <PracticeTask key={index} component={component} />;
           case "diagram":
             return <Diagram key={index} component={component} />;
           default:

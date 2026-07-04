@@ -114,7 +114,7 @@ context: "Source quote components are for short excerpts or named statements; th
 
 ## Section: Check Understanding Components
 
-Use Quiz components for lightweight knowledge checks with feedback revealed on demand. In the preview, click `Show answer` to review the answer and explanation.
+Use Quiz components for lightweight knowledge checks with feedback revealed on demand. Use stronger assessment components for grouped checks, written reasoning, and applied practice.
 
 ```lecture-component
 type: quiz
@@ -126,6 +126,58 @@ options:
   - "Run the browser only and assume validation is equivalent to visual inspection."
 answer: "npm run validate"
 explanation: "Validation checks the active template or collection and exits nonzero on blocking errors; the rendered quiz reveals this feedback only when the learner clicks Show answer."
+```
+
+```lecture-component
+type: question_set
+title: "Component Review Questions"
+instructions: "Choose an answer for each item before revealing feedback."
+shuffle_options: true
+questions:
+  - question: "Which component groups several related single-answer checks?"
+    options:
+      - "question_set"
+      - "free_response"
+      - "practice_task"
+    answer: "question_set"
+    feedback: "Use question_set when several recall or comprehension prompts belong together."
+  - question: "What does preview-only option shuffling preserve for review?"
+    options:
+      - "Authored order in static output and print."
+      - "A hidden answer bank."
+      - "Saved learner progress."
+    answer: "Authored order in static output and print."
+    feedback: "Shuffle is only a learner-preview pacing aid; source, print, and review packages keep authored order."
+```
+
+```lecture-component
+type: free_response
+title: "Explain Reveal Pacing"
+prompt: "Why should a learner draft an answer before comparing it with guidance?"
+placeholder: "Write two or three sentences about retrieval practice."
+guidance: "A drafted answer makes the learner commit to reasoning before seeing model guidance, which makes comparison more useful."
+```
+
+```lecture-component
+type: practice_task
+title: "Repair An Invalid Assessment"
+scenario: "A generated lecture contains a question_set whose answer does not match any authored option."
+task: "Use validation feedback to locate the bad field and revise the YAML without changing the intended teaching point."
+steps:
+  - "Run npm run validate."
+  - "Find the INVALID_COMPONENT_FIELD entry and field path."
+  - "Edit the answer or option text so they match exactly after trimming."
+hints:
+  - "Start with the field path that includes questions[index].answer."
+starter_code:
+  language: "yaml"
+  code: "type: question_set\nquestions:\n  - question: \"Which command validates?\"\n    options:\n      - \"npm run validate\"\n      - \"npm run dev\"\n    answer: \"validate\""
+solution: "Set answer to the exact option text, such as npm run validate, or update one option to the intended exact answer."
+rubric:
+  - criterion: "Schema correctness"
+    expected: "The assessment validates without INVALID_COMPONENT_FIELD errors."
+  - criterion: "Teaching value"
+    expected: "The corrected answer still checks the intended concept."
 ```
 
 ## Section: Diagram Components
@@ -191,8 +243,8 @@ code: "mindmap\n  root((Lecture Skill))\n    Parser\n      YAML\n      Markdown\
 
 ## Key Takeaways
 
-- The engine supports callout, concept_card, step_list, code_block, comparison, summary, quote, quiz, and diagram components.
+- The engine supports callout, concept_card, step_list, code_block, comparison, summary, quote, quiz, question_set, free_response, practice_task, and diagram components.
 - Components must use fenced YAML with the lecture-component language tag.
-- Quiz is a knowledge check whose answer and explanation are revealed on demand.
+- Quiz is a knowledge check whose answer and explanation are revealed on demand; stronger assessment components support grouped checks, local written responses, and applied practice.
 - Diagram renders Mermaid.js diagrams with a static fallback for no-JS environments.
 - The component demo is valid visual-gallery content but should be restored after previewing.

@@ -3,10 +3,25 @@ import path from "node:path";
 import os from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isCollectionMode, scanLectureCollection, validateCollection } from "../../src/lib/lecture-template/collection";
+import { collectCollectionAssessments, collectLectureAnswerKey, collectLectureAssessments } from "../../src/lib/lecture-template/assessments";
 import { parseCourseMetadata } from "../../src/lib/lecture-template/courseMetadata";
+import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
 
 const repoRoot = process.cwd();
-const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz", "diagram"];
+const supportedComponentTypes = [
+  "callout",
+  "concept_card",
+  "step_list",
+  "code_block",
+  "comparison",
+  "summary",
+  "quote",
+  "quiz",
+  "question_set",
+  "free_response",
+  "practice_task",
+  "diagram"
+];
 let tempRoot = "";
 
 describe("collection scanning", () => {
@@ -190,6 +205,49 @@ describe("collection scanning", () => {
     for (const componentType of supportedComponentTypes) {
       expect(componentTypes).toContain(componentType);
     }
+  });
+
+  it("collects assessment summaries and answer keys in source order", () => {
+    const result = validateTemplateSource(readFileSync(path.join(repoRoot, "examples/component-demo.template.md"), "utf8"));
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+
+    const summaries = collectLectureAssessments(result.template, "01-demo");
+    const answerKey = collectLectureAnswerKey(result.template, "01-demo");
+
+    expect(summaries.map((summary) => summary.type)).toEqual(["quiz", "question_set", "free_response", "practice_task"]);
+    expect(summaries[1]).toMatchObject({
+      lectureSlug: "01-demo",
+      sectionTitle: "Check Understanding Components",
+      type: "question_set",
+      title: "Component Review Questions"
+    });
+    expect(answerKey[0].answer).toBe("npm run validate");
+    expect(answerKey[1].questions?.[0].answer).toBe("question_set");
+    expect(answerKey[2].guidance).toContain("drafted answer");
+    expect(answerKey[3].rubric?.[0]).toEqual({
+      criterion: "Schema correctness",
+      expected: "The assessment validates without INVALID_COMPONENT_FIELD errors."
+    });
+  });
+
+  it("collects collection assessment index entries from valid lectures only", () => {
+    const result = validateTemplateSource(readFileSync(path.join(repoRoot, "examples/component-demo.template.md"), "utf8"));
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+
+    const summaries = collectCollectionAssessments({
+      lectureCount: 2,
+      allPassed: false,
+      courseMetadata: { status: "absent", path: "lectures/course.yaml", errors: [] },
+      results: [
+        { slug: "01-demo", templatePath: "lectures/01-demo/lecture.template.md", valid: true, errors: [], template: result.template },
+        { slug: "02-invalid", templatePath: "lectures/02-invalid/lecture.template.md", valid: false, errors: [] }
+      ]
+    });
+
+    expect(summaries).toHaveLength(4);
+    expect(new Set(summaries.map((summary) => summary.lectureSlug))).toEqual(new Set(["01-demo"]));
   });
 });
 

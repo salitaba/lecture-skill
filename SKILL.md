@@ -224,6 +224,66 @@ Rendered label: `Quiz: Knowledge check`. Use `quiz` for lightweight knowledge ch
 
 ````markdown
 ```lecture-component
+type: question_set
+title: "Check Your Understanding"
+instructions: "Answer before revealing feedback."
+shuffle_options: true
+questions:
+  - question: "What validates the active lecture or collection?"
+    options:
+      - "npm run validate"
+      - "npm run dev"
+    answer: "npm run validate"
+    feedback: "Validation catches schema and structure errors."
+  - question: "What does authored order support?"
+    options:
+      - "Stable print and review output."
+      - "Learner analytics."
+    answer: "Stable print and review output."
+```
+````
+
+Rendered label: `Assessment: Question set`. Use `question_set` for several related single-answer checks. It requires non-empty `title` and at least two questions. Each question requires non-empty `question`, at least two non-empty `options`, and an `answer` that exactly matches one option after trimming. Optional `feedback` reveals per question. `shuffle_options` is preview-only and must not be described as secure randomization; authored order remains in source, static output, print, and review packages. Multiple-answer question sets are not supported in P0.
+
+````markdown
+```lecture-component
+type: free_response
+title: "Explain The Tradeoff"
+prompt: "Why compare your answer after drafting it?"
+placeholder: "Draft your response here..."
+guidance: "Committing to an answer first makes the comparison more useful."
+```
+````
+
+Rendered label: `Assessment: Free response`. Use `free_response` for written reasoning, predictions, reflections, or design explanations. It requires non-empty `title` and `prompt`; `guidance` and `placeholder` are optional. Learner input is local-only browser state and is not saved, submitted, graded, tracked, or packaged as learner state.
+
+````markdown
+```lecture-component
+type: practice_task
+title: "Repair An Invalid Assessment"
+scenario: "A generated lecture has a mismatched question_set answer."
+task: "Use validation output to locate and fix the invalid YAML."
+steps:
+  - "Run npm run validate."
+  - "Inspect the reported field path."
+hints:
+  - "Start at questions[index].answer."
+starter_code:
+  language: "yaml"
+  code: "type: question_set"
+solution: "Make answer exactly match one authored option."
+rubric:
+  - criterion: "Validation"
+    expected: "The lecture validates without field errors."
+```
+````
+
+Rendered label: `Practice task`. Use `practice_task` for applied work: coding, debugging, architecture, process, or self-evaluation tasks. It requires non-empty `title` and `task`; optional fields are `scenario`, `steps`, `hints`, `starter_code`, `solution`, and `rubric`. Rubrics are visible by default. Hints and solutions use reveal controls on screen and are visible in print.
+
+For all assessment components, hidden answers, guidance, hints, and solutions are pacing aids only. They remain present in source templates, static HTML, print output, and review packages. Do not promise secure exams, runtime grading, learner analytics, persistence, uploads, AI feedback at runtime, or unsupported component types.
+
+````markdown
+```lecture-component
 type: diagram
 diagram_type: flowchart
 title: "Data flow overview"

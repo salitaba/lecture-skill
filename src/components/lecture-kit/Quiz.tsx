@@ -10,7 +10,7 @@ export function Quiz({ component }: { component: QuizComponent }) {
   const answerLabelId = `${baseId}-answer-label`;
 
   return (
-    <aside className="lecture-component quiz-card">
+    <aside id={component.anchor} className="lecture-component quiz-card">
       <p className="component-label">Quiz: Knowledge check</p>
       <h3 className="quiz-question">{component.question}</h3>
       <ol className="quiz-options">

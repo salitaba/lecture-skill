@@ -16,6 +16,7 @@ describe("quiz reveal interaction", () => {
       <Quiz
         component={{
           type: "quiz",
+          anchor: "quiz-command",
           question: "Which command validates?",
           options: ["npm run validate", "npm run dev"],
           answer: "npm run validate",
@@ -82,6 +83,7 @@ describe("quiz reveal interaction", () => {
         <Quiz
           component={{
             type: "quiz",
+            anchor: "quiz-first",
             question: "First question?",
             options: ["First answer", "Other"],
             answer: "First answer"
@@ -90,6 +92,7 @@ describe("quiz reveal interaction", () => {
         <Quiz
           component={{
             type: "quiz",
+            anchor: "quiz-second",
             question: "Second question?",
             options: ["Second answer", "Other"],
             answer: "Second answer"

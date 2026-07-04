@@ -1,4 +1,5 @@
 import type { CollectionValidationResult, LectureValidationResult } from "@/lib/lecture-template/types";
+import { collectCollectionAssessments } from "@/lib/lecture-template/assessments";
 
 export interface CollectionLandingProps {
   validation: CollectionValidationResult;
@@ -12,6 +13,7 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
   const description =
     courseMetadata?.description ??
     `${validation.lectureCount} ${validation.lectureCount === 1 ? "lecture" : "lectures"} in authored order.`;
+  const assessments = collectCollectionAssessments(validation);
 
   return (
     <section className="collection-landing" aria-labelledby="collection-title">
@@ -46,6 +48,24 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
           </dl>
         ) : null}
       </header>
+
+      <section className="assessment-index" aria-labelledby="assessment-index-title">
+        <h2 id="assessment-index-title">Assessment index</h2>
+        {assessments.length > 0 ? (
+          <ol>
+            {assessments.map((assessment) => (
+              <li key={`${assessment.lectureSlug}-${assessment.anchor}`}>
+                <a href={`/lectures/${assessment.lectureSlug}#${assessment.anchor}`}>{assessment.title}</a>
+                <span>
+                  {labelForAssessment(assessment.type)} • {assessment.lectureTitle} • {assessment.sectionTitle}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>No assessment components found in valid lectures.</p>
+        )}
+      </section>
 
       <ol className="lecture-list">
         {validation.results.map((result, index) => {
@@ -98,6 +118,13 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
       </ol>
     </section>
   );
+}
+
+function labelForAssessment(type: string): string {
+  if (type === "quiz") return "Quiz";
+  if (type === "question_set") return "Question set";
+  if (type === "free_response") return "Free response";
+  return "Practice task";
 }
 
 function parseDurationMinutes(result: LectureValidationResult): number {

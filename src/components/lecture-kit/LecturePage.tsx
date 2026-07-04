@@ -1,3 +1,4 @@
+import { AnswerKeyAppendix } from "@/components/lecture-kit/AnswerKeyAppendix";
 import { LectureHeader } from "@/components/lecture-kit/LectureHeader";
 import { PageShell } from "@/components/lecture-kit/PageShell";
 import { RenderBlocks, SectionRenderer } from "@/components/lecture-kit/SectionRenderer";
@@ -48,6 +49,8 @@ export function LecturePage({ lecture, templatePath }: LecturePageProps) {
               ))}
             </ul>
           </section>
+
+          <AnswerKeyAppendix lecture={lecture} />
         </article>
       </div>
     </PageShell>

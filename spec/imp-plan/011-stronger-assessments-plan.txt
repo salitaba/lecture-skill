@@ -1,0 +1,290 @@
+Implementation Plan: Stronger Assessments (spec/011-stronger-assessments.txt)
+
+## Summary
+
+Extend the Lecture Site Engine assessment vocabulary beyond the existing single-question `quiz` component by adding `question_set`, `free_response`, and `practice_task` components. Preserve the existing `quiz` schema and behavior, keep all new authoring inside `lecture-component` fenced YAML blocks within `## Section:` blocks, and add learner-facing reveal interactions, strict validation, examples, documentation, print behavior, review-package compatibility, assessment anchors, a course-level assessment index, and a printable answer-key appendix.
+
+This is local-first practice support, not grading. Hidden answers and guidance remain present in source templates, static HTML, print output, and review packages.
+
+## Product Decisions For P0
+
+- `question_set` will use per-question reveal controls in P0 so learners can pace feedback independently and multiple question sets keep simple local state boundaries.
+- `free_response` will include a local-only textarea in P0 when `placeholder` is absent or present. The textarea is never persisted, submitted, packaged as state, or treated as graded input.
+- `practice_task.rubric` will be visible by default as self-evaluation criteria. Hints and solution remain behind separate reveal controls.
+- P0 `question_set` remains single-answer only. Multiple-answer mode is deferred to P1.
+- P0 shuffle support is limited to `question_set.shuffle_options?: boolean`; when true, options are shuffled only in JavaScript-enabled learner preview after mount. Static render, print, source templates, validation, and review packages preserve authored order, and selected radio values stay keyed by authored option text so selection remains correct after shuffle.
+- Assessment-level anchors apply to all assessment moments, including legacy `quiz`. The `quiz` authoring schema and validation remain unchanged, but normalized `QuizComponent` gains an internal `anchor: string` and `Quiz.tsx` renders `id={component.anchor}`.
+- The course-level assessment index and printable answer-key appendix are generated from normalized lecture templates and rendered in the local/static page. The answer-key appendix covers `quiz`, `question_set`, `free_response`, and `practice_task`. The broader review-package assessment summary remains P1.
+
+## Relevant Existing Files
+
+### Types and normalized render model
+- `src/lib/lecture-template/types.ts` - Add exported assessment interfaces and union members: `QuestionSetComponent`, `QuestionSetQuestion`, `FreeResponseComponent`, `PracticeTaskComponent`, `StarterCode`, `PracticeRubricItem`; add `"question_set"`, `"free_response"`, and `"practice_task"` to `LectureComponentType` and `LectureComponent`; add normalized-only `anchor: string` to `QuizComponent`.
+- `src/lib/lecture-template/validateTemplate.ts` - Add new component types to `supportedComponents`, validate nested assessment fields, normalize new components, and assign stable assessment anchors during section-aware normalization.
+- `src/lib/lecture-template/anchors.ts` - Add or generalize a helper for unique anchors beyond sections, for example `uniqueAnchors(labels, fallbackBase)`, while preserving existing `slugifySectionTitle` and `uniqueSectionAnchors` behavior.
+
+### Parsing and validation CLI
+- `src/lib/lecture-template/parseTemplate.ts` - No schema-specific parsing changes expected; parser already treats component YAML generically.
+- `src/lib/lecture-template/validateCli.ts` - JSON output already serializes `field`, `sectionTitle`, `componentType`, and locator. Add tests proving nested fields such as `questions[0].options[1]` and `rubric[0].expected` survive human and JSON CLI output.
+- `scripts/validate.ts` - No expected changes.
+
+### Rendering
+- `src/components/lecture-kit/SectionRenderer.tsx` - Import and dispatch new assessment components.
+- `src/components/lecture-kit/Quiz.tsx` - Preserve schema and behavior; optionally share small reveal-control helpers only if duplication becomes material.
+- `src/components/lecture-kit/QuestionSet.tsx` - New client component for grouped single-answer checks with local option selection, optional preview-only shuffling, per-question reveal regions, and print-visible answers/feedback.
+- `src/components/lecture-kit/FreeResponse.tsx` - New client component with prompt, labelled local-only textarea, optional guidance reveal, and print-visible guidance.
+- `src/components/lecture-kit/PracticeTask.tsx` - New client component for scenario/task/steps/starter code/rubric plus separate hint and solution reveals.
+- `src/components/lecture-kit/LecturePage.tsx` - Render a lecture-level printable answer-key appendix and expose assessment anchors in normal reading order.
+- `src/components/lecture-kit/CollectionLanding.tsx` - Add a course-level assessment index across valid lectures in collection mode.
+- `src/app/lectures/[slug]/page.tsx` - No route-shape changes expected; assessment anchors work as in-page fragments under each lecture route.
+
+### Styling and print
+- `src/app/globals.css` - Add assessment card, option selection, reveal region, textarea, rubric, starter-code, assessment-index, and answer-key appendix styles. Extend print rules so hidden answer/guidance/hints/solutions are visible and buttons/no-script helper text are hidden.
+
+### Review package
+- `src/lib/lecture-template/reviewPackage.ts` - Existing package assembly copies rendered static HTML and source templates. Add tests proving new answer-key appendix markup, assessment anchors, and hash-fragment links survive package rewriting; change package code only if those tests expose a rewriting gap.
+
+### Examples and docs
+- `examples/component-demo.template.md` - Add valid demos for `question_set`, `free_response`, and `practice_task` with realistic recall, reasoning, and applied-practice examples.
+- `examples/invalid/*.template.md` - Add invalid fixtures for malformed `question_set`, `free_response`, and `practice_task` fields.
+- `examples/multi-lecture/lectures/*/lecture.template.md` - Add at least one new assessment component to a valid collection fixture or add a focused collection test fixture generated inline.
+- `README.md` - Document new schemas, usage guidance, reveal/print/review-package behavior, local-only input, shuffle limits, and non-goals.
+- `SKILL.md` - Update agent authoring guidance so agents choose `quiz`, `question_set`, `free_response`, or `practice_task` by learning job and stop inventing unsupported assessment component types.
+
+### Tests
+- `tests/lecture-template/validateTemplate.test.ts` - Add valid/invalid validation coverage, normalization coverage, supported component gallery updates, assessment anchors, and backward compatibility for `quiz`.
+- `tests/lecture-template/lecture-components.test.tsx` - Add static markup coverage for new assessment components, SectionRenderer dispatch, labels, lists, reveal regions, textarea, rubrics, print hook classes, escaping, and answer-key appendix markup.
+- `tests/lecture-template/quiz-interaction.test.tsx` - Keep existing quiz behavior unchanged; add separate assessment interaction tests rather than expanding quiz tests too much.
+- `tests/lecture-template/assessment-interaction.test.tsx` - New jsdom tests for question selection, per-question reveal independence, free-response local textarea, practice-task hint/solution toggles, independent state across multiple components, and shuffle behavior.
+- `tests/lecture-template/collection.test.ts` - Prove collection validation accepts new assessment components and that assessment index data can be collected from multiple lectures.
+- `tests/lecture-template/validate-cli.test.ts` and `tests/lecture-template/validate-collection-cli.test.ts` - Prove invalid nested fields appear in human output and JSON output.
+- `tests/lecture-template/review-package.test.ts` - Add checks that exported HTML containing `answer-key-appendix`, assessment ids, `#fragment` links, and `/lectures/<slug>#<anchor>` links is preserved/re-written correctly.
+
+## Proposed Implementation Steps
+
+### Step 1: Add assessment model types
+- In `src/lib/lecture-template/types.ts`, add:
+  - `QuestionSetComponent` with `type: "question_set"`, `anchor: string`, `title`, `questions`, optional `instructions`, optional `shuffle_options`.
+  - `QuestionSetQuestion` with `question`, `options`, `answer`, optional `feedback`.
+  - `FreeResponseComponent` with `type: "free_response"`, `anchor: string`, `title`, `prompt`, optional `guidance`, optional `placeholder`.
+  - `PracticeTaskComponent` with `type: "practice_task"`, `anchor: string`, `title`, `task`, optional `scenario`, `steps`, `hints`, `starter_code`, `solution`, `rubric`.
+  - `StarterCode` with `language` and `code`.
+  - `PracticeRubricItem` with `criterion` and `expected`.
+- Add the three new component type strings to `LectureComponentType` and `LectureComponent`.
+- Add `anchor: string` to the normalized `QuizComponent` interface. Do not add any author-facing `anchor` field to quiz YAML and do not change quiz validation, answer matching, or reveal behavior.
+
+### Step 2: Add validation and normalization
+- In `src/lib/lecture-template/validateTemplate.ts`, add the new types to `supportedComponents`.
+- Refactor normalization so `validateParsedTemplate` calls section-aware normalization:
+  - replace `normalizeBlocks(section.blocks)` with `normalizeBlocks(section.blocks, section.anchor)` for section blocks;
+  - keep overview/takeaway normalization unchanged or pass no section anchor because assessment components remain invalid outside sections;
+  - update `normalizeComponent(block, context)` so assessment anchors are generated with section anchor, component type/title/question fallback, and per-section occurrence counts.
+- Add concrete nested validation helpers in `validateTemplate.ts`:
+  - `componentNestedFieldError(block, sectionTitle, componentType, fieldPath, message, hint)`;
+  - `validateStringListField(block, sectionTitle, errors, field, { minimumItems, fieldPathPrefix? })` or an equivalent extension that can report `questions[0].options[1]`;
+  - `validateMappingListField(block, sectionTitle, errors, field, { minimumItems })` returning records and reporting non-mapping entries;
+  - `requireNestedStringField(record, field, fieldPath, ...)` or equivalent for `starter_code.language` and `rubric[0].expected`.
+- Nested validation errors must use `INVALID_COMPONENT_FIELD`, preserve `locator`, `sectionTitle`, `componentType`, and exact `field` paths such as `questions[0].question`, `questions[0].options[1]`, `starter_code.language`, and `rubric[0].expected`.
+- Validate `question_set`:
+  - required non-empty `title`;
+  - optional non-empty `instructions`;
+  - optional boolean `shuffle_options`; non-boolean values fail validation;
+  - `questions` list with at least two entries;
+  - each question is a mapping; scalar/list entries fail with `field: questions[index]`;
+  - each question has non-empty `question`, at least two non-empty string `options`, non-empty `answer`, optional non-empty `feedback`;
+  - `answer` exactly matches one trimmed option.
+- Validate `free_response`:
+  - required non-empty `title` and `prompt`;
+  - optional non-empty `guidance` and `placeholder`.
+- Validate `practice_task`:
+  - required non-empty `title` and `task`;
+  - optional non-empty `scenario`;
+  - optional `steps` and `hints` as non-empty string lists;
+  - optional `starter_code` mapping with non-empty `language` and `code`; scalar/list values fail with `field: starter_code`;
+  - optional non-empty `solution`;
+  - optional non-empty `rubric` list where each item is a mapping with non-empty `criterion` and `expected`; scalar/list entries fail with `field: rubric[index]`.
+- Normalize fields by trimming strings and preserving authored order.
+- Generate stable assessment anchors for `quiz`, `question_set`, `free_response`, and `practice_task` using section anchor + component type/title/question fallback + occurrence suffix. Store the resulting `anchor` on the normalized component so rendering, deep links, indexes, and answer keys use one source of truth. Add duplicate-title tests.
+- Preserve existing `quiz`, diagram, and other component validation semantics.
+
+### Step 3: Build assessment collection helpers
+- Add a small helper module if needed, for example `src/lib/lecture-template/assessments.ts`, to collect normalized assessment summaries and answer-key entries from a `LectureTemplate` or `CollectionValidationResult`.
+- Include `quiz`, `question_set`, `free_response`, and `practice_task` in answer-key entries. Include all four types in the collection assessment index unless product copy chooses to label `quiz` as a lightweight assessment.
+- Return plain data with lecture slug/title, section title/anchor, assessment type, assessment title/prompt, component anchor, and answer/guidance/solution/rubric material needed for index and appendix rendering.
+- Keep helpers pure and independent of browser APIs.
+
+### Step 4: Implement `QuestionSet`
+- Create `src/components/lecture-kit/QuestionSet.tsx` as a client component.
+- Render a single assessment card with `id={component.anchor}`, label `Assessment: Question set`, title, optional instructions, and each question in a labelled region.
+- Let learners select one option locally before reveal. Use native radio inputs grouped per question. Selection is local state only and does not imply grading.
+- Use per-question reveal buttons with `aria-expanded` and `aria-controls`; reveal answer and optional feedback in normal reading order.
+- If `shuffle_options` is true, create a mounted-only shuffled option model before enabling selection. Server/static markup remains authored order to avoid hydration mismatch, radio `value` remains the authored option text, and selected state is tracked by question index + authored option text so reveal still compares against the authored `answer`.
+- Add a `noscript` message matching the existing quiz pattern.
+- Ensure print styles show all answers/feedback and hide reveal controls.
+
+### Step 5: Implement `FreeResponse`
+- Create `src/components/lecture-kit/FreeResponse.tsx` as a client component.
+- Render `id={component.anchor}`, label `Assessment: Free response`, title, prompt, and a labelled textarea.
+- Add helper text stating the response is local and not saved.
+- Use `placeholder` when provided; otherwise use a neutral default such as `Draft your response here...`.
+- If `guidance` exists, render it in an always-mounted hidden region behind a `Compare your answer` / `Hide guidance` button.
+- Add a `noscript` message and print-visible guidance.
+
+### Step 6: Implement `PracticeTask`
+- Create `src/components/lecture-kit/PracticeTask.tsx` as a client component.
+- Render `id={component.anchor}`, label `Practice task`, title, optional scenario, task, optional steps, optional starter code, and optional rubric.
+- Render rubric visible by default as self-evaluation criteria, not as hidden answer material.
+- Render hints behind `Show hints` / `Hide hints` when present.
+- Render solution behind `Show solution` / `Hide solution` when present.
+- Use separate `useId`-based ids for hints and solution regions.
+- Render starter code by reusing `CodeBlock` with a `CodeBlockComponent` object where practical. If a custom wrapper is necessary, tests must prove it escapes `<script>`-like text and preserves long-code scrolling at narrow widths.
+- Add no-JavaScript and print behavior matching the assessment pacing model.
+
+### Step 7: Wire rendering, answer-key appendix, and assessment index
+- Update `src/components/lecture-kit/SectionRenderer.tsx` to dispatch the new components.
+- Update `src/components/lecture-kit/Quiz.tsx` to render `id={component.anchor}` while keeping its existing visible label, reveal copy, and schema-derived content unchanged.
+- Add `src/components/lecture-kit/AnswerKeyAppendix.tsx` and render it in `src/components/lecture-kit/LecturePage.tsx` immediately after Key Takeaways. Use a clear `answer-key-appendix` class. Implement it as a screen-visible `<details>` disclosure that is open or forced visible in print via CSS, with copy stating it is an answer key for review/printing and not hidden for security.
+- Update `src/components/lecture-kit/CollectionLanding.tsx` to render a course-level assessment index before the lecture list. It must use only `result.valid && result.template`, skip invalid lectures, show an empty state when no valid lecture has assessment components, and link each item to `/lectures/<slug>#<assessment-anchor>`.
+- For single-lecture mode, add an assessment index near the existing section navigation only if the answer-key/index helper makes it straightforward. Otherwise keep P0 course-level index scoped to collection landing and rely on in-page anchors for single lectures.
+
+### Step 8: Add responsive and print styles
+- Add shared `.assessment-card`, `.assessment-region`, `.assessment-reveal-button`, `.assessment-hidden-region`, `.assessment-options`, `.assessment-option`, `.assessment-textarea`, `.practice-rubric`, `.practice-starter-code`, `.assessment-index`, and `.answer-key-appendix` styles to `src/app/globals.css`.
+- Use existing colors and 8px radii. Avoid nested card styling inside assessment cards; use dividers and section headings.
+- Ensure text wraps at phone widths, long code scrolls, buttons remain at least 44px tall, and selected options are visible without relying only on color.
+- In `@media print`, hide reveal buttons and noscript helper text, show hidden regions, show answers/guidance/hints/solutions/rubrics, and avoid splitting short cards and answer-key entries when possible.
+
+### Step 9: Add examples and invalid fixtures
+- Update `examples/component-demo.template.md` so it remains the exact all-components gallery and includes the new assessment types.
+- Add focused invalid fixtures:
+  - `examples/invalid/question-set-field-errors.template.md`;
+  - `examples/invalid/free-response-field-errors.template.md`;
+  - `examples/invalid/practice-task-field-errors.template.md`.
+- Include invalid nested examples for empty question text, empty options, answer mismatch, empty guidance, empty steps/hints, invalid `starter_code`, and incomplete rubric items.
+- Update multi-lecture example content or inline collection tests to include at least one new assessment component.
+
+### Step 10: Update documentation and agent guidance
+- Update `README.md` supported components, examples, validation troubleshooting, print/review package notes, demo restore notes, and non-goals.
+- Update `SKILL.md` supported component guidance with when to use each assessment type and warnings that hidden content is not secure, learner input is not saved, and runtime feedback/grading is unsupported.
+- Document `question_set.shuffle_options` as preview-only and non-review.
+- Document that `question_set` is single-answer in P0 and multiple-answer is deferred.
+
+### Step 11: Write focused tests
+- Add validation tests for every valid new assessment component and all malformed nested fields.
+- Add normalization tests for trimmed values, optional fields, stable anchors, and source order.
+- Update hardcoded `supportedComponentTypes` arrays in tests.
+- Add rendering tests for static markup, labels, ids/anchors, answer/guidance/hint/solution regions, textarea labels, rubric lists, starter code escaping, SectionRenderer dispatch, answer-key appendix, and assessment index.
+- Add jsdom interaction tests for reveal controls, option selection, local textarea input, independent state, and shuffle.
+- Add a shuffle interaction test proving selected option state still maps to the authored answer after options are shuffled.
+- Add CLI tests for nested field paths in human and JSON validation output.
+- Add collection validation/index tests for new assessment components in multi-lecture mode.
+- Add route/package link tests proving collection assessment index links use `/lectures/${slug}#${anchor}`, root package rewriting keeps fragment suffixes, and single-lecture mode does not emit broken `/lectures/...` assessment links.
+- Add backward compatibility assertions that existing quiz fixtures and quiz reveal tests still pass without schema changes.
+
+### Step 12: Verification
+- Run focused tests during implementation:
+  - `npm run test -- tests/lecture-template/validateTemplate.test.ts`
+  - `npm run test -- tests/lecture-template/render-model.test.ts`
+  - `npm run test -- tests/lecture-template/lecture-components.test.tsx`
+  - `npm run test -- tests/lecture-template/assessment-interaction.test.tsx`
+  - `npm run test -- tests/lecture-template/validate-cli.test.ts`
+  - `npm run test -- tests/lecture-template/validate-collection-cli.test.ts`
+  - `npm run test -- tests/lecture-template/collection.test.ts`
+  - `npm run test -- tests/lecture-template/review-package.test.ts`
+- Run final verification:
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run validate`
+
+## Data Model Changes
+
+Additive `LectureComponent` union changes only. Existing authoring shapes stay valid. `QuizComponent.anchor` is normalized render data, not an author-facing YAML field.
+
+```typescript
+export interface QuizComponent {
+  type: "quiz";
+  anchor: string;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation?: string;
+}
+
+export interface QuestionSetQuestion {
+  question: string;
+  options: string[];
+  answer: string;
+  feedback?: string;
+}
+
+export interface QuestionSetComponent {
+  type: "question_set";
+  anchor: string;
+  title: string;
+  instructions?: string;
+  questions: QuestionSetQuestion[];
+  shuffle_options?: boolean;
+}
+
+export interface FreeResponseComponent {
+  type: "free_response";
+  anchor: string;
+  title: string;
+  prompt: string;
+  guidance?: string;
+  placeholder?: string;
+}
+
+export interface StarterCode {
+  language: string;
+  code: string;
+}
+
+export interface PracticeRubricItem {
+  criterion: string;
+  expected: string;
+}
+
+export interface PracticeTaskComponent {
+  type: "practice_task";
+  anchor: string;
+  title: string;
+  scenario?: string;
+  task: string;
+  steps?: string[];
+  hints?: string[];
+  starter_code?: StarterCode;
+  solution?: string;
+  rubric?: PracticeRubricItem[];
+}
+```
+
+No frontmatter, course metadata, database, API, persistence, analytics, or route contract changes are required.
+
+## Test Plan
+
+- Schema validation: valid examples and invalid nested fields for `question_set`, `free_response`, and `practice_task`.
+- Normalization: trimmed strings, optional fields, authored order, generated section-aware anchors for `quiz` and new assessment components, duplicate-title suffixes, and supported component type arrays.
+- Rendering: static markup, accessible labels/regions, ids/anchors, list semantics, textarea labelling, no-JavaScript messages, print hooks, escaping, and SectionRenderer dispatch.
+- Interaction: reveal toggles, `aria-expanded`/`aria-controls`, independent state, local option selection, local textarea drafting, and preview-only shuffle keyed by authored option text.
+- Print/review: CSS makes hidden guidance visible in print; answer-key appendix appears in static markup; review-package HTML rewriting preserves assessment anchors and hash-fragment links.
+- Collection/routes: collection validation accepts new assessment components, collection landing renders an assessment index for valid lectures only, lecture route fragments point to assessment anchors, and single-lecture mode avoids collection-only links.
+- Backward compatibility: existing `quiz` schema, reveal behavior, fixtures, validation failures, and static export route behavior remain unchanged.
+
+## Risks And Mitigations
+
+1. **P0 scope is large** - Implement in layered tasks: schema/validation, rendering, index/appendix, examples/docs, and verification. Keep P1 quality metadata out of P0.
+2. **Hydration mismatch from shuffling** - Render authored order on the server, derive shuffled option order only after mount, keep radio values as authored option text, and test selection after shuffle.
+3. **Hidden content mistaken for security** - Documentation, labels, no-script text, and answer-key appendix should state reveal is a pacing aid only.
+4. **Anchor instability** - Generate anchors during section-aware normalization from normalized section anchors and assessment title/type/question fallbacks with occurrence suffixes, and test duplicate titles.
+5. **Validation helper complexity** - Add small reusable nested-field helpers with exact field paths rather than duplicating ad hoc loops.
+6. **Answer-key duplication** - Build appendix entries from normalized components through one collector helper so rendered cards and appendix stay aligned.
+7. **Client component sprawl** - Keep assessment components focused and reuse local patterns from `Quiz.tsx`; avoid adding a state management library.
+8. **Print regressions** - Add static markup tests for print hook classes and include manual print/CSS review in final verification.
+
+## Assumptions And Open Questions
+
+- Assumption: P0 may add the `anchor` field to normalized `quiz` and new assessment components without adding an author-facing `anchor` YAML field.
+- Assumption: The printable answer-key appendix can be present in screen HTML behind a disclosure because hidden content is not a security boundary; print CSS will force it visible by default.
+- Assumption: The course-level assessment index only lists valid lectures; invalid lectures already surface validation screens and should not produce partial assessment index entries.
+- Open question for implementation: whether the single-lecture page should include a visible assessment index in addition to the existing section navigation. This is useful but should not block the collection-level P0 requirement.

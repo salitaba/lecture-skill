@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { slugifySectionTitle, uniqueSectionAnchors } from "../../src/lib/lecture-template/anchors";
+import { slugifySectionTitle, uniqueAnchors, uniqueSectionAnchors } from "../../src/lib/lecture-template/anchors";
 
 describe("section anchors", () => {
   it("slugifies section titles", () => {
@@ -13,5 +13,9 @@ describe("section anchors", () => {
       "other",
       "repeat-3"
     ]);
+  });
+
+  it("keeps duplicate generic anchors unique and ordered", () => {
+    expect(uniqueAnchors(["Practice", "Practice", "Check"], "assessment")).toEqual(["practice", "practice-2", "check"]);
   });
 });
