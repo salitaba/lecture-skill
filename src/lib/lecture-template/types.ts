@@ -1,6 +1,14 @@
 export type LectureLevel = "beginner" | "intermediate" | "advanced";
 export type CalloutVariant = "note" | "warning" | "insight";
-export type LectureComponentType = "callout" | "concept_card" | "step_list" | "code_block";
+export type LectureComponentType =
+  | "callout"
+  | "concept_card"
+  | "step_list"
+  | "code_block"
+  | "comparison"
+  | "summary"
+  | "quote"
+  | "quiz";
 
 export interface SourceLocator {
   line?: number;
@@ -160,11 +168,50 @@ export interface CodeBlockComponent {
   code: string;
 }
 
+export interface ComparisonItem {
+  label: string;
+  left: string;
+  right: string;
+}
+
+export interface ComparisonComponent {
+  type: "comparison";
+  title: string;
+  leftLabel: string;
+  rightLabel: string;
+  items: ComparisonItem[];
+}
+
+export interface SummaryComponent {
+  type: "summary";
+  title: string;
+  items: string[];
+}
+
+export interface QuoteComponent {
+  type: "quote";
+  quote: string;
+  attribution?: string;
+  context?: string;
+}
+
+export interface QuizComponent {
+  type: "quiz";
+  question: string;
+  options: string[];
+  answer: string;
+  explanation?: string;
+}
+
 export type LectureComponent =
   | CalloutComponent
   | ConceptCardComponent
   | StepListComponent
-  | CodeBlockComponent;
+  | CodeBlockComponent
+  | ComparisonComponent
+  | SummaryComponent
+  | QuoteComponent
+  | QuizComponent;
 
 export type RenderBlock =
   | Exclude<MarkdownBlock, ParsedComponentBlock>

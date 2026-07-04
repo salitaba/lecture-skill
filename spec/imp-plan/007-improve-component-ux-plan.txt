@@ -1,0 +1,239 @@
+Implementation Plan: Improve Component UX
+=========================================
+
+Spec: spec/007-improve-component-ux.txt
+Plan status: finalized after tech-lead review
+
+## Brief Summary
+
+Improve the rendered UX for every supported Lecture Site Engine component: `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, and `quiz`. This is a presentation, accessibility, demo, documentation, and rendering-test pass over the component system that was added by the core learning-components work.
+
+The change must keep the existing authoring schema, validation behavior, route behavior, collection workflow, static review package flow, and local-first rendering model unchanged. It should not add new component types, required fields, grading, persistence, external UI libraries, runtime network dependencies, or JavaScript-dependent quiz behavior for P0/P1.
+
+The main product outcome is that a reviewer, educator, or learner can open the component demo and immediately identify each component's role, including a quiz that is clearly labeled as a quiz while still rendering its answer key as static teaching feedback.
+
+## Relevant Existing Files
+
+- `src/components/lecture-kit/Callout.tsx`: already renders variant-aware labels such as `Warning callout`; verify labels and markup still satisfy the new component-system treatment.
+- `src/components/lecture-kit/ConceptCard.tsx`: renders the `Concept card` label and single-idea card body.
+- `src/components/lecture-kit/StepList.tsx`: currently renders the visible label `Step list`; update this to the user-facing `Step-by-step` label and keep ordered-list semantics.
+- `src/components/lecture-kit/CodeBlock.tsx`: already renders `Code example` and language label inside `figure`/`figcaption`; improve wrapping and internal overflow behavior in CSS as needed.
+- `src/components/lecture-kit/Comparison.tsx`: renders comparison rows with visible side labels on mobile and `sr-only` side labels for values. Strengthen semantics/accessibility if tests show the current grid is not enough.
+- `src/components/lecture-kit/Summary.tsx`: renders `Section summary` with a local recap list.
+- `src/components/lecture-kit/Quote.tsx`: renders `Source quote` and semantic `blockquote` inside a `figure`; keep context, quote text, and attribution visually distinct.
+- `src/components/lecture-kit/Quiz.tsx`: currently renders the visible label `Knowledge check`; update it to include `Quiz`, such as `Quiz: Knowledge check`, and make question, options, answer key, and explanation visually distinct.
+- `src/components/lecture-kit/SectionRenderer.tsx`: already dispatches all supported component types through a `switch` and `assertNever`; no behavior change should be required except tests that exercise the updated component contracts.
+- `src/app/globals.css`: owns the shared component card base, variant colors, component-specific styles, responsive comparison stacking, code overflow, focus states, print behavior if added, and no-horizontal-overflow safeguards.
+- `src/lib/lecture-template/types.ts`: owns normalized component models. This plan should not require type changes unless a backward-compatible internal accessibility helper becomes useful.
+- `src/lib/lecture-template/validateTemplate.ts`: owns schema validation and normalization. This plan should not change validation semantics except fixture/doc wording if tests reveal stale label assumptions.
+- `examples/component-demo.template.md`: canonical visual gallery for all supported components. Expand it with clearer grouping, realistic long-content examples, and text that makes the demo easy to review.
+- `examples/ux-stress.template.md`: existing valid stress fixture with all supported components; useful for responsive/manual checks if the component demo remains concise.
+- `tests/lecture-template/lecture-components.test.tsx`: current static-markup tests for component labels, escaping, quote semantics, comparison side labels, and `SectionRenderer` dispatch. Update label assertions and add focused UX/accessibility assertions.
+- `tests/lecture-template/fixtures.test.ts`: verifies valid and invalid fixtures, including `examples/component-demo.template.md`.
+- `tests/lecture-template/validateTemplate.test.ts`, `validate-cli.test.ts`, `validate-collection-cli.test.ts`, and `collection.test.ts`: should remain green; update only if component-demo changes expose stale expectations.
+- `tests/lecture-template/review-package.test.ts`: add only light coverage if static package behavior needs a direct regression guard.
+- `README.md`: component authoring and demo instructions must describe the improved labels and static quiz answer-key behavior.
+- `SKILL.md`: AI-agent authoring guidance must list all supported components and clearly describe quiz as a static teaching check.
+- `package.json`: project verification commands are `npm run validate`, `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run package:review`. There is no browser test dependency today.
+
+## Proposed Implementation Steps
+
+1. Lock down the user-facing component label contract.
+   - Update `StepList.tsx` so the visible component label is `Step-by-step`.
+   - Update `Quiz.tsx` so the visible component label contains `Quiz`, preferably `Quiz: Knowledge check`.
+   - Keep existing labels that already satisfy the spec:
+     - `Note callout`, `Warning callout`, and `Insight callout` in `Callout.tsx`
+     - `Concept card` in `ConceptCard.tsx`
+     - `Code example` in `CodeBlock.tsx`
+     - `Comparison` in `Comparison.tsx`
+     - `Section summary` in `Summary.tsx`
+     - `Source quote` in `Quote.tsx`
+   - Keep labels visible in the DOM, not only `aria-label`, so visual reviewers and screen-reader users receive the same component identity.
+
+2. Improve component markup where it directly supports accessibility and teaching clarity.
+   - In `Quiz.tsx`, make the question the strongest heading in the card and ensure the answer key is in a clearly labeled region below the options. A small static note such as "Static answer key" is acceptable if it avoids implying secure hidden assessment.
+   - Keep quiz options in an ordered list because option order can matter and the structure is accessible without JavaScript.
+   - In `Comparison.tsx`, preserve enough context for each value to be understood with a screen reader. The implementation must use either:
+     - semantic table markup with `caption` or visible heading, row headers, and `th scope` for side/topic labels, styled responsively without page overflow; or
+     - the existing responsive grid with explicit `id` plus `aria-labelledby`/`aria-describedby` relationships that tie each left/right value to both its row topic and its side label.
+   - Add static markup tests that prove each comparison value is programmatically associated with its row topic and left/right side label, not just visually adjacent to them.
+   - In `Quote.tsx`, keep `blockquote` semantic markup and keep attribution in `figcaption` when present.
+   - Do not use `dangerouslySetInnerHTML`; all user-authored component fields should continue to be escaped by React.
+
+3. Tighten the shared component visual system in `src/app/globals.css`.
+   - Keep the common `.lecture-component` base: `min-width: 0`, restrained border/radius, consistent padding, and spacing that works inside lecture sections.
+   - Add or refine component-specific affordances without making the page noisy:
+     - callout variants: label and border/shape communicate note, warning, and insight; warning cannot rely on red alone.
+     - concept card: framed idea, distinct from callout and summary.
+     - step list: number badges remain aligned when text wraps; long steps do not overlap badges.
+     - code block: caption and language label wrap; long code scrolls inside `pre`, never at body level.
+     - comparison: dense rows have enough spacing; desktop grid remains readable; mobile stacks topic, left, and right values cleanly.
+     - summary: calmer than callouts and final key takeaways.
+     - quote: context, quote text, and attribution are visually distinct.
+     - quiz: question, options, answer key, and explanation are visually separated; the answer area looks intentional.
+   - Add `overflow-wrap: anywhere` or targeted wrapping rules to component headings, labels, comparison values, quote text, quiz options, and answer/explanation text where long authored text could overflow.
+   - Keep body-level horizontal overflow prevented at 390px, 768px, and 1280px.
+
+4. Improve and verify print-friendly component behavior.
+   - Add targeted `@media print` styles only where needed for P1:
+     - comparison rows should not split awkwardly when possible.
+     - quote should keep attribution attached to the quoted text.
+     - quiz answer key should remain visible and clearly labeled in print.
+   - Avoid print-only content that changes the static teaching meaning.
+   - Add a verification task that checks `src/app/globals.css` includes print coverage for comparison, quote, and quiz, and perform a print-preview/manual check that quote attribution remains attached and quiz answer key remains visible.
+
+5. Upgrade `examples/component-demo.template.md` into the canonical gallery.
+   - Keep every component block inside `## Section:` blocks.
+   - Include every supported component: `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, and `quiz`.
+   - Make the rendered text easy to search for each component, especially `Quiz`.
+   - Add concise grouping in section titles or short intro text, such as "Highlight", "Structure", "Evidence", and "Check understanding", without adding schema or route changes.
+   - Include realistic long-content examples for:
+     - comparison item labels and values
+     - quote text and attribution/context
+     - quiz questions, options, answer, and explanation
+     - code lines long enough to prove internal scrolling
+   - Keep examples synthetic and source-neutral.
+   - Validate the fixture with `npm run validate` after changes.
+
+6. Update static rendering tests for the component UX contract.
+   - In `tests/lecture-template/lecture-components.test.tsx`, update assertions from `Step list` to `Step-by-step`.
+   - Update quiz assertions from `Knowledge check` to a label containing `Quiz`, such as `Quiz: Knowledge check`.
+   - Add direct rendering assertions that:
+     - every supported component visible label appears exactly as expected.
+     - quiz renders the label, question, ordered options, answer key, answer, and optional explanation.
+     - quote uses `blockquote`.
+     - comparison exposes both side labels and the row topic programmatically for each value.
+     - code block escapes code text and preserves a visible language label.
+     - HTML-like text in every component type is escaped and no raw `<script>` or unsafe image markup is emitted.
+   - Extend the current `SectionRenderer` dispatch test so it renders all eight supported component types together with surrounding Markdown: `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, and `quiz`.
+   - Assert the updated `Step-by-step` and `Quiz: Knowledge check` labels in the `SectionRenderer` output so missing or stale branches fail.
+
+7. Add component-demo coverage.
+   - Keep `tests/lecture-template/validateTemplate.test.ts` asserting `examples/component-demo.template.md` is valid.
+   - Add or extend a fixture/model assertion that extracts component types from `examples/component-demo.template.md` and asserts the exact supported set is present: `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, and `quiz`.
+   - Assert the count or set in a way that future demo edits cannot accidentally drop `quiz` or another component.
+   - Extend collection-mode fixture coverage in `tests/lecture-template/collection.test.ts` and/or `validate-collection-cli.test.ts` to assert all eight component types from the component demo, not only `comparison`, `summary`, `quote`, and `quiz`.
+
+8. Add a blocking overflow verification gate.
+   - Because the project has no browser-test dependency today, do not add Playwright or another dependency unless the implementation owner explicitly chooses that tradeoff.
+   - Add a final verification task with a mandatory manual browser check for the component demo at 390px, 768px, and 1280px.
+   - The check must execute this expression at each width and record/pass the result:
+
+```js
+document.documentElement.scrollWidth <= document.documentElement.clientWidth
+```
+
+   - To preview the component demo in single-lecture mode, use this exact setup:
+     - save the current `content/lecture.template.md` contents before replacing it.
+     - ensure there is no root `lectures/` directory selected for collection mode.
+     - copy `examples/component-demo.template.md` to `content/lecture.template.md`.
+     - run `npm run validate`.
+     - run `npm run dev` and inspect the local page.
+     - restore the original `content/lecture.template.md` after the check.
+   - Inspect long comparison labels/values, quote text, quiz options/explanation, code captions, and code lines for clipping, overlap, or body-level overflow.
+
+9. Update documentation and agent guidance.
+   - In `README.md`, align component documentation with the new visible labels and improved demo.
+   - Update stale label wording, including the existing `Step list` authoring section, so docs distinguish the YAML type `step_list` from the visible label `Step-by-step`.
+   - Document the visible quiz label as `Quiz: Knowledge check` or equivalent label containing `Quiz`.
+   - State that `quiz` renders as a static teaching check with a visible answer key and is not secure assessment, grading, tracking, or hidden-answer behavior.
+   - Document when to use each component and when not to use it.
+   - In `SKILL.md`, make sure agents are instructed that `quiz` is supported, should be visibly recognizable as a quiz in authored examples, and renders a static visible answer key.
+   - Search for stale label or support language before finishing:
+
+```bash
+rg -n "Knowledge check|Step list|Step-by-step|Quiz|component demo|unsupported component|deferred|comparison|summary|quote" README.md SKILL.md docs examples tests src
+```
+
+10. Verify single-lecture, collection, and static package behavior.
+    - Run focused tests as the implementation changes each layer:
+
+```bash
+npm run test -- tests/lecture-template/lecture-components.test.tsx
+npm run test -- tests/lecture-template/fixtures.test.ts
+npm run test -- tests/lecture-template/validateTemplate.test.ts
+npm run test -- tests/lecture-template/collection.test.ts
+npm run test -- tests/lecture-template/validate-collection-cli.test.ts
+```
+
+    - Run broad project checks before completion:
+
+```bash
+npm run validate
+npm run test
+npm run typecheck
+npm run lint
+npm run build
+npm run package:review
+```
+
+    - Manual viewport checks:
+      - Save the current `content/lecture.template.md`.
+      - Ensure the root `lectures/` directory is absent or not selected for collection mode.
+      - Copy `examples/component-demo.template.md` to `content/lecture.template.md`.
+      - Run `npm run validate`.
+      - Run `npm run dev`.
+      - Check 390px, 768px, and 1280px widths.
+      - Confirm `document.documentElement.scrollWidth <= document.documentElement.clientWidth`.
+      - Confirm long comparison labels/values, quote text, quiz options/explanation, code captions, and code lines wrap or scroll internally without clipping.
+      - Confirm the same improved component UX appears in a collection route and in a generated static review package without package-specific logic.
+      - Check print preview for comparison, quote, and quiz; confirm quote attribution remains attached and the quiz answer key remains visible.
+      - Restore the original `content/lecture.template.md`.
+
+## Data Model, API, Persistence, Event, And Domain Changes
+
+- Template schema changes: none.
+- Required component fields: none.
+- Supported component types: unchanged; this plan assumes the core learning-components work already supports `comparison`, `summary`, `quote`, and `quiz`.
+- Normalized render model changes: none expected.
+- Route/API changes: none.
+- Collection behavior changes: none.
+- Static package behavior changes: none expected; static review packages should receive the improved component UX through the normal rendered HTML/CSS.
+- Persistence/event changes: none. No database, analytics, learner tracking, grading, authentication, accounts, or secure assessment.
+- Dependency changes: avoid new UI libraries. Add a browser-test dependency only if the team accepts the extra weight for automated overflow checks.
+
+## Test Plan
+
+Automated tests:
+
+- `tests/lecture-template/lecture-components.test.tsx`
+  - Assert visible labels for all supported components.
+  - Assert quiz label contains `Quiz`, options render as an ordered list, answer key is clearly labeled, and explanation appears when present.
+  - Assert quote renders `blockquote`.
+  - Assert comparison side labels and row topics are programmatically associated with each value.
+  - Assert all component fields escape HTML-like input.
+  - Assert `SectionRenderer` dispatches all eight supported components.
+- `tests/lecture-template/validateTemplate.test.ts`
+  - Keep component demo validity coverage.
+  - Add or keep an assertion that the demo validates to exactly all eight supported component types: `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, and `quiz`.
+- `tests/lecture-template/fixtures.test.ts`
+  - Run fixture sweep after demo updates.
+- `tests/lecture-template/collection.test.ts` and `tests/lecture-template/validate-collection-cli.test.ts`
+  - Keep collection-mode acceptance for a lecture containing the component demo.
+- Browser/manual check
+  - At 390px, 768px, and 1280px, check no body-level horizontal overflow in the component demo and inspect long comparison, quote, quiz, and code examples.
+- Print/manual check
+  - Check print preview for comparison, quote, and quiz; confirm quote attribution remains attached and quiz answer key remains visible.
+
+Finite verification commands:
+
+```bash
+npm run validate
+npm run test
+npm run typecheck
+npm run lint
+npm run build
+npm run package:review
+```
+
+## Risks, Assumptions, And Open Questions
+
+- Risk: Making each component too distinct could make normal lecture pages noisy. Mitigation: keep a shared `.lecture-component` base and use restrained differences in labels, borders, spacing, and structure.
+- Risk: Quiz styling could imply hidden answers or secure assessment. Mitigation: label it as `Quiz: Knowledge check` and keep the answer key visibly framed as intentional static teaching feedback.
+- Risk: Comparison accessibility can regress if side labels are only visual. Mitigation: keep screen-reader side labels or add stronger relationships, and test the rendered markup.
+- Risk: Long authored text can still create body-level overflow even when the component looks fine at common widths. Mitigation: add targeted wrapping and verify the component demo at 390px, 768px, and 1280px.
+- Risk: Adding a browser test dependency just for overflow checks may be heavier than the feature warrants. Mitigation: prefer a lightweight script if feasible; otherwise document a strict manual check in the task breakdown.
+- Assumption: The uncommitted core learning-components work is the baseline for this plan and should not be reverted.
+- Assumption: Static review packages use the normal app render pipeline and CSS, so no package-specific component logic is needed.
+- Assumption: The existing schema and normalized models are sufficient for the UX pass.
+- Open question: Should P2 client-side quiz reveal behavior remain a separate future feature, or should implementation leave an explicit markup hook now without adding behavior?

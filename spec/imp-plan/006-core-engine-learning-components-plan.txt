@@ -1,0 +1,267 @@
+Implementation Plan: Core Engine Learning Components
+====================================================
+
+Spec: spec/006-core-engine-learning-components.txt
+Plan status: finalized after tech-lead review
+
+## Brief Summary
+
+Extend the Lecture Site Engine component vocabulary with four first-class learning components: `comparison`, `summary`, `quote`, and `quiz`. The implementation should keep the current fenced YAML authoring contract, validation-first workflow, single-lecture and collection routing behavior, and static review package compatibility.
+
+This is a schema, validation, rendering, fixture, and documentation change. It should not introduce a browser editor, custom component plugin system, external UI library, backend, learner tracking, unsafe HTML rendering, or JavaScript-dependent quiz behavior for P0/P1. The quiz should render as a static teaching check with a clearly labeled answer/explanation area; interactive reveal behavior remains deferred.
+
+## Relevant Existing Files
+
+- `src/lib/lecture-template/types.ts`: owns the `LectureComponentType`, concrete component interfaces, `LectureComponent` union, and render model types. Add comparison, summary, quote, and quiz component interfaces here.
+- `src/lib/lecture-template/validateTemplate.ts`: owns supported component type detection, required field checks, component-specific schema validation, meaningful-section detection, and component normalization. Extend this module for the four new component types and keep author-locatable errors.
+- `src/lib/lecture-template/parseTemplate.ts`: already parses fenced `lecture-component` YAML into `ParsedComponentBlock`; no parser grammar change should be needed unless tests uncover location/context gaps.
+- `src/lib/lecture-template/renderMarkdown.tsx`: renders ordinary Markdown blocks and should remain unchanged unless shared rendering helpers are needed. New lecture components should render through `SectionRenderer`, not through raw Markdown conversion.
+- `src/components/lecture-kit/SectionRenderer.tsx`: dispatches normalized `LectureComponent` objects to React components. Add branches for the four new component types.
+- `src/components/lecture-kit/Callout.tsx`, `ConceptCard.tsx`, `StepList.tsx`, and `CodeBlock.tsx`: existing component style and accessibility patterns to follow for labels, headings, escaping, and compact card layout.
+- `src/components/lecture-kit/`: add new `Comparison.tsx`, `Summary.tsx`, `Quote.tsx`, and `Quiz.tsx` components, or use names that match the existing component naming pattern.
+- `src/app/globals.css`: owns the design system and responsive component styles. Add classes for comparison, summary, quote, and quiz while preserving no horizontal body overflow.
+- `src/components/lecture-kit/LecturePage.tsx`, `CollectionLanding.tsx`, and route files under `src/app/`: should not need behavioral changes because they already consume validated `LectureTemplate` models.
+- `src/lib/lecture-template/reviewPackage.ts`: should not need package-specific logic changes if rendered pages are produced by the normal app and no new source paths are introduced.
+- `tests/lecture-template/validateTemplate.test.ts`: extend validation assertions for accepted new component fixtures and invalid field/list cases.
+- `tests/lecture-template/validate-cli.test.ts`: update unsupported-component CLI expectations because `quiz` becomes supported; keep assertions for field/component/section context.
+- `tests/lecture-template/validate-collection-cli.test.ts`: add collection-mode coverage for templates containing new components if `collection.test.ts` alone does not exercise CLI output.
+- `tests/lecture-template/fixtures.test.ts`: keep the auto-scan fixture suite green after adding new invalid fixtures and changing the unsupported-component fixture.
+- `tests/lecture-template/lecture-components.test.tsx`: extend static rendering assertions for new component components and `SectionRenderer` dispatch.
+- `tests/lecture-template/render-model.test.ts`: add model-level assertions only if useful to prove normalized components keep optional/defaulted fields.
+- `tests/lecture-template/backward-compat.test.tsx`: ensure existing templates still pass and render unchanged.
+- `tests/lecture-template/collection.test.ts`: add or extend collection validation coverage with at least one lecture containing new component types.
+- `tests/lecture-template/review-package.test.ts`: add or extend coverage only if package helper tests assert rendered component compatibility.
+- `examples/component-demo.template.md`: update to show every supported component, including the new P0/P1 component shapes.
+- `examples/invalid/`: add focused invalid fixtures for missing fields and malformed nested lists/options for the new component types.
+- `README.md`: update supported component documentation, examples, and the quiz security/non-goal language.
+- `SKILL.md`: update AI-agent authoring instructions so agents know when to use the new components and stop warning that these four types are unsupported.
+
+## Proposed Implementation Steps
+
+1. Update shared component types.
+   - In `src/lib/lecture-template/types.ts`, expand `LectureComponentType` to include `comparison`, `summary`, `quote`, and `quiz`.
+   - Add:
+     - `ComparisonComponent` with `type`, `title`, `leftLabel`, `rightLabel`, and `items`.
+     - `ComparisonItem` with `label`, `left`, and `right`.
+     - `SummaryComponent` with `type`, `title`, and `items`.
+     - `QuoteComponent` with `type`, `quote`, optional `attribution`, and optional `context`.
+     - `QuizComponent` with `type`, `question`, `options`, `answer`, and optional `explanation`.
+   - Keep normalized TypeScript property names idiomatic camelCase even when authored YAML uses `left_label` and `right_label`.
+
+2. Extend component validation in `validateTemplate.ts`.
+   - Add the new types to `supportedComponents`.
+   - Update unsupported-type hints to list all supported components in a deterministic order.
+   - Reuse existing locator fields (`locator`, `sectionTitle`, `componentType`, `field`, `hint`) so validation output remains copyable into an AI-agent prompt.
+   - For nested component data, use precise `field` paths even though the current parser locates the component block rather than individual YAML item lines. Required field paths include examples such as `items`, `items[0].label`, `items[0].left`, `items[0].right`, `options`, `options[0]`, `answer`, `left_label`, and `right_label`.
+   - Ensure tests assert `componentType`, `field`, `sectionTitle`, and useful hints for representative comparison item and quiz option failures.
+   - Add helper functions where they reduce duplication:
+     - required non-empty string field checks
+     - optional non-empty string field checks
+     - non-empty string-list checks
+     - array-of-record checks for comparison items
+   - Validate `comparison`:
+     - `title` must be a non-empty string.
+     - `items` must be a non-empty list.
+     - each item must be a YAML mapping with non-empty `label`, `left`, and `right`.
+     - optional `left_label` and `right_label`, when present, must be non-empty strings.
+   - Validate `summary`:
+     - `title` must be a non-empty string.
+     - `items` must be a non-empty list of non-empty strings.
+   - Validate `quote`:
+     - `quote` must be a non-empty string.
+     - optional `attribution` and `context`, when present, must be non-empty strings.
+   - Validate `quiz`:
+     - `question` must be a non-empty string.
+     - `options` must contain at least two non-empty strings.
+     - `answer` must be a non-empty string that exactly matches one option after trimming.
+     - optional `explanation`, when present, must be a non-empty string.
+   - Preserve the existing rule that components outside `## Section:` fail with `COMPONENT_OUTSIDE_SECTION`.
+   - Ensure valid new components count as meaningful section content through `isMeaningfulSectionBlock`.
+
+3. Normalize validated component payloads.
+   - Extend `normalizeComponent()` in `validateTemplate.ts` for the new types.
+   - Trim all string values in normalized output, including nested comparison item fields, summary items, quiz options, and answer.
+   - Default `comparison.leftLabel` to `Option A` and `comparison.rightLabel` to `Option B` when optional labels are absent.
+   - Preserve author-provided quiz option order.
+   - Do not normalize invalid payloads into renderable components.
+
+4. Add React components under `src/components/lecture-kit/`.
+   - `Comparison` should render a labeled, accessible comparison block. A semantic table is acceptable if CSS makes it responsive; otherwise use a structured grid with headings that remain visible on mobile.
+   - `Summary` should render a concise recap block using a heading and bullet list, visually distinct from `Callout` and final `Key Takeaways`.
+   - `Quote` should render semantic `blockquote` markup; attribution should be visually connected to the quote, and context should render as supporting prose outside the quoted text.
+   - `Quiz` should render a static knowledge-check card with the question, options, a clearly labeled answer area, and optional explanation. Do not add client-side state for P0/P1.
+   - All components must rely on React escaping and must not use `dangerouslySetInnerHTML`.
+   - Follow existing labels such as `component-label` for screen-readable component identity.
+
+5. Wire component rendering.
+   - Update `SectionRenderer.tsx` imports and dispatch branches for the four new component types.
+   - Keep normal Markdown rendering around components unchanged.
+   - Replace the current `if` chain and silent `return null` fallback with a `switch (component.type)` plus a compile-time `assertNever(component)` fallback. This prevents future union members from being dropped silently.
+   - Add a `SectionRenderer` static-markup test that renders one section containing `comparison`, `summary`, `quote`, and `quiz`; the test should fail if any dispatch branch is missing.
+
+6. Add responsive visual styles.
+   - Extend `src/app/globals.css` with classes for the four new components.
+   - Keep cards at `8px` radius to match the existing design system.
+   - Ensure long labels, long quote text, and long quiz options wrap without clipping.
+   - For comparison, avoid desktop-only horizontal tables unless wrapped in an existing `.table-scroll` style and mobile layout still satisfies the spec. Prefer a layout that stacks naturally under the existing mobile breakpoints.
+   - Preserve `body { overflow-x: clip; }` and verify no component creates body-level horizontal overflow at 390px, 768px, or 1280px.
+
+7. Update valid examples and component gallery.
+   - Update `examples/component-demo.template.md` so it demonstrates all supported components, not just the earlier MVP set.
+   - Include representative examples for `comparison`, `summary`, `quote`, and `quiz`.
+   - Keep the fixture synthetic and source-neutral, matching the existing example style.
+   - Keep all new component blocks inside `## Section:` blocks.
+
+8. Add invalid fixtures for author-locatable validation.
+   - Add focused files under `examples/invalid/` for:
+     - missing `comparison.title`
+     - malformed or empty `comparison.items`
+     - comparison item missing `label`, `left`, or `right`
+     - empty optional `comparison.left_label` or `right_label`
+     - missing or empty `summary.items`
+     - non-string or empty-string `summary.items` entries
+     - missing `quote.quote`
+     - empty optional `quote.attribution` or `quote.context`
+     - `quiz.options` with fewer than two entries
+     - non-string or empty quiz option entries
+     - `quiz.answer` missing or not exactly matching a trimmed option
+     - empty optional `quiz.explanation`
+   - Prefer a small number of fixtures that each exercise a coherent error family instead of one fixture per field when tests can assert multiple errors clearly.
+
+9. Extend automated tests.
+   - In `validateTemplate.test.ts`, assert `examples/component-demo.template.md` remains valid and produces normalized models for the new components.
+   - Add direct inline-template tests for defaults and trimming:
+     - comparison labels default to `Option A` and `Option B`
+     - authored `left_label` and `right_label` override defaults
+     - quiz answer matching uses trimmed values
+   - Add invalid-fixture assertions for each new component's required fields, nested list validation, optional field validation, and quiz answer matching.
+   - Update `examples/invalid/unsupported-component-type.template.md`: `quiz` is now supported, so use a genuinely unsupported type such as `flashcard` or `timeline`.
+   - Update every test that depends on that fixture, including `validateTemplate.test.ts` and `validate-cli.test.ts`, so assertions expect the new unsupported component name and still verify `UNSUPPORTED_COMPONENT_TYPE`, `component=...`, `section=Valid Section`, location, and hint output.
+   - Run `fixtures.test.ts` because it auto-runs every valid and invalid fixture and will catch stale invalid examples that become valid by accident.
+   - Add collection-mode tests:
+     - `collection.test.ts` should validate a temp collection with at least one lecture containing new components.
+     - `validate-collection-cli.test.ts` should verify collection CLI acceptance or output for a collection lecture containing new components if no existing CLI path covers it.
+     - A render test should use a collection lecture template or validated collection lecture model and assert `LecturePage`/`SectionRenderer` renders the new components.
+   - In `lecture-components.test.tsx`, render each new React component directly and through `SectionRenderer`, assert labels/content are present, and assert raw HTML/script-like text is escaped.
+   - Add a static rendering assertion that `Quote` emits `blockquote`.
+   - Keep package/review tests focused; do not duplicate all component validation there unless a package behavior depends on it.
+
+10. Update README and `SKILL.md`.
+   - In `README.md`, replace the old deferred-component warning with examples for all supported component types.
+   - Document when to use each new component:
+     - `comparison` for two-sided contrasts
+     - `summary` for local section recap
+     - `quote` only for short source-grounded excerpts or named statements
+     - `quiz` for teaching checks, not secure assessment
+   - Include the exact YAML authoring shapes and optional fields.
+   - State that unsupported custom component types still fail validation.
+   - In `SKILL.md`, update the supported component list and usage guidance so AI agents stop inventing unsupported alternatives and use new components only when they clarify source-grounded teaching.
+   - Run a repo documentation search for stale language before finishing:
+
+```bash
+rg -n "comparison|summary|quote|quiz|MVP|deferred|unsupported component type" README.md SKILL.md docs examples
+```
+
+   - Update stale references in `README.md`, `SKILL.md`, and `examples/component-demo.template.md`, including older "MVP/deferred" wording and common-error text that still claims these four component types fail validation. Do not rewrite historical spec files or implementation-plan archives unless a current task file would confuse implementers.
+
+11. Verify end to end.
+   - Run focused tests as each layer is implemented:
+
+```bash
+npm run test -- tests/lecture-template/validateTemplate.test.ts
+npm run test -- tests/lecture-template/validate-cli.test.ts
+npm run test -- tests/lecture-template/fixtures.test.ts
+npm run test -- tests/lecture-template/collection.test.ts
+npm run test -- tests/lecture-template/validate-collection-cli.test.ts
+npm run test -- tests/lecture-template/lecture-components.test.tsx
+```
+
+   - Run broad project checks before completion:
+
+```bash
+npm run validate
+npm run test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+   - Run static package smoke verification because the spec calls out package compatibility:
+
+```bash
+npm run package:review
+```
+
+   - Manual responsive check:
+     - Start `npm run dev`.
+     - Preview a template containing all supported components.
+     - Check 390px, 768px, and 1280px widths.
+     - Confirm `document.documentElement.scrollWidth <= document.documentElement.clientWidth`.
+     - Confirm comparison, long quote text, and long quiz options wrap without clipping or overlap.
+
+## Data Model, API, Persistence, Event, And Domain Changes
+
+- Template schema changes:
+  - Add supported component types `comparison`, `summary`, `quote`, and `quiz`.
+  - Components remain fenced YAML blocks with language tag `lecture-component`.
+  - Components remain valid only inside `## Section:` blocks.
+- TypeScript model changes:
+  - Extend `LectureComponentType`, add four component interfaces, and extend the `LectureComponent` union.
+  - Use camelCase in normalized render models for YAML fields such as `left_label` and `right_label`.
+- API/routing changes:
+  - No public route changes.
+  - No collection behavior changes.
+  - No CLI command changes.
+- Persistence/event changes:
+  - No database, backend service, analytics, authentication, learner tracking, or persistent quiz results.
+- Packaging changes:
+  - No package model changes should be required. Static review packages should include the rendered output automatically after the normal app can render the components.
+
+## Test Plan
+
+- Unit validation tests:
+  - valid examples for all new components
+  - missing required fields
+  - empty strings after trimming
+  - malformed/non-list nested structures
+  - optional fields present but empty
+  - comparison item field errors
+  - summary string-list validation
+  - quiz minimum option count
+  - quiz answer exact match after trimming
+  - unsupported-type behavior using a still-unsupported type
+  - field paths on nested validation failures, including `items[0].label`, `items[0].left`, `items[0].right`, `options[0]`, and `answer`
+- Render/model tests:
+  - normalized comparison default labels and optional label overrides
+  - trimmed nested component values
+  - summary items preserved in order
+  - quote optional attribution/context preserved only when present
+  - quiz options preserved in order, answer and explanation rendered clearly
+- React component tests:
+  - direct render for each new component
+  - `SectionRenderer` dispatch for each new component through an exhaustive `switch`/`assertNever` path
+  - `blockquote` semantics for quote
+  - no raw HTML injection
+- Regression tests:
+  - existing valid templates remain valid
+  - existing invalid templates remain invalid with intentional updates where `quiz` is no longer unsupported
+  - `validateCollection` and `validateCollectionCli` work with collection lectures containing new components
+  - `fixtures.test.ts` still passes after adding invalid fixtures and updating `unsupported-component-type.template.md`
+  - review package helper/static package checks do not require component-specific source logic
+
+## Risks, Assumptions, And Open Questions
+
+- Risk: Validation helpers can become hard to read if every component check is added inline. Mitigation: extract small field/list helper functions in `validateTemplate.ts` while keeping all schema rules local to that module.
+- Risk: Nested component validation could be hard to act on if every error points only to the component fence. Mitigation: keep the locator at the component block, but make `field` paths precise and include component/section context in every nested field error.
+- Risk: `quiz.answer` matching could surprise authors if whitespace differs. Mitigation: compare trimmed option strings to the trimmed answer, store trimmed normalized values, and document exact value matching.
+- Risk: Comparison layout can overflow on small screens. Mitigation: use CSS grid or stacked rows with `min-width: 0` and wrapping, and manually check 390px width.
+- Risk: A semantic table for comparison is accessible but may need horizontal scrolling. Mitigation: if using a table, wrap it and verify labels remain visible; otherwise choose a responsive row-card layout with clear headings.
+- Risk: The new `summary` component could visually compete with final `## Key Takeaways`. Mitigation: use subtler styling and document that summary is for local section recap only.
+- Risk: Quote blocks could encourage unsourced invention. Mitigation: `README.md` and `SKILL.md` should explicitly limit quote use to source-grounded short excerpts or named statements.
+- Risk: Static quiz answers visible by default may look like a failed assessment design. Mitigation: label the answer area as teaching-preview or answer key and document that quiz is not secure assessment.
+- Risk: Existing tests use `quiz` as an unsupported component example. Mitigation: update unsupported fixtures/tests to use another unsupported type.
+- Risk: `SectionRenderer` currently drops unhandled component union members silently. Mitigation: require an exhaustive `switch` with `assertNever` and static-markup dispatch tests for all new components.
+- Risk: Documentation and examples still contain historical "MVP/deferred" language. Mitigation: run the repo documentation search in Step 10 and update current docs/examples while leaving historical spec archives alone.
+- Assumption: `parseTemplate.ts` already preserves enough component locator context for new validation errors; no parser changes are expected.
+- Assumption: Existing static review packaging renders through the normal app, so new components require no package-specific data model changes.
+- Open question: How many invalid fixtures should be added versus inline validation test templates? The recommended implementation is to keep fixtures for common author mistakes and use inline templates for narrow normalization edge cases.

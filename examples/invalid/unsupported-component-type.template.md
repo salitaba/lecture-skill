@@ -1,6 +1,6 @@
 ---
 title: "Unsupported Component"
-description: "Uses a deferred component."
+description: "Uses an unsupported component."
 audience: "Engineers"
 duration: "30 minutes"
 level: "beginner"
@@ -17,7 +17,7 @@ This overview is present.
 ## Section: Valid Section
 
 ```lecture-component
-type: quiz
+type: flashcard
 title: "Question"
 body: "Unsupported."
 ```

@@ -137,6 +137,8 @@ steps:
 ```
 ````
 
+The authored type is `step_list`, but the rendered label is `Step-by-step`. Use it only for ordered workflows.
+
 ````markdown
 ```lecture-component
 type: code_block
@@ -145,7 +147,61 @@ code: "Example code or command"
 ```
 ````
 
-Do not use unsupported component types such as `comparison`, `summary`, `quote`, or `quiz`.
+Rendered label: `Code example`. Use code blocks for commands, snippets, and short structured text.
+
+````markdown
+```lecture-component
+type: comparison
+title: "Local State vs Shared State"
+left_label: "Local state"
+right_label: "Shared state"
+items:
+  - label: "Ownership"
+    left: "Owned by one component."
+    right: "Shared across several components."
+```
+````
+
+Rendered label: `Comparison`. Use `comparison` only for clear two-sided contrasts. `left_label` and `right_label` are optional.
+
+````markdown
+```lecture-component
+type: summary
+title: "What to remember"
+items:
+  - "First recap point."
+  - "Second recap point."
+```
+````
+
+Rendered label: `Section summary`. Use `summary` for a local section recap before moving on, not as a replacement for final key takeaways.
+
+````markdown
+```lecture-component
+type: quote
+quote: "Short source-grounded excerpt or named statement."
+attribution: "Original notes"
+context: "Why this quote matters here."
+```
+````
+
+Rendered label: `Source quote`. Use `quote` only for short source-grounded excerpts or named statements. Do not invent quotes or include long passages.
+
+````markdown
+```lecture-component
+type: quiz
+question: "Which command validates the active lecture or collection?"
+options:
+  - "npm run validate"
+  - "npm run dev"
+answer: "npm run validate"
+explanation: "Validation checks the active template or collection."
+```
+````
+
+Rendered label: `Quiz: Knowledge check`. Use `quiz` for static teaching checks that should be visibly recognizable as quizzes. Quizzes render a visible static answer key; they are not secure assessment, grading, learner tracking, hidden-answer tests, learner accounts, or analytics. The `answer` must exactly match one option after trimming whitespace.
+
+Do not invent custom component types. Unsupported component types fail validation.
 
 ## Validation Checklist Before Finishing
 

@@ -1,0 +1,300 @@
+Feature: Core Engine Learning Components
+
+## Product Summary
+
+Extend the main Lecture Site Engine from a structured reading renderer into a stronger teaching engine by adding first-class learning components that educators can place inside lecture sections: comparison, summary, quote, and quiz.
+
+The current engine already does the foundational job well: it reads a predictable lecture template, validates schema shape, renders a polished local lecture page, supports collections, and creates review artifacts. The next core engine gap is instructional expressiveness. Educators can currently use callouts, concept cards, step lists, and code blocks, but common teaching patterns such as comparing ideas, checking understanding, highlighting a source quote, and summarizing a section are still unsupported.
+
+The primary product outcome is: an educator or AI agent can turn raw lecture material into a richer, more teachable template without escaping the supported schema or asking for custom React work. The rendered lecture should still feel consistent, validated, accessible, static-export friendly, and easy for an AI agent to generate deterministically.
+
+This feature is about the main lecture rendering and validation engine. It is not a review workflow, package workflow, hosted publishing workflow, or browser authoring editor.
+
+## Problem
+
+The engine currently has a narrow component vocabulary. That was the right MVP tradeoff because it made validation, rendering, and AI-agent generation reliable. Now that the core workflow exists, the limited component set causes product friction:
+
+- Educators need to compare concepts, tools, tradeoffs, or before/after states using more than plain paragraphs.
+- Generated lectures often need quick knowledge checks, but the engine has no supported quiz component.
+- Source-grounded lessons sometimes need short quoted excerpts or cited statements, but quote blocks are intentionally unsupported.
+- Sections can become long because there is no supported summary component to recap a local idea before moving on.
+- AI agents may invent unsupported component types unless the next supported set is clearly specified and validated.
+
+The result is that a lecture can be valid and readable but still less useful as a teaching surface than it should be.
+
+## Goals
+
+- Add a small set of core learning components that improve teaching value without making the schema open-ended.
+- Keep every new component authored as a `lecture-component` fenced YAML block inside a `## Section:` block.
+- Add validator support with author-locatable errors for every new component type and field.
+- Render every new component with the existing lecture-kit visual system.
+- Keep the single-lecture and collection workflows unchanged.
+- Keep static review package export compatible with the rendered output.
+- Update examples, docs, and AI-agent instructions so new components are used correctly.
+
+## Priority
+
+P0 requirements:
+
+- Add `comparison`, `summary`, `quote`, and `quiz` as supported component types.
+- Validate each new component type with clear required fields and useful error messages.
+- Render each new component in `src/components/lecture-kit/` using accessible, responsive UI.
+- Update Markdown rendering so new components work in single lecture and collection mode.
+- Add valid and invalid examples for every new component.
+- Add focused tests for parsing, validation, rendering, and backward compatibility.
+- Update README and `SKILL.md` so AI agents know when to use each new component and when not to.
+
+P1 requirements:
+
+- Add a component gallery example that shows all supported components in one lecture.
+- Add stronger validation hints for common YAML mistakes in the new components.
+- Add optional quiz answer explanation text.
+- Add optional comparison column labels beyond the default left/right labels.
+
+P2 requirements:
+
+- Add interactive quiz state in the browser while preserving static fallback behavior.
+- Add component-level anchors for deep links to specific components.
+- Add print-friendly styling for comparison and quiz components.
+
+## Non-Goals
+
+- No browser-based authoring editor.
+- No in-app AI generation or LLM API integration.
+- No arbitrary custom component plugin system.
+- No external UI library dependency.
+- No database, backend service, analytics, authentication, or hosted publishing.
+- No change to the required lecture heading structure.
+- No support for embedding unsafe HTML.
+- No automatic grading, learner tracking, or persistent quiz results.
+
+## Design Principles
+
+- Teaching value over decoration. New components should help explain, compare, recall, or verify understanding.
+- Strict schema, clear errors. Every field should be predictable enough for humans and AI agents to author reliably.
+- Static first. Components must render well without a server, database, or network access.
+- Accessible by default. Keyboard navigation, semantic structure, contrast, and readable fallback content are product requirements.
+- Consistent with the existing engine. New components should feel like natural additions to the current lecture-kit, not a separate design system.
+
+## Recommended Experience Direction
+
+### Component: Comparison
+
+Use comparison when a lecture needs to contrast two ideas, tools, approaches, states, or tradeoffs.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: comparison
+title: "Local State vs Shared State"
+left_label: "Local state"
+right_label: "Shared state"
+items:
+  - label: "Ownership"
+    left: "Owned by one component."
+    right: "Shared across several components."
+  - label: "Best use"
+    left: "Simple isolated behavior."
+    right: "Cross-component coordination."
+```
+````
+
+Required fields:
+
+- `type`: `comparison`
+- `title`: non-empty string
+- `items`: non-empty list
+- Each item requires `label`, `left`, and `right`
+
+Optional fields:
+
+- `left_label`: non-empty string, default `Option A`
+- `right_label`: non-empty string, default `Option B`
+
+Rendering requirements:
+
+- Desktop may use a compact comparison table or two-column layout.
+- Mobile must stack cleanly without horizontal body overflow.
+- Labels must remain visible when values wrap.
+- The component must not rely on color alone to communicate difference.
+
+### Component: Summary
+
+Use summary when a section needs a compact recap before the lecture moves on.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: summary
+title: "What to remember"
+items:
+  - "Keep the validation contract small and explicit."
+  - "Use components only when they clarify the source material."
+```
+````
+
+Required fields:
+
+- `type`: `summary`
+- `title`: non-empty string
+- `items`: non-empty list of non-empty strings
+
+Rendering requirements:
+
+- Render as a concise recap block distinct from `callout` and `key takeaways`.
+- Keep bullets readable at phone width.
+- Do not visually compete with the final `## Key Takeaways` section.
+
+### Component: Quote
+
+Use quote only for source-grounded short excerpts or named statements that need emphasis.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: quote
+quote: "Small, source-grounded excerpt or statement."
+attribution: "Original lecture notes"
+context: "Use this quote to introduce the section's main tradeoff."
+```
+````
+
+Required fields:
+
+- `type`: `quote`
+- `quote`: non-empty string
+
+Optional fields:
+
+- `attribution`: non-empty string
+- `context`: non-empty string
+
+Rendering requirements:
+
+- Render with semantic `blockquote` markup.
+- Attribution must be visually connected to the quote when present.
+- Context should render as supporting prose, not as part of the quote.
+- The component must support wrapping long text without clipping.
+
+### Component: Quiz
+
+Use quiz for lightweight knowledge checks inside a lecture section.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: quiz
+question: "Which command validates the active lecture or collection?"
+options:
+  - "npm run validate"
+  - "npm run dev"
+  - "npm run package:review"
+answer: "npm run validate"
+explanation: "Validation checks the active template or collection and exits nonzero on blocking errors."
+```
+````
+
+Required fields:
+
+- `type`: `quiz`
+- `question`: non-empty string
+- `options`: list of at least two non-empty strings
+- `answer`: non-empty string that exactly matches one option
+
+Optional fields:
+
+- `explanation`: non-empty string
+
+Rendering requirements:
+
+- P0 can render a static quiz card with question, options, and an answer/explanation area.
+- If the answer is visible by default, it should be clearly labeled so reviewers understand this is a teaching preview, not a secure test.
+- P2 may add client-side reveal behavior, but the static HTML must remain useful without JavaScript.
+- Options must be readable and keyboard accessible if any interactive behavior is later added.
+
+## Validation Requirements
+
+- Unsupported component types must still fail validation.
+- New component blocks must only be valid inside `## Section:` blocks.
+- Missing required fields must report the component type, field name, active template path, and best available location.
+- Empty strings after trimming must fail for required string fields.
+- Empty lists must fail for required list fields.
+- `comparison.items` must reject missing `label`, `left`, or `right`.
+- `summary.items` must reject non-string and empty-string entries.
+- `quiz.options` must require at least two options.
+- `quiz.answer` must exactly match one option after trimming.
+- Optional fields, when present, must be the expected type and non-empty after trimming.
+- Validation output should remain copyable into an AI-agent prompt.
+
+## Rendering Requirements
+
+- Add or update component models in `src/lib/lecture-template/types.ts`.
+- Update parsing and rendering paths so all new components render through `SectionRenderer`.
+- Keep visual implementation under `src/components/lecture-kit/`.
+- Avoid `dangerouslySetInnerHTML`.
+- Preserve normal Markdown rendering around components.
+- Ensure long text, long labels, and long quiz options wrap without layout overflow.
+- Ensure components render in static export output without runtime network access.
+
+## Documentation Requirements
+
+- README must list all supported component types with examples.
+- `SKILL.md` must tell AI agents when to use each component and warn against unsupported custom types.
+- Examples must include at least one valid lecture using all supported components.
+- Invalid examples must cover missing required fields and malformed nested lists for the new component types.
+- Docs must state that quiz is a teaching check, not a secure assessment system.
+
+## Success Metrics / Quality Gates
+
+- A technical educator can express common teaching patterns without leaving the supported template schema.
+- An AI agent following `SKILL.md` can use the new components without creating validation failures in normal cases.
+- `npm run validate` catches malformed new components with author-locatable messages.
+- Existing valid templates continue to pass unchanged.
+- Existing invalid unsupported component tests are updated intentionally for newly supported types.
+- A component-demo lecture renders all supported components without clipped text, overlap, or body-level horizontal overflow at 390px, 768px, and 1280px.
+- Static review packages include rendered pages that display the new components correctly.
+
+## Functional Requirements
+
+- `comparison`, `summary`, `quote`, and `quiz` are first-class supported component types.
+- Each component has a typed parsed representation.
+- Each component has validation coverage for valid and invalid payloads.
+- Each component has render coverage in React tests.
+- New components work in both `content/lecture.template.md` and `lectures/<slug>/lecture.template.md`.
+- The collection landing page does not need to summarize component usage in P0.
+- The validation command exits nonzero when any new component is malformed.
+- The app route shows the blocking validation screen for malformed new components.
+- Static export and package review workflows require no special cases for the new components.
+
+## Accessibility Requirements
+
+- Quote uses semantic blockquote markup.
+- Quiz options use semantic list markup in the static P0 version.
+- Comparison content preserves meaningful reading order on mobile and for assistive technologies.
+- Component titles use heading levels or labeled regions that do not disrupt the page heading hierarchy.
+- Focus states are visible for any interactive controls introduced later.
+- Color contrast meets WCAG AA for normal text and essential UI states.
+- Component meaning does not depend on color alone.
+
+## Responsive Requirements
+
+- At 390px width, every new component stacks or wraps without page-level horizontal overflow.
+- At 768px width, comparison and quiz layouts remain readable without cramped columns.
+- At 1280px width, components align with the lecture content column and do not become overly wide.
+- Long quote text, comparison labels, and quiz options wrap cleanly.
+- Code-adjacent component content must not cause layout shifts or overlap with section navigation.
+
+## Acceptance Criteria
+
+- `npm run validate` accepts valid templates containing `comparison`, `summary`, `quote`, and `quiz`.
+- `npm run validate` rejects malformed new components with clear field-level errors.
+- A demo template with every supported component renders successfully.
+- Existing valid examples still pass validation.
+- Existing parser, validator, rendering, collection, package, and source-review tests still pass after implementation.
+- README and `SKILL.md` document the new component contracts.
+- No new runtime network dependency is added.
+- No custom HTML rendering is introduced.

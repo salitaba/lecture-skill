@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
 import { errorCodes, fixture, validationErrors } from "./testUtils";
 
+const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz"];
+
 describe("validateTemplateSource", () => {
   it("accepts the active valid template", () => {
     const result = validateTemplateSource(fixture("content/lecture.template.md"));
@@ -17,6 +19,73 @@ describe("validateTemplateSource", () => {
 
   it("accepts the component demo fixture", () => {
     expect(validateTemplateSource(fixture("examples/component-demo.template.md")).valid).toBe(true);
+  });
+
+  it("keeps the component demo as an exact all-components gallery", () => {
+    const result = validateTemplateSource(fixture("examples/component-demo.template.md"));
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const componentTypes = result.template.sections.flatMap((section) =>
+        section.blocks.flatMap((block) => (block.kind === "component" ? [block.component.type] : []))
+      );
+
+      expect(new Set(componentTypes)).toEqual(new Set(supportedComponentTypes));
+      for (const componentType of supportedComponentTypes) {
+        expect(componentTypes).toContain(componentType);
+      }
+    }
+  });
+
+  it("normalizes learning components with defaults, trimmed strings, and preserved order", () => {
+    const result = validateTemplateSource(validLearningComponentsTemplate());
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const components = result.template.sections.flatMap((section) =>
+        section.blocks.flatMap((block) => (block.kind === "component" ? [block.component] : []))
+      );
+
+      expect(components).toContainEqual({
+        type: "comparison",
+        title: "Default labels",
+        leftLabel: "Option A",
+        rightLabel: "Option B",
+        items: [
+          { label: "Ownership", left: "Owned locally", right: "Shared broadly" },
+          { label: "Timing", left: "Before review", right: "After validation" }
+        ]
+      });
+      expect(components).toContainEqual({
+        type: "comparison",
+        title: "Custom labels",
+        leftLabel: "Local",
+        rightLabel: "Shared",
+        items: [{ label: "Scope", left: "One component", right: "Many components" }]
+      });
+      expect(components).toContainEqual({
+        type: "summary",
+        title: "Remember",
+        items: ["Trimmed first", "Trimmed second"]
+      });
+      expect(components).toContainEqual({
+        type: "quote",
+        quote: "Short source-grounded statement.",
+        attribution: "Lecture notes",
+        context: "Introduce the tradeoff."
+      });
+      expect(components).toContainEqual({
+        type: "quote",
+        quote: "A quote can omit attribution and context."
+      });
+      expect(components).toContainEqual({
+        type: "quiz",
+        question: "Which option is correct?",
+        options: ["First", "Second"],
+        answer: "First",
+        explanation: "The answer matches a trimmed option."
+      });
+    }
   });
 
   it("reports missing and empty frontmatter fields", () => {
@@ -56,8 +125,95 @@ describe("validateTemplateSource", () => {
     const unsupported = validationErrors("examples/invalid/unsupported-component-type.template.md").find(
       (error) => error.code === "UNSUPPORTED_COMPONENT_TYPE"
     );
-    expect(unsupported?.componentType).toBe("quiz");
+    expect(unsupported?.componentType).toBe("flashcard");
     expect(unsupported?.sectionTitle).toBe("Valid Section");
+    expect(unsupported?.hint).toContain("comparison");
+    expect(unsupported?.hint).toContain("quiz");
+  });
+
+  it("reports learning component field paths with component, section, locator, and hints", () => {
+    const result = validateTemplateSource(invalidLearningComponentsTemplate());
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const byField = new Map(result.errors.filter((error) => error.code === "INVALID_COMPONENT_FIELD").map((error) => [error.field, error]));
+
+      for (const field of ["items", "items[0].label", "items[0].left", "items[0].right", "options", "options[0]", "answer"]) {
+        expect(byField.has(field), field).toBe(true);
+        const error = byField.get(field);
+        expect(error?.sectionTitle).toBe("Learning Problems");
+        expect(error?.componentType).toMatch(/comparison|quiz/);
+        expect(error?.locator?.line).toBeGreaterThan(0);
+        expect(error?.hint).toBeTruthy();
+      }
+
+      expect(byField.get("items[0].label")?.componentType).toBe("comparison");
+      expect(byField.get("options[0]")?.componentType).toBe("quiz");
+      expect(byField.get("answer")?.componentType).toBe("quiz");
+    }
+  });
+
+  it("keeps lecture components outside section blocks invalid for new component types", () => {
+    const result = validateTemplateSource(`---
+title: "Outside Components"
+description: "Components are outside sections."
+audience: "Engineers"
+duration: "20 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+\`\`\`lecture-component
+type: comparison
+title: "Outside"
+items:
+  - label: "A"
+    left: "B"
+    right: "C"
+\`\`\`
+
+\`\`\`lecture-component
+type: summary
+title: "Outside"
+items:
+  - "One"
+\`\`\`
+
+\`\`\`lecture-component
+type: quote
+quote: "Outside."
+\`\`\`
+
+\`\`\`lecture-component
+type: quiz
+question: "Outside?"
+options:
+  - "Yes"
+  - "No"
+answer: "Yes"
+\`\`\`
+
+## Learning Objectives
+
+- Learn placement.
+
+## Section: Valid Section
+
+Section content.
+
+## Key Takeaways
+
+- Keep components inside sections.
+`);
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const outsideErrors = result.errors.filter((error) => error.code === "COMPONENT_OUTSIDE_SECTION");
+      expect(outsideErrors.map((error) => error.componentType)).toEqual(["comparison", "summary", "quote", "quiz"]);
+    }
   });
 
   it("reports syntax-breaking YAML and fence errors", () => {
@@ -101,3 +257,147 @@ Section content.
     }
   });
 });
+
+function validLearningComponentsTemplate(): string {
+  return `---
+title: "Learning Components"
+description: "Valid learning components."
+audience: "Engineers"
+duration: "30 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn the components.
+
+## Section: Learning Models
+
+\`\`\`lecture-component
+type: comparison
+title: " Default labels "
+items:
+  - label: " Ownership "
+    left: " Owned locally "
+    right: " Shared broadly "
+  - label: " Timing "
+    left: " Before review "
+    right: " After validation "
+\`\`\`
+
+\`\`\`lecture-component
+type: comparison
+title: "Custom labels"
+left_label: " Local "
+right_label: " Shared "
+items:
+  - label: "Scope"
+    left: "One component"
+    right: "Many components"
+\`\`\`
+
+\`\`\`lecture-component
+type: summary
+title: " Remember "
+items:
+  - " Trimmed first "
+  - " Trimmed second "
+\`\`\`
+
+\`\`\`lecture-component
+type: quote
+quote: " Short source-grounded statement. "
+attribution: " Lecture notes "
+context: " Introduce the tradeoff. "
+\`\`\`
+
+\`\`\`lecture-component
+type: quote
+quote: " A quote can omit attribution and context. "
+\`\`\`
+
+\`\`\`lecture-component
+type: quiz
+question: " Which option is correct? "
+options:
+  - " First "
+  - " Second "
+answer: "First"
+explanation: " The answer matches a trimmed option. "
+\`\`\`
+
+## Key Takeaways
+
+- Learning components validate.
+`;
+}
+
+function invalidLearningComponentsTemplate(): string {
+  return `---
+title: "Invalid Learning Components"
+description: "Invalid learning components."
+audience: "Engineers"
+duration: "30 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn the errors.
+
+## Section: Learning Problems
+
+\`\`\`lecture-component
+type: comparison
+title: "Empty items"
+items: []
+\`\`\`
+
+\`\`\`lecture-component
+type: comparison
+title: "Bad item"
+items:
+  - label: ""
+    left: ""
+    right: ""
+\`\`\`
+
+\`\`\`lecture-component
+type: quiz
+question: "Too few options"
+options:
+  - "Only"
+answer: "Only"
+\`\`\`
+
+\`\`\`lecture-component
+type: quiz
+question: "Bad option and answer"
+options:
+  - ""
+  - "Second"
+answer: "Missing"
+\`\`\`
+
+\`\`\`lecture-component
+type: quiz
+question: "Wrong answer"
+options:
+  - "First"
+  - "Second"
+answer: "Missing"
+\`\`\`
+
+## Key Takeaways
+
+- Invalid learning components fail.
+`;
+}

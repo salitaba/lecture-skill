@@ -47,6 +47,22 @@ describe("collection validation CLI", () => {
     });
   });
 
+  it("accepts a collection lecture containing learning components", async () => {
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+    copyFixture("examples/component-demo.template.md", "lectures/02-learning-components/lecture.template.md");
+
+    const result = await validateCollectionCli();
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Collection validation: 2 lectures found");
+    expect(result.stdout).toContain("[PASS] 02-learning-components/lecture.template.md");
+    expect(result.stdout).toContain("2 of 2 lectures passed validation.");
+    expect(result.stderr).toBe("");
+  });
+
   it("prints mixed pass and fail output in authored order", async () => {
     copyFixture(
       "examples/multi-lecture/lectures/01-introduction/lecture.template.md",

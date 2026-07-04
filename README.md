@@ -52,7 +52,7 @@ The worksheet command runs validation, records the result, and still writes a wo
 - `lectures/`: local multi-lecture workspace for collection mode; keep it out of git if you want private course content.
 - `examples/raw-lecture.txt`: golden raw source for MVP evaluation.
 - `examples/golden.template.md`: reviewer reference for the golden workflow.
-- `examples/component-demo.template.md`: valid demo of all supported MVP components.
+- `examples/component-demo.template.md`: valid demo of all supported components.
 - `examples/multi-lecture/`: example collection scaffold for multi-lecture mode.
 - `docs/mvp-review-checklist.md`: human pass/fail review checklist.
 - `docs/golden-conversion-batch.md`: launch-decision record for the three-run golden conversion batch.
@@ -130,7 +130,7 @@ The command owns Next's generated `out/` directory for the current run. If `out/
 
 ## Template Schema
 
-The MVP supports exactly one template schema: YAML frontmatter plus Markdown body sections.
+The engine supports one template schema: YAML frontmatter plus Markdown body sections.
 
 Required frontmatter fields:
 
@@ -176,6 +176,7 @@ body: "Highlighted explanation."
 ````
 
 `variant` must be `note`, `warning`, or `insight`.
+Rendered labels are `Note callout`, `Warning callout`, and `Insight callout`. Use callouts for short notes, warnings, or insights that need emphasis; do not use them for long recaps or source excerpts.
 
 Concept card:
 
@@ -187,7 +188,9 @@ body: "Compact explanation of one concept."
 ```
 ````
 
-Step list:
+Rendered label: `Concept card`. Use a concept card for one compact term, rule, or mental model; do not use it as a general-purpose warning or summary.
+
+Step list (`step_list`):
 
 ````markdown
 ```lecture-component
@@ -199,6 +202,8 @@ steps:
 ```
 ````
 
+Authored type: `step_list`. Rendered label: `Step-by-step`. Use it for ordered workflows; do not use it for unordered facts.
+
 Code block:
 
 ````markdown
@@ -209,7 +214,69 @@ code: "npm run validate"
 ```
 ````
 
-Deferred component types such as `comparison`, `summary`, `quote`, and `quiz` are not supported in MVP and will fail validation.
+Rendered label: `Code example`. Use it for commands, snippets, and short structured text; long lines scroll inside the block instead of widening the page.
+
+Comparison:
+
+````markdown
+```lecture-component
+type: comparison
+title: "Local State vs Shared State"
+left_label: "Local state"
+right_label: "Shared state"
+items:
+  - label: "Ownership"
+    left: "Owned by one component."
+    right: "Shared across several components."
+```
+````
+
+Rendered label: `Comparison`. Use `comparison` for two-sided contrasts. `left_label` and `right_label` are optional and default to `Option A` and `Option B`. Do not use comparison for unrelated lists or more than two sides.
+
+Summary:
+
+````markdown
+```lecture-component
+type: summary
+title: "What to remember"
+items:
+  - "Keep the validation contract small and explicit."
+  - "Use components only when they clarify the source material."
+```
+````
+
+Rendered label: `Section summary`. Use `summary` for a compact recap inside a section, not as a replacement for final key takeaways or a warning callout.
+
+Quote:
+
+````markdown
+```lecture-component
+type: quote
+quote: "Small, source-grounded excerpt or named statement."
+attribution: "Original lecture notes"
+context: "Use this quote to introduce the section's main tradeoff."
+```
+````
+
+Rendered label: `Source quote`. Use `quote` only for short source-grounded excerpts or named statements. `attribution` and `context` are optional. Do not invent quotes or paste long passages.
+
+Quiz (`quiz`):
+
+````markdown
+```lecture-component
+type: quiz
+question: "Which command validates the active lecture or collection?"
+options:
+  - "npm run validate"
+  - "npm run dev"
+answer: "npm run validate"
+explanation: "Validation checks the active template or collection."
+```
+````
+
+Rendered label: `Quiz: Knowledge check`. Use `quiz` for static teaching checks. It is not a secure assessment, grader, tracker, hidden-answer system, learner-account feature, or analytics feature; the visible static answer key is rendered in the page. `explanation` is optional.
+
+Unsupported custom component types still fail validation.
 
 ## Complete Synthetic Template
 
@@ -287,13 +354,13 @@ For the golden MVP workflow, use `examples/raw-lecture.txt` as the only raw sour
 - Missing required section: add the exact heading named in the error.
 - Out-of-order heading: use Overview, Learning Objectives, Section blocks, then Key Takeaways.
 - Component outside section: move the fenced block inside a `## Section: <title>` block.
-- Unsupported component type: use only `callout`, `concept_card`, `step_list`, or `code_block`.
+- Unsupported component type: use only `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, or `quiz`.
 - Malformed YAML: check indentation, quotes, and key/value syntax.
 - Empty list: add at least one bullet item or step.
 
 ## Previewing The Component Demo
 
-To preview all supported components, preserve your active template first, then copy the demo:
+To preview all supported components, preserve your active template first, then copy the visual gallery demo:
 
 ```bash
 cp content/lecture.template.md /tmp/lecture.template.backup.md
@@ -302,7 +369,7 @@ npm run validate
 npm run dev
 ```
 
-This replaces the active render template. Restore your lecture afterward:
+This replaces the active render template. The demo includes every supported component and long-content cases for comparison, quote, quiz, and code overflow review. Restore your lecture afterward:
 
 ```bash
 cp /tmp/lecture.template.backup.md content/lecture.template.md

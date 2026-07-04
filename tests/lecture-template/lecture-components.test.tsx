@@ -2,11 +2,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Callout } from "../../src/components/lecture-kit/Callout";
 import { CodeBlock } from "../../src/components/lecture-kit/CodeBlock";
+import { Comparison } from "../../src/components/lecture-kit/Comparison";
 import { ConceptCard } from "../../src/components/lecture-kit/ConceptCard";
 import { LectureHeader } from "../../src/components/lecture-kit/LectureHeader";
+import { Quiz } from "../../src/components/lecture-kit/Quiz";
+import { Quote } from "../../src/components/lecture-kit/Quote";
 import { SectionNavigation } from "../../src/components/lecture-kit/SectionNavigation";
 import { SectionRenderer } from "../../src/components/lecture-kit/SectionRenderer";
 import { StepList } from "../../src/components/lecture-kit/StepList";
+import { Summary } from "../../src/components/lecture-kit/Summary";
 import { ValidationScreen } from "../../src/components/lecture-kit/ValidationScreen";
 import { lectureNavigationTargets } from "../../src/lib/lecture-template/navigationTargets";
 import { ACTIVE_TEMPLATE_PATH } from "../../src/lib/lecture-template/readTemplate";
@@ -79,24 +83,222 @@ describe("lecture component UX contracts", () => {
     }
   });
 
-  it("renders supported component labels and content without raw HTML injection", () => {
+  it("renders every supported component label and core content", () => {
     const html = renderToStaticMarkup(
       <>
-        <Callout component={{ type: "callout", variant: "warning", title: "Careful", body: "Avoid <script>alert(1)</script>" }} />
+        <Callout component={{ type: "callout", variant: "note", title: "Note", body: "Useful context" }} />
+        <Callout component={{ type: "callout", variant: "warning", title: "Careful", body: "Avoid a mistake" }} />
+        <Callout component={{ type: "callout", variant: "insight", title: "Insight", body: "Connect ideas" }} />
         <ConceptCard component={{ type: "concept_card", title: "Concept", body: "One idea" }} />
         <StepList component={{ type: "step_list", title: "Workflow", steps: ["First step", "Second step"] }} />
         <CodeBlock component={{ type: "code_block", language: "ts", code: "const value = '<unsafe>'; // should escape" }} />
+        <Comparison
+          component={{
+            type: "comparison",
+            title: "Local vs Shared",
+            leftLabel: "Local",
+            rightLabel: "Shared",
+            items: [{ label: "Ownership", left: "One component", right: "Many components" }]
+          }}
+        />
+        <Summary component={{ type: "summary", title: "Remember", items: ["Keep schema explicit", "Validate before preview"] }} />
+        <Quote component={{ type: "quote", quote: "Short source-grounded excerpt.", attribution: "Lecture notes" }} />
+        <Quiz
+          component={{
+            type: "quiz",
+            question: "Which command validates?",
+            options: ["npm run validate", "npm run dev"],
+            answer: "npm run validate",
+            explanation: "Validation checks the template."
+          }}
+        />
       </>
     );
 
+    expect(html).toContain("Note callout");
     expect(html).toContain("Warning callout");
+    expect(html).toContain("Insight callout");
     expect(html).toContain("Concept card");
-    expect(html).toContain("Step list");
+    expect(html).toContain("Step-by-step");
     expect(html).toContain("Code example");
     expect(html).toContain("ts");
-    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("Comparison");
+    expect(html).toContain("Section summary");
+    expect(html).toContain("Source quote");
+    expect(html).toContain("Quiz: Knowledge check");
     expect(html).toContain("&lt;unsafe&gt;");
-    expect(html).not.toContain("<script>alert(1)</script>");
+  });
+
+  it("renders comparison values with programmatic topic and side context", () => {
+    const html = renderToStaticMarkup(
+      <Comparison
+        component={{
+          type: "comparison",
+          title: "Local vs Shared",
+          leftLabel: "Local",
+          rightLabel: "Shared",
+          items: [{ label: "Ownership", left: "One component", right: "Many components" }]
+        }}
+      />
+    );
+
+    const topicLabelId = html.match(/<span id="([^"]+)">Topic<\/span>/)?.[1];
+    const leftLabelId = html.match(/<span id="([^"]+)">Local<\/span>/)?.[1];
+    const rightLabelId = html.match(/<span id="([^"]+)">Shared<\/span>/)?.[1];
+    const topicId = html.match(/<h4 id="([^"]+)" aria-labelledby="[^"]+">Ownership<\/h4>/)?.[1];
+
+    expect(topicLabelId).toBeTruthy();
+    expect(leftLabelId).toBeTruthy();
+    expect(rightLabelId).toBeTruthy();
+    expect(topicId).toBeTruthy();
+    expect(html).toContain(`<h4 id="${topicId}" aria-labelledby="${topicLabelId} ${topicId}">Ownership</h4>`);
+    expect(html).toContain(`<p aria-labelledby="${topicId} ${leftLabelId}">One component</p>`);
+    expect(html).toContain(`<p aria-labelledby="${topicId} ${rightLabelId}">Many components</p>`);
+  });
+
+  it("renders quiz as a static teaching check and quote as blockquote", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Quote
+          component={{
+            type: "quote",
+            quote: "Short source-grounded excerpt.",
+            attribution: "Lecture notes",
+            context: "Use this before a tradeoff."
+          }}
+        />
+        <Quiz
+          component={{
+            type: "quiz",
+            question: "Which command validates?",
+            options: ["npm run validate", "npm run dev"],
+            answer: "npm run validate",
+            explanation: "Validation checks the template."
+          }}
+        />
+      </>
+    );
+
+    expect(html).toContain("Source quote");
+    expect(html).toContain("<blockquote>");
+    expect(html).toContain("<figcaption>Lecture notes</figcaption>");
+    expect(html).toContain("Quiz: Knowledge check");
+    expect(html).toContain('<h3 class="quiz-question">Which command validates?</h3>');
+    expect(html).toContain('<ol class="quiz-options">');
+    expect(html).toContain("Static answer key");
+    expect(html).toContain('<p class="quiz-answer-value">npm run validate</p>');
+    expect(html).toContain("Validation checks the template.");
+  });
+
+  it("escapes raw HTML-like text in every component type", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <Callout component={{ type: "callout", variant: "warning", title: "Careful <script>alert(0)</script>", body: "Avoid <img src=x onerror=alert(0)>" }} />
+        <ConceptCard component={{ type: "concept_card", title: "Concept <script>alert(0)</script>", body: "<img src=x onerror=alert(0)>" }} />
+        <StepList component={{ type: "step_list", title: "Workflow <script>alert(0)</script>", steps: ["<img src=x onerror=alert(0)>"] }} />
+        <CodeBlock component={{ type: "code_block", language: "html", code: "<script>alert(0)</script><img src=x onerror=alert(0)>" }} />
+        <Comparison
+          component={{
+            type: "comparison",
+            title: "Compare <script>alert(1)</script>",
+            leftLabel: "Left",
+            rightLabel: "Right",
+            items: [{ label: "Label", left: "<img src=x onerror=alert(1)>", right: "Safe text" }]
+          }}
+        />
+        <Summary component={{ type: "summary", title: "Summary", items: ["<script>alert(2)</script>"] }} />
+        <Quote component={{ type: "quote", quote: "<script>alert(3)</script>" }} />
+        <Quiz
+          component={{
+            type: "quiz",
+            question: "Run <script>alert(4)</script>?",
+            options: ["<script>alert(5)</script>", "No"],
+            answer: "<script>alert(5)</script>"
+          }}
+        />
+      </>
+    );
+
+    expect(html).toContain("&lt;script&gt;alert(0)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).toContain("&lt;script&gt;alert(5)&lt;/script&gt;");
+    expect(html).not.toContain("<script>alert");
+    expect(html).not.toContain("<img src=x");
+  });
+
+  it("dispatches every supported component through SectionRenderer with surrounding Markdown", () => {
+    const html = renderToStaticMarkup(
+      <SectionRenderer
+        index={0}
+        section={{
+          title: "Learning Components",
+          anchor: "learning-components",
+          blocks: [
+            { kind: "paragraph", text: "Before components.", locator: { line: 1 } },
+            {
+              kind: "component",
+              locator: { line: 2 },
+              component: { type: "callout", variant: "note", title: "Note", body: "Context" }
+            },
+            {
+              kind: "component",
+              locator: { line: 3 },
+              component: { type: "concept_card", title: "Concept", body: "One idea" }
+            },
+            {
+              kind: "component",
+              locator: { line: 4 },
+              component: { type: "step_list", title: "Workflow", steps: ["First", "Second"] }
+            },
+            {
+              kind: "component",
+              locator: { line: 5 },
+              component: { type: "code_block", language: "ts", code: "const valid = true;" }
+            },
+            {
+              kind: "component",
+              locator: { line: 6 },
+              component: {
+                type: "comparison",
+                title: "A vs B",
+                leftLabel: "A",
+                rightLabel: "B",
+                items: [{ label: "Use", left: "One", right: "Two" }]
+              }
+            },
+            {
+              kind: "component",
+              locator: { line: 7 },
+              component: { type: "summary", title: "Recap", items: ["One recap"] }
+            },
+            {
+              kind: "component",
+              locator: { line: 8 },
+              component: { type: "quote", quote: "Quoted text" }
+            },
+            {
+              kind: "component",
+              locator: { line: 9 },
+              component: { type: "quiz", question: "Question?", options: ["Yes", "No"], answer: "Yes" }
+            },
+            { kind: "paragraph", text: "After components.", locator: { line: 10 } }
+          ]
+        }}
+      />
+    );
+
+    expect(html).toContain("Before components.");
+    expect(html).toContain("Note callout");
+    expect(html).toContain("Concept card");
+    expect(html).toContain("Step-by-step");
+    expect(html).toContain("Code example");
+    expect(html).toContain("A vs B");
+    expect(html).toContain("Recap");
+    expect(html).toContain("<blockquote>");
+    expect(html).toContain("Quiz: Knowledge check");
+    expect(html).toContain("Static answer key");
+    expect(html).toContain("After components.");
   });
 });
 

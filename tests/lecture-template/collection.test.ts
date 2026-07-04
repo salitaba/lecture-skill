@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isCollectionMode, scanLectureCollection, validateCollection } from "../../src/lib/lecture-template/collection";
 
 const repoRoot = process.cwd();
+const supportedComponentTypes = ["callout", "concept_card", "step_list", "code_block", "comparison", "summary", "quote", "quiz"];
 let tempRoot = "";
 
 describe("collection scanning", () => {
@@ -85,6 +86,32 @@ describe("collection scanning", () => {
     });
     expect(validation.results[1].template?.metadata.title).toBe("Invalid Level");
     expect(validation.results[1].errors.map((error) => error.code)).toContain("INVALID_LEVEL");
+  });
+
+  it("validates collection lectures that contain learning components", async () => {
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+    copyFixture("examples/component-demo.template.md", "lectures/02-learning-components/lecture.template.md");
+
+    const validation = await validateCollection();
+
+    expect(validation.lectureCount).toBe(2);
+    expect(validation.allPassed).toBe(true);
+    expect(validation.results[1]).toMatchObject({
+      slug: "02-learning-components",
+      valid: true
+    });
+    const componentTypes =
+      validation.results[1].template?.sections.flatMap((section) =>
+        section.blocks.flatMap((block) => (block.kind === "component" ? [block.component.type] : []))
+      ) ?? [];
+
+    expect(new Set(componentTypes)).toEqual(new Set(supportedComponentTypes));
+    for (const componentType of supportedComponentTypes) {
+      expect(componentTypes).toContain(componentType);
+    }
   });
 });
 

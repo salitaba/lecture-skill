@@ -1,6 +1,7 @@
 import { parseLectureTemplate } from "./parseTemplate";
 import type {
   LectureComponent,
+  LectureComponentType,
   LectureLevel,
   MarkdownBlock,
   ParsedComponentBlock,
@@ -13,7 +14,16 @@ import type {
 const requiredFrontmatter = ["title", "description", "audience", "duration", "level"] as const;
 const allowedLevels: LectureLevel[] = ["beginner", "intermediate", "advanced"];
 const allowedCalloutVariants = ["note", "warning", "insight"] as const;
-const supportedComponents = ["callout", "concept_card", "step_list", "code_block"] as const;
+const supportedComponents = [
+  "callout",
+  "concept_card",
+  "step_list",
+  "code_block",
+  "comparison",
+  "summary",
+  "quote",
+  "quiz"
+] as const satisfies readonly LectureComponentType[];
 
 export function validateTemplateSource(source: string): ValidationResult {
   return validateParsedTemplate(parseLectureTemplate(source));
@@ -234,7 +244,7 @@ function validateComponent(block: ParsedComponentBlock, errors: ValidationError[
       locator: block.locator,
       sectionTitle,
       componentType: type,
-      hint: "Use one of: callout, concept_card, step_list, code_block."
+      hint: supportedComponentHint()
     });
     return;
   }
@@ -277,6 +287,40 @@ function validateComponent(block: ParsedComponentBlock, errors: ValidationError[
   if (type === "code_block") {
     requireStringFields(block, sectionTitle, errors, ["language", "code"]);
   }
+
+  if (type === "comparison") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    optionalStringFields(block, sectionTitle, errors, ["left_label", "right_label"]);
+    validateComparisonItems(block, sectionTitle, errors);
+  }
+
+  if (type === "summary") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    validateStringListField(block, sectionTitle, errors, "items", { minimumItems: 1 });
+  }
+
+  if (type === "quote") {
+    requireStringFields(block, sectionTitle, errors, ["quote"]);
+    optionalStringFields(block, sectionTitle, errors, ["attribution", "context"]);
+  }
+
+  if (type === "quiz") {
+    requireStringFields(block, sectionTitle, errors, ["question", "answer"]);
+    optionalStringFields(block, sectionTitle, errors, ["explanation"]);
+    const trimmedOptions = validateStringListField(block, sectionTitle, errors, "options", { minimumItems: 2 });
+    const answer = stringValue(block.data.answer);
+    if (answer && trimmedOptions.length >= 2 && !trimmedOptions.includes(answer)) {
+      errors.push({
+        code: "INVALID_COMPONENT_FIELD",
+        message: "quiz.answer must exactly match one option.",
+        locator: block.locator,
+        sectionTitle,
+        componentType: "quiz",
+        field: "answer",
+        hint: "Set answer: to the exact text of one quiz option after trimming whitespace."
+      });
+    }
+  }
 }
 
 function requireStringFields(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[], fields: string[]) {
@@ -286,6 +330,105 @@ function requireStringFields(block: ParsedComponentBlock, sectionTitle: string, 
       errors.push(componentFieldError(block, sectionTitle, field, `${block.componentType ?? block.data.type} is missing required field "${field}".`));
     }
   }
+}
+
+function optionalStringFields(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[], fields: string[]) {
+  if (!isRecord(block.data)) return;
+  for (const field of fields) {
+    if (field in block.data && (typeof block.data[field] !== "string" || String(block.data[field]).trim() === "")) {
+      errors.push(
+        componentFieldError(block, sectionTitle, field, `${block.componentType ?? block.data.type}.${field} must be a non-empty string when present.`)
+      );
+    }
+  }
+}
+
+function validateComparisonItems(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data)) return;
+  const items = block.data.items;
+  if (!Array.isArray(items) || items.length === 0) {
+    errors.push({
+      code: "INVALID_COMPONENT_FIELD",
+      message: "comparison.items must be a non-empty YAML list of mappings.",
+      locator: block.locator,
+      sectionTitle,
+      componentType: "comparison",
+      field: "items",
+      hint: "Add comparison items with label, left, and right fields."
+    });
+    return;
+  }
+
+  items.forEach((item, index) => {
+    if (!isRecord(item)) {
+      errors.push({
+        code: "INVALID_COMPONENT_FIELD",
+        message: `comparison.items[${index}] must be a YAML mapping.`,
+        locator: block.locator,
+        sectionTitle,
+        componentType: "comparison",
+        field: `items[${index}]`,
+        hint: "Use a YAML mapping such as - label: Ownership, left: Local, right: Shared."
+      });
+      return;
+    }
+
+    for (const field of ["label", "left", "right"] as const) {
+      if (typeof item[field] !== "string" || item[field].trim() === "") {
+        errors.push({
+          code: "INVALID_COMPONENT_FIELD",
+          message: `comparison.items[${index}].${field} must be a non-empty string.`,
+          locator: block.locator,
+          sectionTitle,
+          componentType: "comparison",
+          field: `items[${index}].${field}`,
+          hint: `Add a non-empty ${field}: value to this comparison item.`
+        });
+      }
+    }
+  });
+}
+
+function validateStringListField(
+  block: ParsedComponentBlock,
+  sectionTitle: string,
+  errors: ValidationError[],
+  field: string,
+  options: { minimumItems: number }
+): string[] {
+  if (!isRecord(block.data)) return [];
+  const value = block.data[field];
+  const componentType = String(block.data.type);
+  if (!Array.isArray(value) || value.length < options.minimumItems) {
+    errors.push({
+      code: "INVALID_COMPONENT_FIELD",
+      message: `${componentType}.${field} must be a YAML list with at least ${options.minimumItems} ${options.minimumItems === 1 ? "item" : "items"}.`,
+      locator: block.locator,
+      sectionTitle,
+      componentType,
+      field,
+      hint: `Add ${field}: as a YAML list of non-empty strings.`
+    });
+    return [];
+  }
+
+  const trimmed: string[] = [];
+  value.forEach((item, index) => {
+    if (typeof item !== "string" || item.trim() === "") {
+      errors.push({
+        code: "INVALID_COMPONENT_FIELD",
+        message: `${componentType}.${field}[${index}] must be a non-empty string.`,
+        locator: block.locator,
+        sectionTitle,
+        componentType,
+        field: `${field}[${index}]`,
+        hint: `Use a quoted string for ${field}[${index}].`
+      });
+      return;
+    }
+    trimmed.push(item.trim());
+  });
+  return trimmed;
 }
 
 function componentFieldError(block: ParsedComponentBlock, sectionTitle: string, field: string, message: string): ValidationError {
@@ -353,7 +496,52 @@ function normalizeComponent(block: ParsedComponentBlock): LectureComponent | und
   if (data.type === "code_block") {
     return { type: "code_block", language: stringValue(data.language), code: stringValue(data.code) };
   }
+  if (data.type === "comparison") {
+    const items = Array.isArray(data.items) ? data.items.filter(isRecord) : [];
+    return {
+      type: "comparison",
+      title: stringValue(data.title),
+      leftLabel: stringValue(data.left_label) || "Option A",
+      rightLabel: stringValue(data.right_label) || "Option B",
+      items: items.map((item) => ({
+        label: stringValue(item.label),
+        left: stringValue(item.left),
+        right: stringValue(item.right)
+      }))
+    };
+  }
+  if (data.type === "summary") {
+    return {
+      type: "summary",
+      title: stringValue(data.title),
+      items: Array.isArray(data.items) ? data.items.map(stringValue) : []
+    };
+  }
+  if (data.type === "quote") {
+    const attribution = stringValue(data.attribution);
+    const context = stringValue(data.context);
+    return {
+      type: "quote",
+      quote: stringValue(data.quote),
+      ...(attribution ? { attribution } : {}),
+      ...(context ? { context } : {})
+    };
+  }
+  if (data.type === "quiz") {
+    const explanation = stringValue(data.explanation);
+    return {
+      type: "quiz",
+      question: stringValue(data.question),
+      options: Array.isArray(data.options) ? data.options.map(stringValue) : [],
+      answer: stringValue(data.answer),
+      ...(explanation ? { explanation } : {})
+    };
+  }
   return undefined;
+}
+
+function supportedComponentHint(): string {
+  return `Use one of: ${supportedComponents.join(", ")}.`;
 }
 
 function missingHeading(errors: ValidationError[], count: number, heading: string) {

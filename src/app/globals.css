@@ -77,6 +77,19 @@ summary:focus-visible {
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 h1,
@@ -237,6 +250,7 @@ summary .nav-summary-count {
   display: grid;
   min-width: 0;
   gap: 26px;
+  overflow-x: clip;
 }
 
 .lecture-panel,
@@ -288,6 +302,12 @@ summary .nav-summary-count {
   border-left-width: 5px;
   border-radius: 8px;
   background: var(--surface-soft);
+  overflow-wrap: anywhere;
+}
+
+.lecture-component h3,
+.lecture-component h4 {
+  min-width: 0;
 }
 
 .callout-note {
@@ -351,7 +371,157 @@ summary .nav-summary-count {
   font-weight: 800;
 }
 
+.comparison {
+  background: var(--surface);
+  border-left-color: var(--accent);
+}
+
+.comparison-list {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.comparison-header,
+.comparison-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+
+.comparison-header {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.comparison-row {
+  padding: 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.comparison-row > div {
+  min-width: 0;
+}
+
+.comparison-row h4,
+.comparison-row p {
+  min-width: 0;
+  margin: 0;
+}
+
+.comparison-row h4 {
+  font-size: 1rem;
+}
+
+.comparison-cell-label {
+  display: none;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.summary-card {
+  background: #f8fafc;
+  border-left-color: var(--border-strong);
+}
+
+.summary-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 22px;
+}
+
+.quote-card {
+  background: #fffbeb;
+  border-left-color: #b45309;
+}
+
+.quote-context {
+  margin: 0 0 10px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.quote-card blockquote {
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 0 16px;
+  border-left: 3px solid #b45309;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.quote-card blockquote p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.quote-card figcaption {
+  margin-top: 10px;
+  color: var(--muted);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.quiz-card {
+  background: #f0f9ff;
+  border-left-color: #0369a1;
+}
+
+.quiz-question {
+  font-size: 1.14rem;
+}
+
+.quiz-options {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.quiz-options li {
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.quiz-answer {
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  border-left: 4px solid #0369a1;
+}
+
+.quiz-answer p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.quiz-answer-label {
+  color: #075985;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.quiz-explanation {
+  margin-top: 8px !important;
+  color: var(--muted);
+}
+
 .code-block {
+  contain: inline-size;
+  max-width: 100%;
   padding: 0;
   overflow: hidden;
   background: var(--code-bg);
@@ -373,7 +543,15 @@ summary .nav-summary-count {
   font-weight: 700;
 }
 
+.code-block figcaption span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 pre {
+  contain: inline-size paint;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   margin: 0;
   overflow-x: auto;
@@ -381,6 +559,10 @@ pre {
 }
 
 code {
+  display: block;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.92rem;
 }
@@ -704,6 +886,18 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .comparison-header {
+    display: none;
+  }
+
+  .comparison-row {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-cell-label {
+    display: block;
+  }
+
   .lecture-nav {
     width: min(100% - 24px, 1160px);
     padding-top: 18px;
@@ -718,5 +912,43 @@ td {
   .lecture-nav-back,
   .lecture-nav-next {
     justify-self: stretch;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .lecture-component,
+  .comparison-row,
+  .quote-card,
+  .quiz-card,
+  .quiz-answer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .comparison-header,
+  .comparison-row {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .quote-card blockquote,
+  .quote-card figcaption,
+  .quiz-answer {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .quiz-answer {
+    border-color: #666666;
+    border-left-color: #000000;
+  }
+
+  pre {
+    white-space: pre-wrap;
+    overflow-x: visible;
   }
 }

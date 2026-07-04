@@ -1,0 +1,294 @@
+Feature: Improve Component UX
+
+## Product Summary
+
+Improve the visual design, discoverability, accessibility, and teaching usefulness of every supported Lecture Site Engine component: `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, and `quiz`.
+
+The engine now supports a richer component vocabulary, but the current component experience is still uneven. Some components communicate their role clearly, while others can be missed or misunderstood. For example, the `quiz` component renders as a static knowledge check, but the visible label and answer treatment can make it feel like generic content instead of an intentional quiz. Newer learning components need stronger hierarchy, clearer labels, better spacing, and more consistent behavior across desktop, tablet, mobile, and static review packages.
+
+The primary product outcome is: a reviewer, educator, or learner can immediately recognize what each component is, why it appears in the lesson, and how to read it. The component gallery should feel like a polished teaching surface rather than a list of technically valid cards.
+
+This feature is about improving the existing component presentation and component demo. It is not a schema expansion, new authoring workflow, or interactive learning platform.
+
+## Problem
+
+The current component UX is valid but not yet strong enough for a teaching engine:
+
+- Component labels are sometimes technically accurate but not user-facing enough. `quiz` appears as "Knowledge check", which can make users think quiz is unsupported or missing.
+- All component cards share similar weight, so their teaching roles are not always obvious at a glance.
+- The component demo does not make each component's purpose and state obvious enough for manual review.
+- Static quiz rendering exposes the answer by design, but the answer area needs better framing so it feels intentional rather than like a leaked answer.
+- Comparison is useful, but dense rows can feel table-like without enough visual guidance.
+- Summary can compete visually with callouts or final key takeaways if its treatment is too strong.
+- Quote needs clearer distinction between context, quoted text, and attribution.
+- Code blocks need robust long-line handling while still feeling connected to the surrounding lesson.
+- Existing components should feel like one coherent component system, not additions from different design passes.
+
+The result is that supported components work, but users may not trust or understand the component set without reading the source template.
+
+## Goals
+
+- Make every supported component visually self-explanatory in the rendered page.
+- Make `quiz` obviously visible as a quiz while preserving the static answer-key behavior.
+- Improve the component demo so it is an effective gallery for reviewing all supported components.
+- Strengthen visual hierarchy and spacing without making components dominate the lecture.
+- Improve responsive behavior for all components at phone, tablet, and desktop widths.
+- Preserve static export compatibility and local-first rendering.
+- Preserve the existing authoring schema and validation contract.
+- Keep accessibility as a first-class requirement, including semantic markup, visible focus, readable labels, and no color-only meaning.
+
+## Priority
+
+P0 requirements:
+
+- Update visible component labels so each supported component is unmistakable:
+  - `callout`: Note, Warning, or Insight callout.
+  - `concept_card`: Concept card.
+  - `step_list`: Step-by-step.
+  - `code_block`: Code example.
+  - `comparison`: Comparison.
+  - `summary`: Section summary.
+  - `quote`: Source quote.
+  - `quiz`: Quiz or Quiz: Knowledge check.
+- Improve quiz UI so the question, options, answer key, and optional explanation are visually distinct.
+- Improve the component demo so all supported components are easy to find and review.
+- Ensure all components wrap long text without clipping or body-level horizontal overflow at 390px, 768px, and 1280px.
+- Ensure component labels and headings are accessible to screen readers.
+- Add focused rendering tests for visible labels, semantic markup, escaping, and component-demo coverage.
+
+P1 requirements:
+
+- Add subtle component-specific visual affordances such as compact icons, badges, or structured sublabels if they fit the existing design system.
+- Improve print-friendly behavior for comparison, quote, and quiz.
+- Add optional visual grouping in the component demo, such as "Highlight", "Structure", "Evidence", and "Check understanding".
+- Add screenshot or browser-driven checks for component-demo overflow.
+
+P2 requirements:
+
+- Add optional client-side quiz reveal behavior while preserving useful static HTML without JavaScript.
+- Add component-level anchors for deep links to specific components.
+- Add a dedicated component gallery route if examples become too large for one template.
+
+## Non-Goals
+
+- No new supported component types.
+- No schema changes to existing component YAML.
+- No new required component fields.
+- No browser-based authoring editor.
+- No grading, scoring, persistence, learner accounts, analytics, or secure assessment.
+- No external UI library dependency.
+- No runtime network dependency.
+- No unsafe HTML rendering.
+- No redesign of the whole lecture page unless required to make component UX coherent.
+
+## Design Principles
+
+- Component role first. A user should know whether they are seeing a warning, concept, workflow, quote, comparison, recap, code example, or quiz before reading every word.
+- Teaching over decoration. Visual differences should clarify use, not add noise.
+- Static first. Components must remain useful in static export and without JavaScript.
+- Accessible by default. Semantics, contrast, keyboard behavior, labels, and wrapping are product requirements.
+- Consistent but not identical. Components should share a system while still expressing different teaching roles.
+- Demo as contract. The component demo should be the easiest way to inspect the supported component set and catch regressions.
+
+## Recommended Experience Direction
+
+### Global Component System
+
+All components should share a recognizable base:
+
+- Consistent card radius, border treatment, internal spacing, and typography scale.
+- A visible component label that uses user-facing language, not only internal schema names.
+- A clear heading or primary content area.
+- Enough spacing between label, heading, body, and nested lists.
+- Long text wrapping with `min-width: 0`, `overflow-wrap`, or equivalent constraints.
+- No body-level horizontal overflow.
+- No color-only distinction; labels, text, borders, or structure must carry meaning.
+
+Avoid making every component the same color block. Use restrained differences in border, background, label, and layout to communicate role.
+
+### Callout
+
+Use callout for short notes, warnings, and insights.
+
+UX requirements:
+
+- The visible label must include the variant: `Note callout`, `Warning callout`, or `Insight callout`.
+- Warning callouts must not rely on red alone; the label and border should communicate severity.
+- Callout body text should remain short and readable.
+- Multiple callouts in a row should not feel like unrelated alert boxes.
+
+### Concept Card
+
+Use concept card for one compact idea, definition, rule, or mental model.
+
+UX requirements:
+
+- The component should feel like a framed concept, not a warning or generic note.
+- Title should be prominent but not larger than section headings.
+- Body should have comfortable line length and wrapping.
+- It should remain visually distinct from `summary`.
+
+### Step List
+
+Use step list for ordered workflows.
+
+UX requirements:
+
+- The label should make the ordered workflow role clear, such as `Step-by-step`.
+- Step numbers should remain visible and aligned when text wraps.
+- Long step text must not overlap the number badge.
+- Mobile layout should preserve scan speed for multi-step workflows.
+
+### Code Block
+
+Use code block for commands, snippets, and short structured text.
+
+UX requirements:
+
+- The language label should be visible and readable.
+- Long lines should scroll inside the code block only, never at page level.
+- The caption should distinguish "Code example" from ordinary prose.
+- The component should preserve whitespace and escaping.
+- The code block should not visually overpower surrounding learning content.
+
+### Comparison
+
+Use comparison for two-sided contrasts.
+
+UX requirements:
+
+- The label must clearly say `Comparison`.
+- The title should explain what is being compared.
+- Left and right labels must be visible and accessible.
+- Each row should preserve the relationship between item label, left value, and right value.
+- Desktop may use a grid or table-like layout; mobile should stack each comparison item cleanly.
+- Screen readers must receive enough context to understand each value's side.
+- Dense comparison rows should have enough spacing to avoid looking like raw data output.
+
+### Summary
+
+Use summary for a compact recap inside a section.
+
+UX requirements:
+
+- The label must clearly say `Section summary`.
+- Styling should be calmer than callouts and less dominant than final key takeaways.
+- Bullet spacing should support quick scanning.
+- The component should feel like a local recap, not a second takeaways section.
+
+### Quote
+
+Use quote only for short source-grounded excerpts or named statements.
+
+UX requirements:
+
+- The label must clearly say `Source quote`.
+- Use semantic `blockquote`.
+- Context, quote text, and attribution must be visually distinct.
+- Attribution should feel attached to the quote, not like unrelated prose.
+- Long quote text should wrap without clipping or layout shift.
+- The design should discourage long pasted passages by keeping the quote treatment optimized for short excerpts.
+
+### Quiz
+
+Use quiz for static teaching checks.
+
+UX requirements:
+
+- The visible label must include the word `Quiz`, such as `Quiz: Knowledge check`.
+- The question should be the strongest content in the card.
+- Options should read like possible answers, not generic bullets.
+- The answer key must be clearly labeled and visually separated from options.
+- If explanation is present, it should appear as teaching feedback under the answer.
+- The card must communicate that this is a static teaching check, not a secure hidden-answer assessment.
+- The answer area should not look accidental or leaked.
+- Long questions, options, answers, and explanations must wrap cleanly at phone width.
+
+## Component Demo Requirements
+
+The component demo should become the canonical visual gallery for all supported components.
+
+Requirements:
+
+- Include every supported component: `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, and `quiz`.
+- Make every component easy to find from rendered text, especially `quiz`.
+- Include realistic long-content examples for comparison labels, quote text, and quiz options.
+- Include a concise intro that explains the demo is a visual gallery, not a production lecture.
+- Keep all component blocks inside `## Section:` blocks.
+- Validate with `npm run validate`.
+- Render cleanly in single-lecture mode and collection mode.
+- Work in static review packages without package-specific logic.
+
+## Accessibility Requirements
+
+- Components must use semantic HTML where appropriate:
+  - `blockquote` for quote.
+  - Ordered list for step list and quiz options when useful.
+  - Table semantics or equivalent accessible labels for comparison.
+  - Figure/caption semantics for code block if retained.
+- Every visible interactive control, if any are added later, must be keyboard accessible.
+- All component labels must be available to assistive technology.
+- Component-specific meaning must not rely only on color.
+- Focus states must remain visible for any links or future controls.
+- Text must remain readable under browser zoom.
+- Static HTML must remain meaningful when CSS or JavaScript is limited.
+
+## Responsive Requirements
+
+- At 390px, 768px, and 1280px:
+  - No body-level horizontal overflow.
+  - No clipped component labels, headings, options, code captions, or comparison values.
+  - Long quiz options wrap inside the card.
+  - Long comparison labels and values wrap inside their row/card.
+  - Quote text wraps without overlap.
+  - Code blocks scroll internally when needed.
+- Mobile components should stack naturally and avoid dense desktop-only layouts.
+- Desktop components should use available width without creating oversized cards or excessive whitespace.
+
+## Documentation Requirements
+
+- Update README component documentation if labels, visible behavior, or demo instructions change.
+- Update `SKILL.md` so AI agents know that `quiz` is supported and should be visibly recognizable as a quiz.
+- Document that `quiz` is a static teaching check with a visible answer key.
+- Document when to use each component and when not to use it.
+- Ensure current docs no longer imply that any supported component is missing or deferred.
+
+## Test Requirements
+
+- Rendering tests should assert the visible labels for all supported components.
+- Rendering tests should assert `quiz` includes a visible label containing `Quiz`, options, answer key, and explanation when present.
+- Rendering tests should assert quote uses `blockquote`.
+- Rendering tests should assert comparison exposes side labels accessibly.
+- Escaping tests should cover user-authored text in all component types.
+- Fixture tests should keep the component demo valid.
+- CLI and validation behavior should remain unchanged unless a UX improvement intentionally changes error copy.
+- Browser or Playwright-style smoke checks should verify no horizontal overflow for the component demo at 390px, 768px, and 1280px if the project has browser test infrastructure.
+
+## Success Metrics / Quality Gates
+
+- A user viewing the component demo can identify every supported component without reading the Markdown source.
+- The quiz component is visibly recognizable as a quiz in the rendered page.
+- The answer key is clearly intentional and does not look like an accidental spoiler.
+- All components render without clipped text, overlap, or body-level horizontal overflow at 390px, 768px, and 1280px.
+- Component labels and meaningful structure are available to assistive technology.
+- The component demo validates and builds in the normal app workflow.
+- Static review packages display the improved component UX without component-specific packaging logic.
+
+## Functional Requirements
+
+- Keep all component authoring shapes unchanged.
+- Keep existing normalized component models unless a backward-compatible internal refactor is required.
+- Keep all component rendering under `src/components/lecture-kit/`.
+- Keep route behavior unchanged.
+- Keep collection and single-lecture workflows unchanged.
+- Keep `npm run validate`, `npm run test`, `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run package:review` passing.
+
+## Risks, Assumptions, And Open Questions
+
+- Risk: Making components too visually distinct could create a noisy page. Mitigation: use restrained component-specific accents and consistent base spacing.
+- Risk: Quiz styling could imply secure assessment. Mitigation: explicitly label answer key and document quiz as static teaching check.
+- Risk: Comparison accessibility can regress if labels are only visual. Mitigation: test accessible labels or use semantic table structure.
+- Risk: Component demo may become too long. Mitigation: keep examples concise but include enough long text to test wrapping.
+- Assumption: The existing component schema is sufficient and should not change for this UX pass.
+- Assumption: Static review package generation already uses the normal render pipeline, so package-specific changes should not be needed.
+- Open question: Should quiz eventually support client-side reveal behavior, or should it remain always-static for predictability?
