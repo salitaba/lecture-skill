@@ -1,0 +1,385 @@
+Implementation Plan: Advanced UI Engine Components (spec/013-advanced-ui-engine-components.txt)
+
+## Summary
+
+Extend the Lecture Site Engine component vocabulary with ten validated instructional UI components:
+`glossary_term`, `tabs`, `accordion`, `timeline`, `checklist`, `flashcard`, `worked_example`,
+`mistake_correction`, `resource_links`, and `instructor_note`.
+
+The change is an authoring-schema and rendering expansion. Authors continue to write fenced
+`lecture-component` YAML blocks inside `## Section:` blocks, and existing lecture templates must keep
+validating and rendering unchanged. The implementation should follow the current repo pattern: TypeScript
+component interfaces in `types.ts`, validation and normalization in `validateTemplate.ts`, one focused
+React component per rendered UI primitive under `src/components/lecture-kit/`, shared styles in
+`src/app/globals.css`, fixtures under `examples/`, and focused Vitest coverage under
+`tests/lecture-template/`.
+
+## Product Decisions For Implementation
+
+- Implement all ten component types in the normalized `LectureComponent` union, but stage behavior by risk:
+  - P0: `glossary_term`, `checklist`, `worked_example`, `mistake_correction`, and `tabs`.
+  - P1: `accordion`, `flashcard`, `resource_links`, and `timeline`.
+  - P2: `instructor_note`, component-count review package summaries, and optional component-level anchors if still desired.
+- Do not add inline glossary syntax in this feature. `glossary_term` remains a block component.
+- Checklist state should be local UI state by default for `storage: session`; `storage: local` may use
+  `localStorage`, namespaced separately from section progress. Checklist state is never synced, submitted,
+  exported, or included in review packages.
+- Render `tabs` with progressive enhancement: server/static markup includes every panel in authored order;
+  a client component may enhance that markup to one active panel with ARIA tablist semantics only after
+  hydration has marked the component enhanced. Static HTML must not render inactive panels with `hidden`.
+- Use native `<details>/<summary>` for `accordion` where practical, because it gives a useful no-JavaScript
+  fallback and straightforward print expansion.
+- Treat hidden content as pacing only. Flashcard answers, accordion bodies, tab panels, checklist items,
+  worked example solutions, mistake corrections, resource URLs, and instructor notes must remain available
+  in source, print, and review packages.
+- Allow `resource_links.url` values that are `http:`, `https:`, root-relative (`/docs/page`), or relative
+  local paths (`docs/page.html`, `../assets/file.pdf`, `#local-anchor`). Reject unsafe schemes such as
+  `javascript:`, protocol-relative URLs, empty URLs, and malformed absolute URLs.
+- Unknown component fields remain ignored for now unless they conflict with a known field's expected type.
+- Do not introduce a generic plugin system, remote URL fetching, LMS behavior, grading, analytics, secure
+  hiding, or browser authoring UI.
+
+## Relevant Existing Files
+
+### Type, parsing, validation, and normalization
+- `src/lib/lecture-template/types.ts` - Add new component interfaces, nested item/link/tab types, and
+  `LectureComponentType`/`LectureComponent` union members.
+- `src/lib/lecture-template/validateTemplate.ts` - Extend `supportedComponents`, component-specific
+  validation, URL validation, duplicate label checks, and normalization.
+- `src/lib/lecture-template/parseTemplate.ts` - No expected parser contract change; parser tests should
+  prove fenced YAML blocks for the new types are still parsed as ordinary component blocks.
+- `src/lib/lecture-template/anchors.ts` - Reuse only if P2 component-level anchors are implemented. Do not
+  add author-facing anchors in P0/P1.
+- `src/lib/lecture-template/renderMarkdown.tsx` - Reuse for Markdown blocks only; component string fields
+  should continue rendering as safe text or through existing escaped React rendering unless a component
+  deliberately supports Markdown content.
+
+### Rendering
+- `src/components/lecture-kit/SectionRenderer.tsx` - Import and dispatch every new component type in
+  `RenderBlocks`, preserving the existing `assertNever` exhaustiveness check. Add an optional runtime
+  identity contract if checklist `storage: local` ships: `LecturePage` should pass a stable `lectureId` into
+  `SectionRenderer`, and `RenderBlocks` should derive component instance ids from section anchor plus the
+  component ordinal.
+- `src/components/lecture-kit/LecturePage.tsx` - Source of the single-lecture runtime identity already used
+  by progress tracking; pass that identity into section rendering if local checklist persistence is enabled.
+- `src/components/lecture-kit/CollectionLanding.tsx` and collection lecture routes - Ensure collection
+  rendering passes the same lecture identity shape so checklist persistence does not diverge by route.
+- Existing component files such as `Callout.tsx`, `Comparison.tsx`, `Quiz.tsx`, `QuestionSet.tsx`,
+  `FreeResponse.tsx`, and `PracticeTask.tsx` - Use these as markup/style references for labels, hidden
+  answer regions, local interaction state, and static rendering conventions.
+- New files under `src/components/lecture-kit/`:
+  - `GlossaryTerm.tsx`
+  - `Tabs.tsx`
+  - `Accordion.tsx`
+  - `Timeline.tsx`
+  - `Checklist.tsx`
+  - `Flashcard.tsx`
+  - `WorkedExample.tsx`
+  - `MistakeCorrection.tsx`
+  - `ResourceLinks.tsx`
+  - `InstructorNote.tsx`
+- `src/app/globals.css` - Add shared component styles, responsive rules, no-overflow protections, focus
+  states, and print rules.
+
+### Static export and review packaging
+- `src/lib/lecture-template/reviewPackage.ts` - Extend manifest/preflight metadata with component counts by
+  type, instructor-note summaries, resource-link summaries, and detectable local-link status once the
+  normalized template includes the new types. The implementation needs explicit changes to
+  `ReviewPackagePreflight`, `ReviewPackageManifest`, lecture-record construction, manifest creation, and
+  Markdown rendering.
+- `scripts/packageReview.ts` - No expected command change; output should pick up new manifest/readme text.
+- `src/app/page.tsx`, `src/components/lecture-kit/LecturePage.tsx`, and collection routes/components -
+  Ensure new components render through the same section rendering path in single-lecture and collection
+  modes.
+
+### Fixtures and docs
+- `examples/component-demo.template.md` - Expand the demo so it includes all existing and new component
+  types, or add a dedicated section for the ten advanced components while preserving all-components gallery
+  coverage.
+- `examples/invalid/*.template.md` - Add invalid fixtures for missing required fields, empty lists, duplicate
+  tab/default labels, invalid enum values, invalid resource URLs, and malformed nested mappings.
+- `examples/multi-lecture/lectures/*/lecture.template.md` - Add at least one multi-lecture example with five
+  or more new components for collection-route rendering evidence.
+- `README.md` - Add authoring examples and selection guidance for all ten components.
+- `SKILL.md` - Update agent guidance so generated lectures use these supported components instead of
+  inventing unsupported Markdown structures or custom React.
+
+### Tests
+- `tests/lecture-template/validateTemplate.test.ts` - Add supported-type coverage, normalization assertions,
+  validation errors with `field`, `componentType`, and locators, duplicate label checks, URL validation, and
+  backward-compatible supported-component lists.
+- `tests/lecture-template/fixtures.test.ts` - Ensure new valid and invalid fixtures are exercised by the
+  existing fixture sweep.
+- `tests/lecture-template/lecture-components.test.tsx` - Static rendering tests for every new component's
+  labels, core content, no-overflow wrappers, print-only content, and `SectionRenderer` dispatch.
+- `tests/lecture-template/assessment-interaction.test.tsx` or a new
+  `tests/lecture-template/advanced-components-interaction.test.tsx` - Prefer a new file for tabs,
+  checklist, flashcard, and accordion interaction tests.
+- `tests/lecture-template/review-package.test.ts` - Component count summaries, resource link summaries,
+  instructor-note presence, and source preservation.
+- `tests/lecture-template/backward-compat.test.tsx` and collection tests - Existing valid templates and
+  collection pages remain valid/renderable.
+
+## Proposed Implementation Steps
+
+### Step 1: Add component type contracts
+- Add exported interfaces in `types.ts` for all ten components and their nested structures:
+  - `GlossaryTermComponent` with `term`, `definition`, optional `context`, `aliases`.
+  - `TabsComponent`, `TabPanel`, optional `default_tab`.
+  - `AccordionComponent`, `AccordionItem`, optional `default_open`.
+  - `TimelineComponent`, `TimelineItem`, optional `orientation` and item `date`.
+  - `ChecklistComponent`, optional `storage` and `reset_label`.
+  - `FlashcardComponent`, optional `hint` and `category`.
+  - `WorkedExampleComponent`, optional `starter_code`, `language`, `takeaway`.
+  - `MistakeCorrectionComponent`, optional `example_before`, `example_after`.
+  - `ResourceLinksComponent`, `ResourceLink`, optional `description` and `category`.
+  - `InstructorNoteComponent` with `title`, `body`, optional `audience`, and optional `timing`.
+- Add all new literal types to `LectureComponentType` and `LectureComponent`.
+- Keep author-facing component anchors out of the P0/P1 type shapes unless the P2 anchor decision is made.
+- Add a focused type/normalization test target before rendering dispatch is expanded, or plan typecheck to run
+  after the renderer handles the full union.
+
+### Step 2: Extend validation and normalization
+- Add the ten new names to `supportedComponents`.
+- Reuse existing validation helpers where possible:
+  - `requireStringFields` for top-level required strings.
+  - `optionalStringFields` for optional non-empty strings.
+  - `validateStringListField` for string arrays.
+  - `requireNestedStringField` and `validateNestedStringList` style helpers for nested maps/lists.
+- Add new helper validators:
+  - `validateTabPanels` requiring at least two panels, non-empty `label` and `content`, unique labels, and
+    `default_tab` matching a label when present.
+  - `validateAccordionItems` requiring at least one item with non-empty `title` and `body`, and `default_open`
+    titles matching authored item titles when present. If `default_open` is supported, reject duplicate item
+    titles because title-based default-open references would otherwise be ambiguous.
+  - `validateTimelineItems` requiring at least two items with non-empty `label` and `detail`, valid
+    `orientation` when present, and non-empty optional `date`.
+  - `validateChecklist` requiring at least one string item and `storage` in `session | local` when present.
+  - `validateResourceLinks` requiring at least one link with non-empty `label` and valid `url`, plus optional
+    non-empty `description` and `category`.
+  - `validateInstructorNote` requiring non-empty `title` and `body`, and `audience` in
+    `instructor | reviewer | both` when present.
+- Ensure every validation error includes `code`, `message`, `locator`, `sectionTitle`, `componentType`, and
+  `field` where applicable.
+- Extend `normalizeComponent` to trim strings, preserve authored order, apply defaults (`checklist.storage`
+  as `session`, `timeline.orientation` as `vertical`, `instructor_note.audience` as `instructor`), and omit
+  absent optional fields.
+- Keep `isMeaningfulSectionBlock` aligned with the expanded `supportedComponents` list.
+
+### Step 3: Add P0 rendering components
+- Implement `GlossaryTerm`, `Checklist`, `WorkedExample`, `MistakeCorrection`, and `Tabs`.
+- Use one `.lecture-component` surface per component; avoid nested card shells.
+- `GlossaryTerm` should use semantic definition markup where practical.
+- `Checklist` should be a client component only for local check state. Render labels and unchecked boxes
+  safely on first paint, recover if storage is unavailable, and avoid language implying grading/submission.
+  If `storage: local` is implemented, it must receive a stable component runtime id from `LecturePage` through
+  `SectionRenderer`/`RenderBlocks`; otherwise validation should reject `storage: local` until that identity
+  plumbing exists.
+- `WorkedExample` should render problem, ordered walkthrough, solution, optional starter code, and takeaway.
+- `MistakeCorrection` should clearly separate mistake, why it fails, and correction, with before/after examples
+  stacking on mobile.
+- `Tabs` should render all tab panels in server/static markup, then enhance to active-panel tab behavior in a
+  client component. Use `useId()` or a passed component runtime id for DOM ids; do not derive ARIA ids only
+  from titles/labels because duplicate tab components would create duplicate ids. Hide inactive panels only
+  after hydration sets an enhanced state/class/data attribute, and test that static HTML contains all panels
+  without `hidden`.
+- Dispatch P0 types from `SectionRenderer`.
+
+### Step 4: Add P1 rendering components
+- Implement `Accordion`, `Flashcard`, `ResourceLinks`, and `Timeline`.
+- Use `<details>` for accordion items and set `open` based on `default_open` where provided. Print CSS must
+  expose all bodies even when closed in browser preview, but do not rely only on forcing closed `<details>`
+  open in print. Keep each body present in static markup and add a print-visible hook or fallback region that
+  makes the print contract assertable.
+- `Flashcard` should be a client component with a keyboard-operable reveal button using `aria-expanded`.
+  Button copy should be `Reveal answer` and `Hide answer`, never `Submit`.
+- `ResourceLinks` should show label, optional description/category, visible hostname or local path, external
+  treatment for `http/https`, and full URL visibility in print.
+- `Timeline` should render a vertical sequence at mobile widths and avoid horizontal overflow at 390px, 768px,
+  and 1280px. Sequence markers must include text/ARIA labels rather than relying on color.
+- Dispatch P1 types from `SectionRenderer`.
+
+### Step 5: Add P2 instructor/review behavior
+- Implement `InstructorNote`.
+- Normal learner preview may collapse or visually de-emphasize notes, but do not remove them from the DOM or
+  imply secure hiding. Print/review output must show notes with an explicit `Instructor note` label.
+- Ensure instructor notes do not change section progress calculations. Progress currently tracks sections, so
+  avoid introducing component-level progress integration.
+- Extend review-package manifest and Markdown output with:
+  - component counts by type for valid lectures;
+  - resource link counts by lecture and whether each link is external or local;
+  - detectable local resource-link status as `present`, `missing`, or `not_checked` for relative,
+    root-relative, and hash references where repository/package context makes that possible;
+  - instructor-note presence by lecture;
+  - a clear statement that hidden/instructor/answer content is included for review.
+- Defer optional cross-component anchors, glossary indexes, copy actions, checklist bulk controls, and review
+  mode toggles unless P2 scope is explicitly pulled into the implementation pass.
+
+### Step 6: Add styles and print rules
+- Add classes in `globals.css` for:
+  - `.glossary-term`, `.glossary-aliases`;
+  - `.tabs`, `.tabs-list`, `.tabs-panel`;
+  - `.accordion`, `.accordion-item`;
+  - `.timeline`, `.timeline-item`, `.timeline-marker`;
+  - `.checklist`, `.checklist-item`, `.checklist-reset`;
+  - `.flashcard`, `.flashcard-answer`, `.flashcard-hint`;
+  - `.worked-example`, `.worked-example-region`;
+  - `.mistake-correction`, `.mistake-region`, `.correction-region`;
+  - `.resource-links`, `.resource-link-url`;
+  - `.instructor-note`.
+- Match the existing palette and 8px-radius component style. Use component labels consistent with the spec:
+  `Glossary`, `Tabs`, `More detail`, `Timeline`, `Checklist`, `Flashcard`, `Worked example`,
+  `Common mistake`, `Resources`, and `Instructor note`.
+- Add mobile-first layout rules and `overflow-wrap: anywhere` or equivalent for labels, URLs, definitions,
+  code-like examples, and tab content.
+- Add print styles that show all tab panels, expanded accordion bodies, flashcard hints/answers, unchecked
+  checklist boxes, full resource URLs, worked example solutions, mistake corrections, and instructor notes.
+- For accordion specifically, pair print CSS with markup hooks or print-only fallback content so tests do not
+  depend on browser-specific closed-`details` print behavior.
+- Respect `prefers-reduced-motion` for any reveal/transition polish.
+
+### Step 7: Add examples and invalid fixtures
+- Expand `examples/component-demo.template.md` so validation proves the gallery includes every supported type.
+- Add one multi-lecture fixture update with five or more new components.
+- Add invalid fixture files for:
+  - missing required strings for each component family;
+  - empty list minimums for aliases/items/tabs/timeline/walkthrough/links as applicable;
+  - duplicate tab labels and invalid `default_tab`;
+  - invalid `default_open` references and duplicate accordion titles when `default_open` is present;
+  - invalid `timeline.orientation`;
+  - invalid `checklist.storage`;
+  - invalid `resource_links.url` schemes and empty link labels;
+  - invalid `instructor_note.audience`.
+- Ensure invalid fixture names are specific enough for future implementers to locate failures quickly, for
+  example `advanced-tabs-field-errors.template.md` and `resource-links-invalid-url.template.md`.
+
+### Step 8: Update docs and agent guidance
+- Update `README.md` with:
+  - authoring examples for all ten components;
+  - selection guidance for when to use each component versus plain Markdown;
+  - warnings that hidden content is not secure and checklist state is local only;
+  - print/review package behavior for hidden, instructor, resource, and answer content.
+- Update `SKILL.md` with:
+  - a compact component chooser for AI-generated lectures;
+  - valid YAML snippets or field summaries;
+  - instructions not to invent unsupported component types or raw HTML;
+  - guidance for static review package and print expectations.
+
+### Step 9: Write focused tests
+- Parser/validation tests:
+  - every new component type validates in a synthetic valid template;
+  - every required field and list minimum emits `INVALID_COMPONENT_FIELD`;
+  - duplicate labels and enum/url errors produce author-locatable messages;
+  - `supportedComponentTypes` in tests matches the expanded list.
+- Normalization tests:
+  - trimmed values, defaults, omitted optional fields, and preserved authored order for all ten types.
+- Rendering tests:
+  - individual component static markup;
+  - `SectionRenderer` dispatch for all ten types;
+  - no raw unsafe HTML rendering from component string fields;
+  - print-only or print-visible content for hidden/collapsed/revealed regions.
+  - duplicate `tabs` components produce unique tab/panel DOM ids.
+  - static `tabs` markup contains every panel and no inactive-panel `hidden` attributes before enhancement.
+- Interaction tests:
+  - tabs keyboard/click switching and no-JavaScript static content availability;
+  - checklist local state, reset label, and unavailable storage recovery;
+  - flashcard reveal/hide and independent state between multiple cards;
+  - accordion keyboard/native disclosure behavior and default-open state.
+- Review package tests:
+  - source templates are preserved;
+  - manifest/Markdown summarize component counts by type;
+  - resource link and instructor note summaries appear.
+- Backward compatibility:
+  - existing `examples/golden.template.md`, active content, existing invalid fixtures, and collection examples
+    keep their expected behavior.
+
+### Step 10: Verification
+- Run focused tests while implementing:
+  - `npm run test -- tests/lecture-template/validateTemplate.test.ts`
+  - `npm run test -- tests/lecture-template/lecture-components.test.tsx`
+  - `npm run test -- tests/lecture-template/advanced-components-interaction.test.tsx`
+  - `npm run test -- tests/lecture-template/fixtures.test.ts`
+  - `npm run test -- tests/lecture-template/review-package.test.ts`
+  - `npm run test -- tests/lecture-template/backward-compat.test.tsx`
+- Run final verification:
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run validate`
+  - `npm run package:review`
+- Perform manual viewport/print checks for the component demo at 390px and 1280px, and preferably 768px:
+  no horizontal body overflow, controls are keyboard reachable, hidden content is visible in print, and review
+  package output preserves the component content.
+
+## Data Model And API Changes
+
+No database, remote API, authentication, LMS, analytics, or hosted service changes are required.
+
+The authoring schema expands only through the `LectureComponent` model. Existing components keep their
+current field names and behavior. New component names are additive and should be normalized into render-ready
+objects after validation passes.
+
+Checklist storage, when enabled with `storage: local`, should use browser-local namespaced keys such as:
+
+```typescript
+lecture-checklist:<template-or-lecture-id>:<component-id>
+```
+
+The component id can be derived from the section anchor plus component order/label. This is runtime state only
+and must not be included in validation output, review package manifests, source templates, or exported learner
+data.
+
+If implementation cannot pass a stable lecture/component runtime id through `LecturePage` -> `SectionRenderer`
+-> `RenderBlocks` in the same task slice, `storage: local` should be rejected with an author-locatable
+validation error or deferred while `storage: session` remains supported. Silent unstable localStorage keys are
+not acceptable.
+
+## Review Package Changes
+
+Add a manifest structure for component summaries, for example:
+
+```typescript
+interface ReviewPackageComponentSummary {
+  totalCountsByType: Record<string, number>;
+  lectures: Array<{
+    slug?: string;
+    sourceTemplatePath: string;
+    countsByType: Record<string, number>;
+  }>;
+  resourceLinks: Array<{
+    lectureSlug?: string;
+    label: string;
+    url: string;
+    kind: "external" | "local";
+    localTargetStatus: "present" | "missing" | "not_checked";
+  }>;
+  instructorNotes: Array<{
+    lectureSlug?: string;
+    title: string;
+    audience: "instructor" | "reviewer" | "both";
+  }>;
+}
+```
+
+Keep this summary derived from validated normalized templates and source snapshots. Do not fetch external URLs
+or validate remote availability. For local resource links, resolve only repository/package-detectable targets
+and report uncertain cases as `not_checked` instead of failing the package.
+
+## Risks, Assumptions, And Open Questions
+
+- The current renderer uses server components for most static components and client components for interactive
+  assessments/progress. The plan assumes interactive advanced components can follow the same pattern without
+  moving `SectionRenderer` itself to the client.
+- `tabs` no-JavaScript fallback is the highest markup risk: if the enhanced client component hides inactive
+  panels after hydration, the static server markup must still contain all panels for review, print, and
+  no-JavaScript users.
+- `resource_links` URL validation should be centralized and covered heavily; unsafe schemes are a security and
+  trust issue even though links are authored content.
+- Component-level anchors are explicitly P2. Adding them earlier would broaden validation, rendering, and link
+  stability work beyond the core component vocabulary.
+- `instructor_note` learner-preview behavior needs a product decision during implementation: collapsed but
+  visible is safer than fully visually hidden because the content is not secret and should remain inspectable.
+- Checklist `storage: local` needs a stable component identity. If stable component ids are deferred, implement
+  `storage: session` first and reject or ignore `storage: local` until identity is defined.
+- Tests should avoid relying only on CSS for print behavior. Prefer static markup hooks and class names that
+  make the print contract assertable in jsdom.

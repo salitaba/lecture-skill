@@ -59,6 +59,16 @@ export interface ReviewPackageLecture {
   packageSourcePath: string;
   renderedOutputPath: string;
   sectionCount: number;
+  componentCounts: Record<string, number>;
+  resourceLinks: ReviewPackageResourceLinkSummary[];
+  instructorNoteCount: number;
+}
+
+export interface ReviewPackageResourceLinkSummary {
+  label: string;
+  url: string;
+  kind: "external" | "local";
+  status: "present" | "missing" | "not_checked";
 }
 
 export interface ReviewPackageValidationOutput {
@@ -338,6 +348,10 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
     `- Collection key prefix: ${manifest.progressTracking.collectionKeyPrefix}`,
     `- Reviewer verification: ${manifest.progressTracking.reviewerVerification}`,
     "",
+    "## Advanced Component Review",
+    "",
+    "Hidden, collapsed, answer, and instructor-only content is included in source templates, rendered print output, and this package for review.",
+    "",
     "## Lectures",
     ""
   ];
@@ -350,8 +364,14 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
       `  Audience: ${lecture.audience}`,
       `  Level: ${lecture.level}`,
       `  Duration: ${lecture.duration}`,
-      `  Sections: ${lecture.sectionCount}`
+      `  Sections: ${lecture.sectionCount}`,
+      `  Component counts: ${formatComponentCounts(lecture.componentCounts)}`,
+      `  Resource links: ${lecture.resourceLinks.length}`,
+      `  Instructor notes: ${lecture.instructorNoteCount}`
     );
+    for (const link of lecture.resourceLinks) {
+      lines.push(`    - ${link.label}: ${link.url} (${link.kind}, ${link.status})`);
+    }
   }
 
   if (manifest.ignoredInactiveTemplatePaths.length > 0) {
@@ -397,6 +417,10 @@ export function renderReviewPackageReadme(manifest: ReviewPackageManifest): stri
     "## Progress Tracking",
     "",
     "Learner progress is runtime browser `localStorage` state. It is not included in this package, synced, exported, or shared.",
+    "",
+    "Checklist completion state is also browser-local learner state. It is not included in this package, synced, exported, graded, or shared.",
+    "",
+    "Hidden answers, collapsed detail, tab panels, and instructor notes are review pacing only. They are visible in source files, print output, and package metadata.",
     "",
     `Expected single-lecture key prefix: \`${manifest.progressTracking.singleLectureKeyPrefix}\``,
     `Expected collection key prefix: \`${manifest.progressTracking.collectionKeyPrefix}\``,
@@ -712,6 +736,7 @@ function buildLectureRecord(
   packageSourcePath: string,
   renderedOutputPath: string
 ): ReviewPackageLecture {
+  const resourceLinks = collectResourceLinks(template, sourceTemplatePath);
   return {
     slug,
     title: template.metadata.title,
@@ -722,8 +747,69 @@ function buildLectureRecord(
     sourceTemplatePath,
     packageSourcePath,
     renderedOutputPath,
-    sectionCount: template.sections.length
+    sectionCount: template.sections.length,
+    componentCounts: collectComponentCounts(template),
+    resourceLinks,
+    instructorNoteCount: countComponents(template, "instructor_note")
   };
+}
+
+function collectComponentCounts(template: LectureTemplate): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const section of template.sections) {
+    for (const block of section.blocks) {
+      if (block.kind !== "component") continue;
+      counts[block.component.type] = (counts[block.component.type] ?? 0) + 1;
+    }
+  }
+  return Object.fromEntries(Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function countComponents(template: LectureTemplate, type: string): number {
+  return template.sections.reduce(
+    (total, section) =>
+      total + section.blocks.filter((block) => block.kind === "component" && block.component.type === type).length,
+    0
+  );
+}
+
+function collectResourceLinks(template: LectureTemplate, sourceTemplatePath: string): ReviewPackageResourceLinkSummary[] {
+  return template.sections.flatMap((section) =>
+    section.blocks.flatMap((block) => {
+      if (block.kind !== "component" || block.component.type !== "resource_links") return [];
+      return block.component.links.map((link) => ({
+        label: link.label,
+        url: link.url,
+        kind: isExternalResourceUrl(link.url) ? "external" : "local",
+        status: resourceLinkStatus(link.url, sourceTemplatePath)
+      }));
+    })
+  );
+}
+
+function isExternalResourceUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
+function resourceLinkStatus(url: string, sourceTemplatePath: string): ReviewPackageResourceLinkSummary["status"] {
+  if (isExternalResourceUrl(url) || url.startsWith("#")) return "not_checked";
+  const cleanUrl = url.split("#")[0]?.split("?")[0] ?? url;
+  if (!cleanUrl) return "not_checked";
+  const localPath = cleanUrl.startsWith("/")
+    ? repositoryPath(cleanUrl.slice(1))
+    : repositoryPath(path.posix.normalize(path.posix.join(path.posix.dirname(sourceTemplatePath), cleanUrl)));
+  try {
+    accessSync(localPath, constants.F_OK);
+    return "present";
+  } catch {
+    return "missing";
+  }
+}
+
+function formatComponentCounts(counts: Record<string, number>): string {
+  const entries = Object.entries(counts);
+  if (entries.length === 0) return "none";
+  return entries.map(([type, count]) => `${type}=${count}`).join(", ");
 }
 
 function activeTemplateExists(): boolean {

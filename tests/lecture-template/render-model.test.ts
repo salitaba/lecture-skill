@@ -36,4 +36,29 @@ describe("render model", () => {
       expect(result.errors.map((error) => error.code)).toContain("INVALID_LEVEL");
     }
   });
+
+  it("normalizes advanced component blocks in the component demo render model", () => {
+    const result = validateTemplateSource(fixture("examples/component-demo.template.md"));
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const componentTypes = result.template.sections.flatMap((section) =>
+        section.blocks.flatMap((block) => (block.kind === "component" ? [block.component.type] : []))
+      );
+      expect(componentTypes).toEqual(
+        expect.arrayContaining([
+          "glossary_term",
+          "tabs",
+          "accordion",
+          "timeline",
+          "checklist",
+          "flashcard",
+          "worked_example",
+          "mistake_correction",
+          "resource_links",
+          "instructor_note"
+        ])
+      );
+    }
+  });
 });

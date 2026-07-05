@@ -17,7 +17,7 @@ This overview is present.
 ## Section: Valid Section
 
 ```lecture-component
-type: flashcard
+type: interactive_widget
 title: "Question"
 body: "Unsupported."
 ```

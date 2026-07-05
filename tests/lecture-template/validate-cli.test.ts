@@ -21,7 +21,7 @@ describe("validation CLI", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("UNSUPPORTED_COMPONENT_TYPE");
-    expect(result.stderr).toContain("component=flashcard");
+    expect(result.stderr).toContain("component=interactive_widget");
     expect(result.stderr).toContain("section=Valid Section");
     expect(result.stderr).toContain("Location: line");
     expect(result.stderr).toContain("Hint:");

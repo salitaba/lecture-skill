@@ -27,6 +27,25 @@ title: "Directory rhythm"
 body: "Numbered folders keep the authored order obvious for both people and automation."
 ```
 
+```lecture-component
+type: glossary_term
+term: "Collection mode"
+definition: "A lecture-site workflow where numbered lecture folders render as one ordered course."
+context: "The landing page and per-lecture routes are derived from the collection directory."
+```
+
+```lecture-component
+type: timeline
+title: "Collection Preview Path"
+items:
+  - label: "Scan"
+    detail: "Find numbered lecture folders."
+  - label: "Validate"
+    detail: "Validate each lecture template in authored order."
+  - label: "Render"
+    detail: "Expose the landing page and each lecture route."
+```
+
 ## Section: First Preview
 
 Open the first lecture, confirm the content reads on its own, and then move on to the next route.
@@ -38,6 +57,33 @@ steps:
   - "Open the landing page."
   - "Follow the first lecture link."
   - "Check that the navigation footer points forward."
+```
+
+```lecture-component
+type: checklist
+title: "Preview Checks"
+items:
+  - "Landing page lists the first lecture."
+  - "The first lecture route renders independently."
+  - "The footer points to the next lecture."
+```
+
+```lecture-component
+type: flashcard
+prompt: "Where does collection order come from?"
+answer: "From the numbered lecture directories and course metadata."
+```
+
+```lecture-component
+type: resource_links
+title: "Collection Files"
+links:
+  - label: "Course metadata"
+    url: "../course.yaml"
+    description: "Optional collection label and summary data."
+  - label: "Next lecture"
+    url: "../02-core-concepts/lecture.template.md"
+    description: "The next authored lecture template."
 ```
 
 ## Key Takeaways

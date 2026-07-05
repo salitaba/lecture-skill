@@ -30,12 +30,25 @@ const supportedComponents = [
   "question_set",
   "free_response",
   "practice_task",
-  "diagram"
+  "diagram",
+  "glossary_term",
+  "tabs",
+  "accordion",
+  "timeline",
+  "checklist",
+  "flashcard",
+  "worked_example",
+  "mistake_correction",
+  "resource_links",
+  "instructor_note"
 ] as const satisfies readonly LectureComponentType[];
 
 const allowedDiagramTypes: DiagramType[] = ["flowchart", "sequence", "class", "state", "er", "gantt", "pie", "mindmap"];
 const allowedDiagramDirections: DiagramDirection[] = ["TB", "LR", "BT", "RL"];
 const allowedDiagramThemes: DiagramTheme[] = ["default", "dark", "forest", "neutral", "base"];
+const allowedTimelineOrientations = ["vertical", "horizontal"] as const;
+const allowedChecklistStorage = ["session", "local"] as const;
+const allowedInstructorAudiences = ["instructor", "reviewer", "both"] as const;
 
 export function validateTemplateSource(source: string): ValidationResult {
   return validateParsedTemplate(parseLectureTemplate(source));
@@ -424,6 +437,208 @@ function validateComponent(block: ParsedComponentBlock, errors: ValidationError[
         hint: "Set theme: to one of the supported theme values."
       });
     }
+  }
+
+  if (type === "glossary_term") {
+    requireStringFields(block, sectionTitle, errors, ["term", "definition"]);
+    optionalStringFields(block, sectionTitle, errors, ["context"]);
+    if (isRecord(block.data) && block.data.aliases !== undefined) {
+      validateStringListField(block, sectionTitle, errors, "aliases", { minimumItems: 1 });
+    }
+  }
+
+  if (type === "tabs") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    validateTabPanels(block, sectionTitle, errors);
+  }
+
+  if (type === "accordion") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    validateAccordionItems(block, sectionTitle, errors);
+  }
+
+  if (type === "timeline") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    validateTimelineItems(block, sectionTitle, errors);
+    validateEnumField(block, sectionTitle, errors, "orientation", allowedTimelineOrientations, "vertical or horizontal");
+  }
+
+  if (type === "checklist") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    validateStringListField(block, sectionTitle, errors, "items", { minimumItems: 1 });
+    validateEnumField(block, sectionTitle, errors, "storage", allowedChecklistStorage, "session or local");
+    optionalStringFields(block, sectionTitle, errors, ["reset_label"]);
+  }
+
+  if (type === "flashcard") {
+    requireStringFields(block, sectionTitle, errors, ["prompt", "answer"]);
+    optionalStringFields(block, sectionTitle, errors, ["hint", "category"]);
+  }
+
+  if (type === "worked_example") {
+    requireStringFields(block, sectionTitle, errors, ["title", "problem", "solution"]);
+    validateStringListField(block, sectionTitle, errors, "walkthrough", { minimumItems: 1 });
+    optionalStringFields(block, sectionTitle, errors, ["starter_code", "language", "takeaway"]);
+  }
+
+  if (type === "mistake_correction") {
+    requireStringFields(block, sectionTitle, errors, ["title", "mistake", "why_it_fails", "correction"]);
+    optionalStringFields(block, sectionTitle, errors, ["example_before", "example_after"]);
+  }
+
+  if (type === "resource_links") {
+    requireStringFields(block, sectionTitle, errors, ["title"]);
+    validateResourceLinks(block, sectionTitle, errors);
+  }
+
+  if (type === "instructor_note") {
+    requireStringFields(block, sectionTitle, errors, ["title", "body"]);
+    optionalStringFields(block, sectionTitle, errors, ["timing"]);
+    validateEnumField(block, sectionTitle, errors, "audience", allowedInstructorAudiences, "instructor, reviewer, or both");
+  }
+}
+
+function validateEnumField(
+  block: ParsedComponentBlock,
+  sectionTitle: string,
+  errors: ValidationError[],
+  field: string,
+  allowed: readonly string[],
+  readableValues: string
+) {
+  if (!isRecord(block.data)) return;
+  const value = block.data[field];
+  if (value !== undefined && (typeof value !== "string" || !allowed.includes(value))) {
+    errors.push(componentFieldError(block, sectionTitle, field, `${String(block.data.type)}.${field} must be one of ${readableValues}.`));
+  }
+}
+
+function validateTabPanels(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data)) return;
+  const tabs = block.data.tabs;
+  if (!Array.isArray(tabs) || tabs.length < 2) {
+    errors.push(componentFieldError(block, sectionTitle, "tabs", "tabs.tabs must be a YAML list with at least 2 panel mappings."));
+    return;
+  }
+
+  const labels: string[] = [];
+  tabs.forEach((panel, index) => {
+    if (!isRecord(panel)) {
+      errors.push(componentFieldError(block, sectionTitle, `tabs[${index}]`, `tabs.tabs[${index}] must be a YAML mapping.`));
+      return;
+    }
+    const label = requireNestedStringField(block, sectionTitle, errors, panel, `tabs[${index}]`, "label");
+    requireNestedStringField(block, sectionTitle, errors, panel, `tabs[${index}]`, "content");
+    if (label) labels.push(label);
+  });
+
+  const duplicates = labels.filter((label, index) => labels.indexOf(label) !== index);
+  if (duplicates.length > 0) {
+    errors.push(componentFieldError(block, sectionTitle, "tabs", "tabs.tabs labels must be unique."));
+  }
+
+  const defaultTab = stringValue(block.data.default_tab);
+  if (block.data.default_tab !== undefined && (!defaultTab || !labels.includes(defaultTab))) {
+    errors.push(componentFieldError(block, sectionTitle, "default_tab", "tabs.default_tab must exactly match one tab label."));
+  }
+}
+
+function validateAccordionItems(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data)) return;
+  const items = block.data.items;
+  if (!Array.isArray(items) || items.length < 1) {
+    errors.push(componentFieldError(block, sectionTitle, "items", "accordion.items must be a YAML list with at least 1 item mapping."));
+    return;
+  }
+
+  const titles: string[] = [];
+  items.forEach((item, index) => {
+    if (!isRecord(item)) {
+      errors.push(componentFieldError(block, sectionTitle, `items[${index}]`, `accordion.items[${index}] must be a YAML mapping.`));
+      return;
+    }
+    const title = requireNestedStringField(block, sectionTitle, errors, item, `items[${index}]`, "title");
+    requireNestedStringField(block, sectionTitle, errors, item, `items[${index}]`, "body");
+    if (title) titles.push(title);
+  });
+
+  const defaultOpen = stringValue(block.data.default_open);
+  if (block.data.default_open !== undefined && (!defaultOpen || !titles.includes(defaultOpen))) {
+    errors.push(componentFieldError(block, sectionTitle, "default_open", "accordion.default_open must exactly match one item title."));
+  }
+  if (block.data.default_open !== undefined && new Set(titles).size !== titles.length) {
+    errors.push(componentFieldError(block, sectionTitle, "items", "accordion.items titles must be unique when default_open is present."));
+  }
+}
+
+function validateTimelineItems(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data)) return;
+  const items = block.data.items;
+  if (!Array.isArray(items) || items.length < 2) {
+    errors.push(componentFieldError(block, sectionTitle, "items", "timeline.items must be a YAML list with at least 2 item mappings."));
+    return;
+  }
+
+  items.forEach((item, index) => {
+    if (!isRecord(item)) {
+      errors.push(componentFieldError(block, sectionTitle, `items[${index}]`, `timeline.items[${index}] must be a YAML mapping.`));
+      return;
+    }
+    requireNestedStringField(block, sectionTitle, errors, item, `items[${index}]`, "label");
+    requireNestedStringField(block, sectionTitle, errors, item, `items[${index}]`, "detail");
+    if ("date" in item) {
+      requireNestedStringField(block, sectionTitle, errors, item, `items[${index}]`, "date");
+    }
+  });
+}
+
+function validateResourceLinks(block: ParsedComponentBlock, sectionTitle: string, errors: ValidationError[]) {
+  if (!isRecord(block.data)) return;
+  const links = block.data.links;
+  if (!Array.isArray(links) || links.length < 1) {
+    errors.push(componentFieldError(block, sectionTitle, "links", "resource_links.links must be a YAML list with at least 1 link mapping."));
+    return;
+  }
+
+  links.forEach((link, index) => {
+    if (!isRecord(link)) {
+      errors.push(componentFieldError(block, sectionTitle, `links[${index}]`, `resource_links.links[${index}] must be a YAML mapping.`));
+      return;
+    }
+    requireNestedStringField(block, sectionTitle, errors, link, `links[${index}]`, "label");
+    const url = requireNestedStringField(block, sectionTitle, errors, link, `links[${index}]`, "url");
+    if (url && !isAllowedResourceUrl(url)) {
+      errors.push(componentFieldError(block, sectionTitle, `links[${index}].url`, "resource_links link url must be http, https, root-relative, relative, or a hash reference."));
+    }
+    if ("description" in link) {
+      requireNestedStringField(block, sectionTitle, errors, link, `links[${index}]`, "description");
+    }
+    if ("category" in link) {
+      requireNestedStringField(block, sectionTitle, errors, link, `links[${index}]`, "category");
+    }
+  });
+}
+
+function isAllowedResourceUrl(value: string): boolean {
+  if (value.trim() !== value || value === "" || value.startsWith("//")) return false;
+  if (value.startsWith("#") || value.startsWith("/")) return true;
+
+  const schemeMatch = value.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (schemeMatch) {
+    if (schemeMatch[1] !== "http" && schemeMatch[1] !== "https") return false;
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "http:" || parsed.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
+  try {
+    new URL(value, "https://lecture.local/");
+    return !value.startsWith("\\") && !value.includes("\0");
+  } catch {
+    return false;
   }
 }
 
@@ -852,6 +1067,137 @@ function normalizeComponent(block: ParsedComponentBlock, anchor?: string): Lectu
       code: stringValue(data.code),
       ...(direction ? { direction } : {}),
       ...(theme ? { theme } : {})
+    };
+  }
+  if (data.type === "glossary_term") {
+    return {
+      type: "glossary_term",
+      term: stringValue(data.term),
+      definition: stringValue(data.definition),
+      ...(stringValue(data.context) ? { context: stringValue(data.context) } : {}),
+      ...(Array.isArray(data.aliases) ? { aliases: data.aliases.map(stringValue) } : {})
+    };
+  }
+  if (data.type === "tabs") {
+    const defaultTab = stringValue(data.default_tab);
+    return {
+      type: "tabs",
+      title: stringValue(data.title),
+      tabs: Array.isArray(data.tabs)
+        ? data.tabs.filter(isRecord).map((panel) => ({
+            label: stringValue(panel.label),
+            content: stringValue(panel.content)
+          }))
+        : [],
+      ...(defaultTab ? { default_tab: defaultTab } : {})
+    };
+  }
+  if (data.type === "accordion") {
+    const defaultOpen = stringValue(data.default_open);
+    return {
+      type: "accordion",
+      title: stringValue(data.title),
+      items: Array.isArray(data.items)
+        ? data.items.filter(isRecord).map((item) => ({
+            title: stringValue(item.title),
+            body: stringValue(item.body)
+          }))
+        : [],
+      ...(defaultOpen ? { default_open: defaultOpen } : {})
+    };
+  }
+  if (data.type === "timeline") {
+    return {
+      type: "timeline",
+      title: stringValue(data.title),
+      orientation: typeof data.orientation === "string" ? (data.orientation as "vertical" | "horizontal") : "vertical",
+      items: Array.isArray(data.items)
+        ? data.items.filter(isRecord).map((item) => {
+            const date = stringValue(item.date);
+            return {
+              label: stringValue(item.label),
+              detail: stringValue(item.detail),
+              ...(date ? { date } : {})
+            };
+          })
+        : []
+    };
+  }
+  if (data.type === "checklist") {
+    const resetLabel = stringValue(data.reset_label);
+    return {
+      type: "checklist",
+      title: stringValue(data.title),
+      items: Array.isArray(data.items) ? data.items.map(stringValue) : [],
+      storage: typeof data.storage === "string" ? (data.storage as "session" | "local") : "session",
+      ...(resetLabel ? { reset_label: resetLabel } : {})
+    };
+  }
+  if (data.type === "flashcard") {
+    const hint = stringValue(data.hint);
+    const category = stringValue(data.category);
+    return {
+      type: "flashcard",
+      prompt: stringValue(data.prompt),
+      answer: stringValue(data.answer),
+      ...(hint ? { hint } : {}),
+      ...(category ? { category } : {})
+    };
+  }
+  if (data.type === "worked_example") {
+    const starterCode = stringValue(data.starter_code);
+    const language = stringValue(data.language);
+    const takeaway = stringValue(data.takeaway);
+    return {
+      type: "worked_example",
+      title: stringValue(data.title),
+      problem: stringValue(data.problem),
+      walkthrough: Array.isArray(data.walkthrough) ? data.walkthrough.map(stringValue) : [],
+      solution: stringValue(data.solution),
+      ...(starterCode ? { starter_code: starterCode } : {}),
+      ...(language ? { language } : {}),
+      ...(takeaway ? { takeaway } : {})
+    };
+  }
+  if (data.type === "mistake_correction") {
+    const exampleBefore = stringValue(data.example_before);
+    const exampleAfter = stringValue(data.example_after);
+    return {
+      type: "mistake_correction",
+      title: stringValue(data.title),
+      mistake: stringValue(data.mistake),
+      why_it_fails: stringValue(data.why_it_fails),
+      correction: stringValue(data.correction),
+      ...(exampleBefore ? { example_before: exampleBefore } : {}),
+      ...(exampleAfter ? { example_after: exampleAfter } : {})
+    };
+  }
+  if (data.type === "resource_links") {
+    return {
+      type: "resource_links",
+      title: stringValue(data.title),
+      links: Array.isArray(data.links)
+        ? data.links.filter(isRecord).map((link) => {
+            const description = stringValue(link.description);
+            const category = stringValue(link.category);
+            return {
+              label: stringValue(link.label),
+              url: stringValue(link.url),
+              ...(description ? { description } : {}),
+              ...(category ? { category } : {})
+            };
+          })
+        : []
+    };
+  }
+  if (data.type === "instructor_note") {
+    const timing = stringValue(data.timing);
+    return {
+      type: "instructor_note",
+      title: stringValue(data.title),
+      body: stringValue(data.body),
+      audience: typeof data.audience === "string" ? (data.audience as "instructor" | "reviewer" | "both") : "instructor",
+      ...(timing ? { timing } : {})
     };
   }
   return undefined;

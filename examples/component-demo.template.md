@@ -241,9 +241,123 @@ title: "Lecture skill architecture"
 code: "mindmap\n  root((Lecture Skill))\n    Parser\n      YAML\n      Markdown\n    Components\n      Callout\n      Quiz\n      Diagram\n    Renderer\n      Static\n      Interactive"
 ```
 
+## Section: Advanced Teaching Components
+
+Use advanced components for definitions, compact alternatives, optional depth, recall practice, worked examples, mistake repair, curated resources, timelines, and instructor handoff notes.
+
+```lecture-component
+type: glossary_term
+term: "Schema validation"
+definition: "Checking authored lecture structure before preview or package handoff."
+context: "Validation protects authors from malformed component YAML."
+aliases:
+  - "template validation"
+```
+
+```lecture-component
+type: tabs
+title: "Compare Preview Modes"
+default_tab: "Browser"
+tabs:
+  - label: "CLI"
+    content: "Use npm run validate for fast schema feedback."
+  - label: "Browser"
+    content: "Use local preview to inspect layout, controls, and print behavior."
+```
+
+```lecture-component
+type: accordion
+title: "Optional Review Detail"
+default_open: "When to expand"
+items:
+  - title: "When to expand"
+    body: "Use optional detail when the core path should stay readable."
+  - title: "Review visibility"
+    body: "Collapsed detail remains available in source, print, and review packages."
+```
+
+```lecture-component
+type: timeline
+title: "Authoring Sequence"
+items:
+  - date: "Step 1"
+    label: "Draft"
+    detail: "Write the lecture sections and component YAML."
+  - date: "Step 2"
+    label: "Validate"
+    detail: "Run validation before local preview or package review."
+  - date: "Step 3"
+    label: "Review"
+    detail: "Inspect print and package output for hidden or instructor material."
+```
+
+```lecture-component
+type: checklist
+title: "Local Readiness Check"
+storage: session
+reset_label: "Reset checklist"
+items:
+  - "Validation passes."
+  - "Narrow viewport has no horizontal overflow."
+  - "Print output shows hidden answers and notes."
+```
+
+```lecture-component
+type: flashcard
+category: "Recall"
+prompt: "Which component is best for quick prompt-and-reveal memory practice?"
+hint: "It is not a graded quiz."
+answer: "Use flashcard for lightweight recall."
+```
+
+```lecture-component
+type: worked_example
+title: "Fix A Bad Resource Link"
+problem: "A generated component uses javascript:alert(1) as a resource URL."
+starter_code: "type: resource_links\nlinks:\n  - label: \"Bad\"\n    url: \"javascript:alert(1)\""
+language: "yaml"
+walkthrough:
+  - "Read the validation field path for the link URL."
+  - "Replace the unsafe scheme with an http, https, root-relative, relative, or hash URL."
+solution: "Use url: \"https://example.com/docs\" or a local path such as docs/resource.html."
+takeaway: "Resource links are references only; rendering never fetches remote resources."
+```
+
+```lecture-component
+type: mistake_correction
+title: "Treating Hidden Content As Secure"
+mistake: "Assuming a collapsed answer or instructor note is hidden from reviewers or learners."
+why_it_fails: "The content remains in source and static output for accessibility, print, and review."
+correction: "Use hidden content only for pacing, never for secrets or secure assessment."
+example_before: "flashcard answer: \"secret token\""
+example_after: "flashcard answer: \"Explain the public concept.\""
+```
+
+```lecture-component
+type: resource_links
+title: "Authoring References"
+links:
+  - label: "Local README"
+    url: "/README.md"
+    description: "Project-level authoring guidance."
+    category: "Local"
+  - label: "Example documentation"
+    url: "https://example.com/docs"
+    description: "External documentation shown with visible hostname."
+    category: "External"
+```
+
+```lecture-component
+type: instructor_note
+title: "Facilitation Reminder"
+audience: both
+timing: "Before live review"
+body: "Ask reviewers to compare hidden answers, resources, and instructor notes against the source material."
+```
+
 ## Key Takeaways
 
-- The engine supports callout, concept_card, step_list, code_block, comparison, summary, quote, quiz, question_set, free_response, practice_task, and diagram components.
+- The engine supports callout, concept_card, step_list, code_block, comparison, summary, quote, quiz, question_set, free_response, practice_task, diagram, glossary_term, tabs, accordion, timeline, checklist, flashcard, worked_example, mistake_correction, resource_links, and instructor_note components.
 - Components must use fenced YAML with the lecture-component language tag.
 - Quiz is a knowledge check whose answer and explanation are revealed on demand; stronger assessment components support grouped checks, local written responses, and applied practice.
 - Diagram renders Mermaid.js diagrams with a static fallback for no-JS environments.

@@ -297,6 +297,136 @@ theme: default
 
 Rendered label: `Diagram`. Use `diagram` for visual representations of architecture, process flows, sequence interactions, state machines, data models, and timelines using Mermaid.js syntax. Required fields: `diagram_type`, `title`, and `code`. Supported `diagram_type` values: `flowchart`, `sequence`, `class`, `state`, `er`, `gantt`, `pie`, `mindmap`. Optional fields: `direction` (flowchart only: `TB`, `LR`, `BT`, `RL`) and `theme` (`default`, `dark`, `forest`, `neutral`, `base`). The `code` field contains valid Mermaid.js diagram source. On the client, Mermaid.js renders the diagram as SVG; without JavaScript, the raw source code is shown as a fallback. Use diagrams when visual representations clarify architecture, processes, interactions, or data relationships. Do not use diagrams for simple lists, short text comparisons, single-step processes, or content better suited to code blocks or step lists.
 
+### Advanced Component Chooser
+
+- Use `glossary_term` for a local definition or vocabulary reminder.
+- Use `tabs` for compact alternatives such as CLI/browser, modes, languages, or perspectives.
+- Use `accordion` for optional depth that should not interrupt the main path.
+- Use `timeline` for ordered events, stages, releases, or learning paths.
+- Use `checklist` for local readiness or task completion; it is not grading or progress tracking.
+- Use `flashcard` for quick prompt-and-reveal memory practice.
+- Use `worked_example` for problem, walkthrough, and solution teaching.
+- Use `mistake_correction` for wrong approach, failure reason, and corrected approach.
+- Use `resource_links` for curated references; rendering does not fetch external URLs.
+- Use `instructor_note` for facilitation or reviewer guidance.
+
+````markdown
+```lecture-component
+type: glossary_term
+term: "Schema validation"
+definition: "Checking authored template structure before preview or handoff."
+context: "Use when a definition should stay near the lesson."
+aliases:
+  - "template validation"
+```
+````
+
+````markdown
+```lecture-component
+type: tabs
+title: "Compare Modes"
+default_tab: "Browser"
+tabs:
+  - label: "CLI"
+    content: "Use validation for fast schema feedback."
+  - label: "Browser"
+    content: "Use preview for layout and flow."
+```
+````
+
+````markdown
+```lecture-component
+type: accordion
+title: "Optional Detail"
+items:
+  - title: "When to expand"
+    body: "Reveal optional depth without interrupting the main path."
+```
+````
+
+````markdown
+```lecture-component
+type: timeline
+title: "Implementation Path"
+items:
+  - label: "Draft"
+    detail: "Write the component YAML."
+  - label: "Validate"
+    detail: "Run npm run validate."
+```
+````
+
+````markdown
+```lecture-component
+type: checklist
+title: "Readiness Check"
+storage: session
+reset_label: "Reset checklist"
+items:
+  - "Validation passes."
+  - "Print output shows hidden content."
+```
+````
+
+````markdown
+```lecture-component
+type: flashcard
+prompt: "Which command validates templates?"
+hint: "It runs before preview."
+answer: "npm run validate"
+```
+````
+
+````markdown
+```lecture-component
+type: worked_example
+title: "Fix A Field Error"
+problem: "A generated component has an empty required field."
+walkthrough:
+  - "Read the validation field path."
+  - "Replace the empty value with source-grounded text."
+solution: "Run validation again and confirm the field error is gone."
+takeaway: "Validation errors are authoring feedback."
+```
+````
+
+````markdown
+```lecture-component
+type: mistake_correction
+title: "Hidden Content Is Not Secure"
+mistake: "Treating collapsed answers as secret."
+why_it_fails: "The content remains in source, static HTML, print, and review packages."
+correction: "Use hidden content only for pacing."
+```
+````
+
+````markdown
+```lecture-component
+type: resource_links
+title: "References"
+links:
+  - label: "Project README"
+    url: "/README.md"
+    description: "Local project guidance."
+  - label: "External docs"
+    url: "https://example.com/docs"
+```
+````
+
+`resource_links.url` may be `http`, `https`, root-relative, relative local paths, or hash references. Do not use `javascript:`, protocol-relative URLs, raw HTML embeds, remote fetching promises, or citation-manager behavior.
+
+````markdown
+```lecture-component
+type: instructor_note
+title: "Facilitation Reminder"
+audience: both
+timing: "Before live review"
+body: "Ask reviewers to compare hidden content with the source material."
+```
+````
+
+For advanced components, hidden/collapsed answers, instructor notes, and tab or accordion content are pacing aids only. They remain visible in source templates, static HTML, print output, and review packages. Checklist state is browser-local only; it is never synced, submitted, exported, graded, or included in review packages. Review packages summarize component counts, resource links, detectable local resource-link status, and instructor-note presence.
+
 Do not invent custom component types. Unsupported component types fail validation.
 
 ## Validation Checklist Before Finishing

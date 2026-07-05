@@ -15,7 +15,17 @@ export type LectureComponentType =
   | "question_set"
   | "free_response"
   | "practice_task"
-  | "diagram";
+  | "diagram"
+  | "glossary_term"
+  | "tabs"
+  | "accordion"
+  | "timeline"
+  | "checklist"
+  | "flashcard"
+  | "worked_example"
+  | "mistake_correction"
+  | "resource_links"
+  | "instructor_note";
 
 export interface SourceLocator {
   line?: number;
@@ -296,6 +306,109 @@ export interface DiagramComponent {
   theme?: DiagramTheme;
 }
 
+export interface GlossaryTermComponent {
+  type: "glossary_term";
+  term: string;
+  definition: string;
+  context?: string;
+  aliases?: string[];
+}
+
+export interface TabPanel {
+  label: string;
+  content: string;
+}
+
+export interface TabsComponent {
+  type: "tabs";
+  title: string;
+  tabs: TabPanel[];
+  default_tab?: string;
+}
+
+export interface AccordionItem {
+  title: string;
+  body: string;
+}
+
+export interface AccordionComponent {
+  type: "accordion";
+  title: string;
+  items: AccordionItem[];
+  default_open?: string;
+}
+
+export interface TimelineItem {
+  label: string;
+  detail: string;
+  date?: string;
+}
+
+export interface TimelineComponent {
+  type: "timeline";
+  title: string;
+  items: TimelineItem[];
+  orientation: "vertical" | "horizontal";
+}
+
+export interface ChecklistComponent {
+  type: "checklist";
+  title: string;
+  items: string[];
+  storage: "session" | "local";
+  reset_label?: string;
+}
+
+export interface FlashcardComponent {
+  type: "flashcard";
+  prompt: string;
+  answer: string;
+  hint?: string;
+  category?: string;
+}
+
+export interface WorkedExampleComponent {
+  type: "worked_example";
+  title: string;
+  problem: string;
+  walkthrough: string[];
+  solution: string;
+  starter_code?: string;
+  language?: string;
+  takeaway?: string;
+}
+
+export interface MistakeCorrectionComponent {
+  type: "mistake_correction";
+  title: string;
+  mistake: string;
+  why_it_fails: string;
+  correction: string;
+  example_before?: string;
+  example_after?: string;
+}
+
+export interface ResourceLink {
+  label: string;
+  url: string;
+  description?: string;
+  category?: string;
+}
+
+export interface ResourceLinksComponent {
+  type: "resource_links";
+  title: string;
+  links: ResourceLink[];
+}
+
+export interface InstructorNoteComponent {
+  type: "instructor_note";
+  title: string;
+  body: string;
+  audience: "instructor" | "reviewer" | "both";
+  timing?: string;
+}
+
 export type LectureComponent =
   | CalloutComponent
   | ConceptCardComponent
@@ -308,7 +421,17 @@ export type LectureComponent =
   | QuestionSetComponent
   | FreeResponseComponent
   | PracticeTaskComponent
-  | DiagramComponent;
+  | DiagramComponent
+  | GlossaryTermComponent
+  | TabsComponent
+  | AccordionComponent
+  | TimelineComponent
+  | ChecklistComponent
+  | FlashcardComponent
+  | WorkedExampleComponent
+  | MistakeCorrectionComponent
+  | ResourceLinksComponent
+  | InstructorNoteComponent;
 
 export type RenderBlock =
   | Exclude<MarkdownBlock, ParsedComponentBlock>

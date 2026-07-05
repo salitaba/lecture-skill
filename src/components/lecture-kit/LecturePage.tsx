@@ -45,7 +45,7 @@ export function LecturePage({ lecture, templatePath }: LecturePageProps) {
             </section>
 
             {lecture.sections.map((section, index) => (
-              <SectionRenderer key={section.anchor} section={section} index={index} />
+              <SectionRenderer key={section.anchor} section={section} index={index} lectureId={lectureId} />
             ))}
 
             <section className="takeaways-section lecture-panel" aria-labelledby={lectureNavigationTargets.takeaways.id}>

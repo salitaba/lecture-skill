@@ -14,7 +14,17 @@ const supportedComponentTypes = [
   "question_set",
   "free_response",
   "practice_task",
-  "diagram"
+  "diagram",
+  "glossary_term",
+  "tabs",
+  "accordion",
+  "timeline",
+  "checklist",
+  "flashcard",
+  "worked_example",
+  "mistake_correction",
+  "resource_links",
+  "instructor_note"
 ];
 
 describe("validateTemplateSource", () => {
@@ -139,7 +149,7 @@ describe("validateTemplateSource", () => {
     const unsupported = validationErrors("examples/invalid/unsupported-component-type.template.md").find(
       (error) => error.code === "UNSUPPORTED_COMPONENT_TYPE"
     );
-    expect(unsupported?.componentType).toBe("flashcard");
+    expect(unsupported?.componentType).toBe("interactive_widget");
     expect(unsupported?.sectionTitle).toBe("Valid Section");
     expect(unsupported?.hint).toContain("comparison");
     expect(unsupported?.hint).toContain("quiz");
@@ -305,6 +315,70 @@ Section content.
       expect(byField.get("questions[0].options[1]")?.componentType).toBe("question_set");
       expect(byField.get("guidance")?.componentType).toBe("free_response");
       expect(byField.get("rubric[0].expected")?.componentType).toBe("practice_task");
+    }
+  });
+
+  it("accepts advanced components with defaults, trimmed values, and authored order", () => {
+    const result = validateTemplateSource(validAdvancedComponentsTemplate());
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const components = result.template.sections.flatMap((section) =>
+        section.blocks.flatMap((block) => (block.kind === "component" ? [block.component] : []))
+      );
+      expect(components).toContainEqual({
+        type: "glossary_term",
+        term: "Schema",
+        definition: "A contract.",
+        context: "Use before rendering.",
+        aliases: ["Template contract"]
+      });
+      expect(components).toContainEqual({
+        type: "tabs",
+        title: "Modes",
+        tabs: [
+          { label: "CLI", content: "Validate." },
+          { label: "Browser", content: "Preview." }
+        ],
+        default_tab: "Browser"
+      });
+      expect(components).toContainEqual({
+        type: "timeline",
+        title: "Sequence",
+        orientation: "vertical",
+        items: [
+          { label: "Draft", detail: "Write." },
+          { label: "Validate", detail: "Check.", date: "Step 2" }
+        ]
+      });
+      expect(components).toContainEqual({
+        type: "checklist",
+        title: "Ready",
+        items: ["Validate"],
+        storage: "session"
+      });
+      expect(components).toContainEqual({
+        type: "instructor_note",
+        title: "Teach",
+        body: "Mention source review.",
+        audience: "instructor"
+      });
+    }
+  });
+
+  it("reports advanced component field paths with context", () => {
+    const result = validateTemplateSource(invalidAdvancedComponentsTemplate());
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      const byField = new Map(result.errors.filter((error) => error.code === "INVALID_COMPONENT_FIELD").map((error) => [error.field, error]));
+      for (const field of ["tabs", "default_tab", "items", "orientation", "storage", "links[0].url", "audience"]) {
+        expect(byField.has(field), field).toBe(true);
+        expect(byField.get(field)?.sectionTitle).toBe("Advanced Problems");
+        expect(byField.get(field)?.locator?.line).toBeGreaterThan(0);
+      }
+      expect(byField.get("links[0].url")?.componentType).toBe("resource_links");
+      expect(byField.get("audience")?.componentType).toBe("instructor_note");
     }
   });
 
@@ -623,6 +697,181 @@ rubric:
 ## Key Takeaways
 
 - Stronger assessments validate.
+`;
+}
+
+function validAdvancedComponentsTemplate(): string {
+  return `---
+title: "Advanced Components"
+description: "Valid advanced components."
+audience: "Engineers"
+duration: "30 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn advanced components.
+
+## Section: Advanced Models
+
+\`\`\`lecture-component
+type: glossary_term
+term: " Schema "
+definition: " A contract. "
+context: " Use before rendering. "
+aliases:
+  - " Template contract "
+\`\`\`
+
+\`\`\`lecture-component
+type: tabs
+title: " Modes "
+default_tab: "Browser"
+tabs:
+  - label: " CLI "
+    content: " Validate. "
+  - label: " Browser "
+    content: " Preview. "
+\`\`\`
+
+\`\`\`lecture-component
+type: accordion
+title: " Details "
+default_open: "Open"
+items:
+  - title: " Open "
+    body: " Read first. "
+\`\`\`
+
+\`\`\`lecture-component
+type: timeline
+title: " Sequence "
+items:
+  - label: " Draft "
+    detail: " Write. "
+  - date: " Step 2 "
+    label: " Validate "
+    detail: " Check. "
+\`\`\`
+
+\`\`\`lecture-component
+type: checklist
+title: " Ready "
+items:
+  - " Validate "
+\`\`\`
+
+\`\`\`lecture-component
+type: flashcard
+prompt: " Prompt? "
+answer: " Answer. "
+\`\`\`
+
+\`\`\`lecture-component
+type: worked_example
+title: " Example "
+problem: " Problem. "
+walkthrough:
+  - " Step. "
+solution: " Solution. "
+\`\`\`
+
+\`\`\`lecture-component
+type: mistake_correction
+title: " Fix "
+mistake: " Wrong. "
+why_it_fails: " Breaks. "
+correction: " Right. "
+\`\`\`
+
+\`\`\`lecture-component
+type: resource_links
+title: " Links "
+links:
+  - label: " Docs "
+    url: " https://example.com/docs "
+\`\`\`
+
+\`\`\`lecture-component
+type: instructor_note
+title: " Teach "
+body: " Mention source review. "
+\`\`\`
+
+## Key Takeaways
+
+- Advanced components validate.
+`;
+}
+
+function invalidAdvancedComponentsTemplate(): string {
+  return `---
+title: "Invalid Advanced Components"
+description: "Invalid advanced components."
+audience: "Engineers"
+duration: "30 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview paragraph.
+
+## Learning Objectives
+
+- Learn invalid advanced components.
+
+## Section: Advanced Problems
+
+\`\`\`lecture-component
+type: tabs
+title: "Bad"
+default_tab: "Missing"
+tabs:
+  - label: "Same"
+    content: "First"
+  - label: "Same"
+    content: "Second"
+\`\`\`
+
+\`\`\`lecture-component
+type: timeline
+title: "Bad"
+orientation: sideways
+items: []
+\`\`\`
+
+\`\`\`lecture-component
+type: checklist
+title: "Bad"
+storage: remote
+items:
+  - "One"
+\`\`\`
+
+\`\`\`lecture-component
+type: resource_links
+title: "Bad"
+links:
+  - label: "Bad"
+    url: "javascript:alert(1)"
+\`\`\`
+
+\`\`\`lecture-component
+type: instructor_note
+title: "Bad"
+body: "Present"
+audience: learner
+\`\`\`
+
+## Key Takeaways
+
+- Invalid advanced components fail.
 `;
 }
 

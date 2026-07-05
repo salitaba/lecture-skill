@@ -433,6 +433,146 @@ Rendered label: `Practice task`. Use `practice_task` for applied exercises, debu
 
 Lecture pages include assessment anchors and a printable answer-key appendix after Key Takeaways. Collection landing pages include an assessment index linking to `/lectures/<slug>#<assessment-anchor>` for valid lectures.
 
+Advanced teaching components:
+
+````markdown
+```lecture-component
+type: glossary_term
+term: "Schema validation"
+definition: "Checking authored template structure before preview or handoff."
+context: "Use when a definition should stay close to the lesson."
+aliases:
+  - "template validation"
+```
+````
+
+Use `glossary_term` for explicit definitions. Required fields are `term` and `definition`; optional fields are `context` and `aliases`.
+
+````markdown
+```lecture-component
+type: tabs
+title: "Compare Modes"
+default_tab: "Browser"
+tabs:
+  - label: "CLI"
+    content: "Use validation for fast schema feedback."
+  - label: "Browser"
+    content: "Use preview for layout and flow."
+```
+````
+
+Use `tabs` for compact alternatives. It requires a `title` and at least two unique tab labels. `default_tab` must match one label. Static/no-JavaScript and print output include every panel.
+
+````markdown
+```lecture-component
+type: accordion
+title: "Optional Detail"
+default_open: "When to use"
+items:
+  - title: "When to use"
+    body: "Reveal optional depth without interrupting the main path."
+```
+````
+
+Use `accordion` for optional depth. It requires a `title` and at least one item with `title` and `body`. `default_open` must match an item title.
+
+````markdown
+```lecture-component
+type: timeline
+title: "Implementation Path"
+items:
+  - label: "Draft"
+    detail: "Write the component YAML."
+  - date: "Step 2"
+    label: "Validate"
+    detail: "Run npm run validate."
+```
+````
+
+Use `timeline` for ordered events, stages, releases, or learning paths. It requires at least two items. Optional `orientation` is `vertical` or `horizontal` and defaults to `vertical`.
+
+````markdown
+```lecture-component
+type: checklist
+title: "Readiness Check"
+storage: session
+reset_label: "Reset checklist"
+items:
+  - "Validation passes."
+  - "Print output shows hidden content."
+```
+````
+
+Use `checklist` for local learner readiness. Checklist state is browser-local only. It is never synced, submitted, exported, graded, or included in review packages. `storage` is `session` or `local` and defaults to `session`.
+
+````markdown
+```lecture-component
+type: flashcard
+category: "Recall"
+prompt: "Which command validates templates?"
+hint: "It runs before preview."
+answer: "npm run validate"
+```
+````
+
+Use `flashcard` for quick prompt-and-reveal practice. Answers are hidden by default on screen and visible in print/review output.
+
+````markdown
+```lecture-component
+type: worked_example
+title: "Fix A Field Error"
+problem: "A generated component has an empty required field."
+walkthrough:
+  - "Read the validation field path."
+  - "Replace the empty value with source-grounded text."
+solution: "Run validation again and confirm the field error is gone."
+takeaway: "Validation errors are authoring feedback, not learner content."
+```
+````
+
+Use `worked_example` for problem, walkthrough, and solution teaching. Optional `starter_code`, `language`, and `takeaway` fields are supported.
+
+````markdown
+```lecture-component
+type: mistake_correction
+title: "Hidden Content Is Not Secure"
+mistake: "Treating collapsed answers as secret."
+why_it_fails: "The content remains in source, static HTML, print, and review packages."
+correction: "Use hidden content only for pacing."
+```
+````
+
+Use `mistake_correction` for wrong approach, failure reason, and correction. Optional before/after examples are `example_before` and `example_after`.
+
+````markdown
+```lecture-component
+type: resource_links
+title: "References"
+links:
+  - label: "Project README"
+    url: "/README.md"
+    description: "Local project guidance."
+  - label: "External docs"
+    url: "https://example.com/docs"
+```
+````
+
+Use `resource_links` for curated references. URLs may be `http`, `https`, root-relative, relative local paths, or hash references. Unsafe schemes such as `javascript:` and protocol-relative URLs are rejected. Rendering does not fetch external resources.
+
+````markdown
+```lecture-component
+type: instructor_note
+title: "Facilitation Reminder"
+audience: both
+timing: "Before live review"
+body: "Ask reviewers to compare hidden content with the source material."
+```
+````
+
+Use `instructor_note` for teaching or reviewer guidance. `audience` is `instructor`, `reviewer`, or `both` and defaults to `instructor`.
+
+Hidden, collapsed, answer, and instructor content is not secure. It is visible in source templates, static HTML, print output, and review packages. Review packages summarize component counts, resource links, local resource-link status where detectable, and instructor-note presence.
+
 Unsupported custom component types still fail validation.
 
 ## Complete Synthetic Template
@@ -511,7 +651,7 @@ For the golden MVP workflow, use `examples/raw-lecture.txt` as the only raw sour
 - Missing required section: add the exact heading named in the error.
 - Out-of-order heading: use Overview, Learning Objectives, Section blocks, then Key Takeaways.
 - Component outside section: move the fenced block inside a `## Section: <title>` block.
-- Unsupported component type: use only `callout`, `concept_card`, `step_list`, `code_block`, `comparison`, `summary`, `quote`, or `quiz`.
+- Unsupported component type: use only the documented supported component types in this README.
 - Malformed YAML: check indentation, quotes, and key/value syntax.
 - Empty list: add at least one bullet item or step.
 

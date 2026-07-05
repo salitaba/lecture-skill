@@ -1,0 +1,687 @@
+Feature: Advanced UI Engine Components
+
+## Product Summary
+
+Extend the Lecture Site Engine with a richer set of reusable UI engine components for technical education: `glossary_term`, `tabs`, `accordion`, `timeline`, `checklist`, `flashcard`, `worked_example`, `mistake_correction`, `resource_links`, and `instructor_note`.
+
+The engine already supports a strong foundation: lecture structure, local validation, multi-lecture collections, review packaging, source-fidelity workflows, Mermaid diagrams, progress tracking, and assessment components. The next UI engine gap is reusable instructional layout patterns that make long technical lessons easier to scan, practice, teach, and review without forcing authors or AI agents to invent unsupported Markdown structures.
+
+The primary product outcome is: an educator or AI agent can author common teaching patterns inside the supported `lecture-component` schema, and learners receive a clearer, more interactive, more reviewable lecture experience that remains local-first, static-export friendly, accessible, printable, and deterministic.
+
+This feature is about expanding the validated component vocabulary. It is not a browser editor, hosted CMS, LMS integration, AI tutoring runtime, analytics dashboard, or arbitrary plugin system.
+
+## Product Outcome
+
+Learners should gain more structure and useful interaction while reading a technical lecture:
+
+- Definitions are easy to find and revisit.
+- Alternate examples or perspectives can sit in one compact region.
+- Optional depth can be revealed without interrupting the main reading path.
+- Sequences, history, and learning paths are visually ordered.
+- Practical readiness items can be checked off locally.
+- Memory checks can be practiced with revealable flashcards.
+- Worked examples can teach problem-solving step by step.
+- Common mistakes can be shown safely with corrections.
+- Curated resources can be reviewed without hunting through prose.
+- Instructor-only teaching guidance can travel with the static package.
+
+Educators and reviewers should gain stronger authoring and handoff primitives:
+
+- Every component has a strict schema and validation errors.
+- Every component renders consistently with the existing lecture-kit design system.
+- Static review packages preserve all component content.
+- Print output remains useful for instructor prep, classroom use, and review.
+- AI agents get explicit component guidance instead of inventing unsupported types.
+
+## Users And Jobs
+
+Primary users:
+
+- Learners reading local or static lecture pages.
+- Technical educators converting notes, workshops, transcripts, or course outlines into teachable pages.
+- AI coding agents generating valid lecture templates from source material.
+- Reviewers checking source fidelity, teaching quality, and handoff readiness.
+- Instructors using review packages or print output during live teaching.
+
+Jobs to be done:
+
+- As a learner, I want definitions and reminders close to the lesson so I do not lose context.
+- As a learner, I want to compare variants or examples without scrolling through repeated sections.
+- As a learner, I want optional details to stay available without making the main page noisy.
+- As a learner, I want to check readiness and recall without implying formal grading.
+- As an educator, I want predictable teaching components for examples, mistakes, resources, and instructor prep.
+- As an AI agent, I want explicit component contracts so I can generate useful UI without custom React code.
+- As a reviewer, I want all hidden, instructor, and answer material visible in static packages and print output.
+
+## Problem
+
+The current component set is strong for core lecture content and assessments, but several common teaching patterns still require plain Markdown workarounds:
+
+- Definitions are repeated in prose instead of collected or visually distinguished.
+- Alternative examples, language variants, or perspectives create long duplicated sections.
+- Optional depth interrupts the main reading path.
+- Ordered events, learning paths, and release histories are hard to scan.
+- Readiness tasks are represented as normal bullet lists instead of checkable learner actions.
+- Memorization checks require either `quiz` or `free_response`, neither of which is ideal for quick prompt-and-reveal practice.
+- Worked examples are usually ad hoc headings, code blocks, and paragraphs instead of one structured teaching unit.
+- Wrong approaches and corrections are hard to present without confusing learners.
+- External resources are buried in prose and hard to validate.
+- Instructor notes have no first-class place in the template or review package.
+
+The result is that authors can build valid lectures, but richer teaching layouts still depend on inconsistency, unsupported patterns, or custom implementation.
+
+## Goals
+
+- Add ten validated UI engine components that cover high-value instructional patterns.
+- Keep every component authored as a `lecture-component` fenced YAML block inside a `## Section:` block.
+- Preserve the current lecture heading contract and existing component behavior.
+- Render every component with responsive, accessible, print-friendly lecture-kit UI.
+- Provide no-JavaScript fallbacks for every interactive component.
+- Keep learner state local-only where a component has temporary interaction.
+- Make all component content available in review packages and print output.
+- Update examples, README, and `SKILL.md` so educators and AI agents know when to use each component.
+- Add valid and invalid fixtures for every component.
+- Add focused tests for parsing, validation, rendering, print behavior, and backward compatibility.
+
+## Non-Goals
+
+- No arbitrary custom component plugin system.
+- No browser-based visual component builder.
+- No runtime LLM generation or AI feedback.
+- No remote API, database, authentication, accounts, or LMS integration.
+- No analytics, grading, scoring, or learner reporting.
+- No secure hiding of answers, instructor notes, or hidden content.
+- No external resource fetching during rendering.
+- No unsafe HTML embedding.
+- No drag-and-drop, file uploads, or complex simulation widgets.
+- No breaking changes to existing valid lecture templates.
+
+## Product Decisions
+
+- These components extend the engine vocabulary; they do not replace plain Markdown.
+- P0 should prioritize high-teaching-value components that are mostly static or have simple local interaction.
+- Interactive components must degrade to readable static HTML and useful print output.
+- Hidden or collapsed content is a pacing mechanism only. It is not security.
+- Instructor notes may be visually hidden in learner preview but must be available in source, review packages, and print/review modes.
+- Resource links are curated references, not a web crawler, citation manager, or dependency on remote availability.
+- Component schemas should be easy for AI agents to generate from raw source material.
+- Validation should reject empty structures instead of rendering weak empty UI.
+
+## UX Designer Notes
+
+The expanded component set should make lectures clearer, not busier. Components should be used when they create a recognizable teaching pattern: define, compare variants, reveal optional depth, sequence events, practice recall, walk through a solution, correct a misconception, or prepare an instructor.
+
+Design priorities:
+
+- Keep component labels consistent with the existing lecture-kit visual language.
+- Make the primary learner task immediately obvious inside each component.
+- Avoid nested cards. Use one framed component surface with internal regions.
+- Keep mobile layouts single-column unless a control genuinely benefits from horizontal treatment.
+- Use reveal, tab, and completion controls sparingly and predictably.
+- Do not imply grading, submission, tracking, or instructor surveillance.
+- Print output should read like an instructor handout: all prompts, hidden details, answers, resources, and notes visible with clear labels.
+- Review package output should make hidden or instructor-only material obvious to reviewers.
+- Empty states should be prevented by validation, not decorated at render time.
+
+## Priority
+
+### P0: Launch Scope
+
+P0 adds the highest-value instructional components with simple rendering and predictable validation.
+
+Requirements:
+
+- Add `glossary_term` for explicit definitions and domain vocabulary.
+- Add `checklist` for local learner readiness or task completion.
+- Add `worked_example` for structured problem, walkthrough, and solution teaching.
+- Add `mistake_correction` for wrong approach, why it fails, and corrected approach.
+- Add `tabs` for compact alternatives such as language variants, modes, or perspectives.
+- Render `tabs` with a no-JavaScript fallback that shows all panels in order.
+- Store checklist state only in browser-local UI state or localStorage when enabled; never sync or export learner state.
+- Print output shows checklist items unchecked, all tab panels, full worked examples, and full mistake corrections.
+- Static review packages preserve all component content.
+- Validation rejects empty titles, empty item lists, missing required fields, invalid URLs, duplicate tab labels, and unsupported component types.
+- Add valid and invalid examples for every P0 component.
+- Add component demo coverage for every P0 component.
+- Update README and `SKILL.md` with usage guidance and non-goal warnings.
+- Add focused tests for parsing, validation, rendering, responsive behavior, print hooks, and backward compatibility.
+
+### P1: Quality And Teaching Depth
+
+P1 adds reveal and reference components that improve pacing and study support.
+
+Requirements:
+
+- Add `accordion` for optional depth and progressive disclosure.
+- Add `flashcard` for prompt-and-reveal memory practice.
+- Add `resource_links` for curated references with labels, descriptions, and URL validation.
+- Add `timeline` for ordered events, stages, releases, or learning paths.
+- Add keyboard-operable reveal controls for accordion and flashcard components.
+- Render flashcard answers hidden by default in browser preview and visible in print/review output.
+- Render resource links with visible URL hostnames and clear external-link treatment.
+- Render timeline responsively without horizontal overflow at 390px, 768px, and 1280px.
+- Add valid and invalid examples for every P1 component.
+- Add component demo coverage for every P1 component.
+- Add review-package summaries for resource link count, broken local references where detectable, and instructor-only content presence.
+
+### P2: Instructor And Advanced Polish
+
+P2 adds instructor-specific handoff and deeper polish after the component vocabulary is stable.
+
+Requirements:
+
+- Add `instructor_note` for teaching guidance, facilitation notes, timing notes, and review-only context.
+- Add optional component-level anchors for all ten new components.
+- Add copy actions for resource lists, code-like examples inside worked examples, and tab panel content where useful.
+- Add optional glossary index generation across a lecture or collection.
+- Add optional timeline grouping by phase or date.
+- Add optional checklist reset and mark-all controls.
+- Add optional review-mode toggle that exposes instructor notes and hidden component content in the browser.
+- Add stronger authoring hints for when a component should be split, simplified, or replaced with plain Markdown.
+
+## Recommended Experience Direction
+
+### Component: Glossary Term
+
+Use `glossary_term` when a technical term needs a clear local definition.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: glossary_term
+term: "Schema validation"
+definition: "The process of checking authored template structure before preview or package handoff."
+context: "In this engine, validation protects authors from malformed lecture components."
+aliases:
+  - "template validation"
+```
+````
+
+Required fields:
+
+- `type`: `glossary_term`
+- `term`: non-empty string
+- `definition`: non-empty string
+
+Optional fields:
+
+- `context`: non-empty string
+- `aliases`: list of non-empty strings
+
+Rendering requirements:
+
+- Render as a compact definition block with the term visually prominent.
+- Use semantic definition-list markup where practical.
+- Keep aliases secondary and clearly labeled.
+- Do not render glossary terms as decorative callouts.
+
+### Component: Tabs
+
+Use `tabs` when a section needs mutually related alternatives in one compact place.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: tabs
+title: "Compare Implementation Styles"
+tabs:
+  - label: "CLI"
+    content: "Use the validation command when an agent or script needs fast feedback."
+  - label: "Browser"
+    content: "Use local preview when an educator needs to inspect layout and flow."
+```
+````
+
+Required fields:
+
+- `type`: `tabs`
+- `title`: non-empty string
+- `tabs`: list of at least two tab panels
+- Each tab requires `label` and `content`
+
+Optional fields:
+
+- `default_tab`: label matching one tab
+
+Rendering requirements:
+
+- JavaScript-enabled preview shows one panel at a time with keyboard-accessible tab controls.
+- Without JavaScript, all tab panels render in authored order with labels.
+- Print output shows all tab panels.
+- Duplicate labels are invalid because they break tab targeting.
+
+### Component: Accordion
+
+Use `accordion` for optional detail that should not interrupt the main reading path.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: accordion
+title: "Deeper Details"
+items:
+  - title: "Why strict schemas help AI agents"
+    body: "A small schema reduces ambiguity and makes validation errors easier to repair."
+  - title: "When to avoid a component"
+    body: "Use plain Markdown when a component adds layout but no teaching value."
+```
+````
+
+Required fields:
+
+- `type`: `accordion`
+- `title`: non-empty string
+- `items`: list of at least one item
+- Each item requires `title` and `body`
+
+Optional fields:
+
+- `default_open`: list of item titles that should start open
+
+Rendering requirements:
+
+- Use native disclosure behavior where possible.
+- Preserve authored order.
+- Print output shows all items expanded.
+- Avoid using accordion for required instructions.
+
+### Component: Timeline
+
+Use `timeline` for ordered events, stages, milestones, releases, or learning paths.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: timeline
+title: "Authoring Workflow"
+items:
+  - label: "Draft"
+    detail: "Create or update the lecture template from source evidence."
+  - label: "Validate"
+    detail: "Run validation and fix author-locatable errors."
+  - label: "Review"
+    detail: "Generate a source-fidelity worksheet and inspect the rendered page."
+```
+````
+
+Required fields:
+
+- `type`: `timeline`
+- `title`: non-empty string
+- `items`: list of at least two items
+- Each item requires `label` and `detail`
+
+Optional fields:
+
+- `orientation`: `vertical` or `compact`; defaults to `vertical`
+- `date`: optional non-empty string per item
+
+Rendering requirements:
+
+- Mobile renders as a vertical list with clear sequence markers.
+- Desktop may use a vertical or compact timeline, but must not require horizontal scrolling.
+- Dates are secondary; the sequence is primary.
+- Do not rely on color alone to communicate status.
+
+### Component: Checklist
+
+Use `checklist` for readiness, practice, or review items that a learner or instructor can mark locally.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: checklist
+title: "Before You Continue"
+items:
+  - "I can explain why raw source evidence is preserved."
+  - "I can run validation and interpret the result."
+  - "I can identify when a review package is ready to hand off."
+```
+````
+
+Required fields:
+
+- `type`: `checklist`
+- `title`: non-empty string
+- `items`: list of at least one non-empty string
+
+Optional fields:
+
+- `storage`: `session` or `local`; defaults to `session`
+- `reset_label`: non-empty string
+
+Rendering requirements:
+
+- Browser preview renders checkable items with local-only state.
+- Print output shows unchecked boxes.
+- The UI must not imply grading, submission, or analytics.
+- State must recover cleanly if storage is unavailable.
+
+### Component: Flashcard
+
+Use `flashcard` for quick recall, definitions, command memory, or concept checks.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: flashcard
+prompt: "Which command validates the active lecture or collection?"
+answer: "npm run validate"
+hint: "Use this before previewing or packaging."
+```
+````
+
+Required fields:
+
+- `type`: `flashcard`
+- `prompt`: non-empty string
+- `answer`: non-empty string
+
+Optional fields:
+
+- `hint`: non-empty string
+- `category`: non-empty string
+
+Rendering requirements:
+
+- Browser preview hides the answer until the learner reveals it.
+- Hint is optional and separate from the answer.
+- Print and review output show prompt, hint, and answer with clear labels.
+- The reveal button should say `Reveal answer`, not `Submit`.
+
+### Component: Worked Example
+
+Use `worked_example` for a structured problem-solving walkthrough.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: worked_example
+title: "Fix A Validation Error"
+problem: "A template contains a quiz answer that does not match any option."
+walkthrough:
+  - "Read the validation error and locate the component."
+  - "Compare the answer value with each option after trimming whitespace."
+  - "Update the answer or option so they match exactly."
+solution: "The corrected quiz uses an answer string that exactly matches one option."
+```
+````
+
+Required fields:
+
+- `type`: `worked_example`
+- `title`: non-empty string
+- `problem`: non-empty string
+- `walkthrough`: list of at least one non-empty step
+- `solution`: non-empty string
+
+Optional fields:
+
+- `starter_code`: non-empty string
+- `language`: non-empty string, used only when `starter_code` is present
+- `takeaway`: non-empty string
+
+Rendering requirements:
+
+- Render problem, walkthrough, and solution as distinct regions.
+- Keep the walkthrough scannable.
+- If starter code is present, render it using code-block styling.
+- Print output includes the full solution.
+
+### Component: Mistake Correction
+
+Use `mistake_correction` to teach a common wrong approach and its correction.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: mistake_correction
+title: "Do Not Invent Unsupported Components"
+mistake: "Adding a custom component type because it looks useful."
+why_it_fails: "The validator rejects unsupported types, and reviewers cannot rely on custom rendering."
+correction: "Use the closest supported component or plain Markdown until the schema adds a new component."
+```
+````
+
+Required fields:
+
+- `type`: `mistake_correction`
+- `title`: non-empty string
+- `mistake`: non-empty string
+- `why_it_fails`: non-empty string
+- `correction`: non-empty string
+
+Optional fields:
+
+- `example_before`: non-empty string
+- `example_after`: non-empty string
+
+Rendering requirements:
+
+- Clearly distinguish the wrong approach from the correction.
+- Avoid alarm-heavy visual styling; this is teaching, not an error screen.
+- Before/after examples should stack on mobile.
+- Do not rely on red/green color alone.
+
+### Component: Resource Links
+
+Use `resource_links` for curated supporting references.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: resource_links
+title: "Further Reading"
+links:
+  - label: "Lecture Site Engine README"
+    url: "https://example.com/lecture-site-engine"
+    description: "Project setup, validation, preview, and packaging workflow."
+  - label: "Mermaid documentation"
+    url: "https://mermaid.js.org/"
+    description: "Diagram syntax reference for authored diagrams."
+```
+````
+
+Required fields:
+
+- `type`: `resource_links`
+- `title`: non-empty string
+- `links`: list of at least one link
+- Each link requires `label` and `url`
+
+Optional fields:
+
+- `description`: non-empty string per link
+- `category`: non-empty string per link
+
+Validation requirements:
+
+- URLs must be valid `http`, `https`, root-relative, or relative local paths.
+- Empty labels and empty URLs are invalid.
+- JavaScript URLs are invalid.
+
+Rendering requirements:
+
+- Show the label, optional description, and visible host or local path.
+- External links should be visually clear.
+- Print output includes full URLs.
+- The component must not fetch or validate remote availability at render time.
+
+### Component: Instructor Note
+
+Use `instructor_note` for teaching guidance that should travel with the course but not dominate learner preview.
+
+Authoring shape:
+
+````markdown
+```lecture-component
+type: instructor_note
+title: "Facilitation Note"
+body: "Pause here and ask learners to explain the validation loop before showing the worked example."
+audience: "instructor"
+```
+````
+
+Required fields:
+
+- `type`: `instructor_note`
+- `title`: non-empty string
+- `body`: non-empty string
+
+Optional fields:
+
+- `audience`: `instructor`, `reviewer`, or `both`; defaults to `instructor`
+- `timing`: non-empty string
+
+Rendering requirements:
+
+- Normal learner preview may collapse or visually de-emphasize instructor notes.
+- Review mode, print output, and static review packages show instructor notes clearly.
+- The component must not claim secure hiding because content exists in source and static output.
+- Instructor notes should not appear in learner progress calculations.
+
+## Validation Requirements
+
+Every new component must produce author-locatable validation errors with `field`, `componentType`, and source locator when available.
+
+General validation rules:
+
+- `type` must match one of the ten supported component names.
+- Required string fields must be non-empty after trimming.
+- Required list fields must contain the minimum number of valid entries.
+- Optional string fields, when present, must be non-empty after trimming.
+- Unknown fields are ignored in P0 unless they create ambiguity with a known field.
+- Duplicate labels are rejected where labels become UI identifiers.
+- Component content must not include raw HTML that bypasses Markdown safety rules.
+- URLs in `resource_links` must reject unsafe schemes.
+
+Suggested validation error examples:
+
+- "glossary_term component requires a non-empty term field."
+- "tabs component requires at least two tab panels."
+- "tabs component has duplicate tab label: CLI."
+- "accordion item requires a non-empty body field."
+- "timeline component requires at least two items."
+- "checklist component requires at least one item."
+- "flashcard component requires a non-empty answer field."
+- "worked_example component requires at least one walkthrough step."
+- "mistake_correction component requires a why_it_fails field."
+- "resource_links URL must use http, https, or a local path."
+- "instructor_note audience must be instructor, reviewer, or both."
+
+## Rendering Requirements
+
+- Components render inside existing lecture sections using the lecture-kit visual system.
+- Components must be responsive at 390px, 768px, and 1280px widths.
+- Components must not create horizontal body overflow.
+- Interactive components must have static no-JavaScript fallbacks.
+- Print output must expose hidden, collapsed, tabbed, answer, and instructor content.
+- Review packages must preserve every authored component field that matters to review.
+- Component labels should be human-readable and consistent:
+  - `Glossary`
+  - `Tabs`
+  - `More detail`
+  - `Timeline`
+  - `Checklist`
+  - `Flashcard`
+  - `Worked example`
+  - `Common mistake`
+  - `Resources`
+  - `Instructor note`
+
+## Accessibility Requirements
+
+- All interactive controls must be keyboard operable.
+- Tab controls should follow ARIA tablist semantics when JavaScript is active.
+- Accordion and flashcard reveal controls must expose expanded/collapsed state.
+- Checklist items must have accessible labels and visible focus states.
+- Timeline sequence markers must have text labels, not only color or position.
+- Resource links must have meaningful link text.
+- Instructor notes must not be hidden from assistive technology in review or print modes.
+- Components must meet the existing color contrast bar.
+- Motion should be subtle and should respect reduced-motion preferences.
+
+## Responsive Requirements
+
+- Phone width: single-column rendering for all components.
+- Tablet width: controls may sit above content, but content remains single-column unless labels are short.
+- Desktop width: tabs, worked examples, and mistake correction may use side-by-side internal regions when readability improves.
+- Long labels, URLs, code, and definitions must wrap before overflowing.
+- Component spacing should match the existing lecture-panel rhythm.
+
+## Print And Review Package Requirements
+
+- Print output expands all hidden or collapsed content.
+- Print output shows all tab panels in authored order.
+- Print output shows flashcard answers and hints.
+- Print output shows checklist boxes unchecked.
+- Print output shows full URLs for resource links.
+- Print output shows instructor notes with an explicit `Instructor note` label.
+- Review packages include valid examples and component demo output.
+- Review package manifests should summarize component counts by type.
+
+## Documentation Requirements
+
+- Update `README.md` with authoring examples for all ten components.
+- Update `SKILL.md` with generation guidance for all ten components.
+- Add component selection guidance:
+  - Use `glossary_term` for definitions.
+  - Use `tabs` for compact alternatives.
+  - Use `accordion` for optional depth.
+  - Use `timeline` for ordered stages.
+  - Use `checklist` for readiness or action items.
+  - Use `flashcard` for memorization and quick recall.
+  - Use `worked_example` for step-by-step problem solving.
+  - Use `mistake_correction` for misconceptions and debugging patterns.
+  - Use `resource_links` for curated references.
+  - Use `instructor_note` for facilitation or reviewer context.
+- Add a component demo fixture that includes all ten components.
+- Add invalid fixtures for missing fields, empty lists, duplicate labels, and invalid URLs.
+
+## Test Requirements
+
+- Parser tests for every component type.
+- Validation tests for every required field and list minimum.
+- Invalid fixture tests for each component.
+- Rendering tests for every component's static markup.
+- Interaction tests for tabs, accordion, checklist, and flashcard.
+- Print-behavior tests for hidden or collapsed content.
+- Accessibility-focused tests for labels, roles, focusable controls, and expanded state.
+- Backward compatibility tests proving existing templates still validate and render.
+- Collection tests proving component rendering works in `/lectures/<slug>` routes.
+- Review-package tests proving component content is preserved.
+
+## Metrics For Product Review
+
+Launch-quality evidence:
+
+- A component demo lecture validates and renders all ten components.
+- At least one multi-lecture example includes five or more new components.
+- Invalid fixtures produce clear, author-locatable validation errors.
+- Manual viewport checks pass at 390px and 1280px.
+- Print output exposes all hidden or collapsed content.
+- Review package output preserves component content and summaries.
+
+Teaching-quality evidence:
+
+- A reviewer can identify when to use each new component from README and `SKILL.md`.
+- A generated lecture uses at least three of the new components appropriately without unsupported types.
+- Worked examples and mistake corrections improve practical teaching value over plain Markdown.
+- Resource links and instructor notes improve review/handoff clarity without confusing learner preview.
+
+## Open Questions
+
+- Should `glossary_term` remain a block component in P0, or should the engine later support inline glossary syntax?
+- Should checklist state use session-only state by default, or persist in localStorage like progress tracking?
+- Should instructor notes be hidden in normal learner preview by default, or collapsed but visible?
+- Should resource link validation allow only `http` and `https` in P0, or also local relative paths for packaged assets?
+- Should all new components receive anchors in P0, or should anchors remain a P2 cross-component enhancement?

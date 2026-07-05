@@ -1,24 +1,34 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AnswerKeyAppendix } from "../../src/components/lecture-kit/AnswerKeyAppendix";
+import { Accordion } from "../../src/components/lecture-kit/Accordion";
 import { Callout } from "../../src/components/lecture-kit/Callout";
+import { Checklist } from "../../src/components/lecture-kit/Checklist";
 import { CodeBlock } from "../../src/components/lecture-kit/CodeBlock";
 import { CollectionLanding } from "../../src/components/lecture-kit/CollectionLanding";
 import { Comparison } from "../../src/components/lecture-kit/Comparison";
 import { ConceptCard } from "../../src/components/lecture-kit/ConceptCard";
 import { Diagram } from "../../src/components/lecture-kit/Diagram";
+import { Flashcard } from "../../src/components/lecture-kit/Flashcard";
 import { FreeResponse } from "../../src/components/lecture-kit/FreeResponse";
+import { GlossaryTerm } from "../../src/components/lecture-kit/GlossaryTerm";
+import { InstructorNote } from "../../src/components/lecture-kit/InstructorNote";
 import { LectureHeader } from "../../src/components/lecture-kit/LectureHeader";
 import { LecturePage } from "../../src/components/lecture-kit/LecturePage";
+import { MistakeCorrection } from "../../src/components/lecture-kit/MistakeCorrection";
 import { PracticeTask } from "../../src/components/lecture-kit/PracticeTask";
 import { QuestionSet } from "../../src/components/lecture-kit/QuestionSet";
 import { Quiz } from "../../src/components/lecture-kit/Quiz";
 import { Quote } from "../../src/components/lecture-kit/Quote";
+import { ResourceLinks } from "../../src/components/lecture-kit/ResourceLinks";
 import { SectionNavigation } from "../../src/components/lecture-kit/SectionNavigation";
 import { SectionRenderer } from "../../src/components/lecture-kit/SectionRenderer";
 import { StepList } from "../../src/components/lecture-kit/StepList";
 import { Summary } from "../../src/components/lecture-kit/Summary";
+import { Tabs } from "../../src/components/lecture-kit/Tabs";
+import { Timeline } from "../../src/components/lecture-kit/Timeline";
 import { ValidationScreen } from "../../src/components/lecture-kit/ValidationScreen";
+import { WorkedExample } from "../../src/components/lecture-kit/WorkedExample";
 import { lectureNavigationTargets } from "../../src/lib/lecture-template/navigationTargets";
 import { ACTIVE_TEMPLATE_PATH } from "../../src/lib/lecture-template/readTemplate";
 import type { LectureTemplate } from "../../src/lib/lecture-template/types";
@@ -339,6 +349,38 @@ describe("lecture component UX contracts", () => {
             code: "graph LR\n  A --> B"
           }}
         />
+        <GlossaryTerm component={{ type: "glossary_term", term: "Term <script>alert(20)</script>", definition: "<img src=x onerror=alert(21)>" }} />
+        <Tabs
+          component={{
+            type: "tabs",
+            title: "Tabs <script>alert(22)</script>",
+            tabs: [
+              { label: "A", content: "<img src=x onerror=alert(23)>" },
+              { label: "B", content: "Safe" }
+            ]
+          }}
+        />
+        <Flashcard component={{ type: "flashcard", prompt: "Prompt <script>alert(24)</script>", answer: "<img src=x onerror=alert(25)>" }} />
+        <WorkedExample
+          component={{
+            type: "worked_example",
+            title: "Example <script>alert(26)</script>",
+            problem: "<img src=x onerror=alert(27)>",
+            walkthrough: ["<script>alert(28)</script>"],
+            solution: "<script>alert(29)</script>"
+          }}
+        />
+        <MistakeCorrection
+          component={{
+            type: "mistake_correction",
+            title: "Mistake <script>alert(30)</script>",
+            mistake: "<script>alert(31)</script>",
+            why_it_fails: "<script>alert(32)</script>",
+            correction: "<script>alert(33)</script>"
+          }}
+        />
+        <ResourceLinks component={{ type: "resource_links", title: "Links", links: [{ label: "<script>alert(34)</script>", url: "https://example.com" }] }} />
+        <InstructorNote component={{ type: "instructor_note", title: "Note", body: "<script>alert(35)</script>", audience: "instructor" }} />
       </>
     );
 
@@ -350,6 +392,9 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("&lt;script&gt;alert(9)&lt;/script&gt;");
     expect(html).toContain("&lt;script&gt;alert(14)&lt;/script&gt;");
     expect(html).toContain("&lt;script&gt;alert(17)&lt;/script&gt;");
+    expect(html).toContain("&lt;script&gt;alert(20)&lt;/script&gt;");
+    expect(html).toContain("&lt;img src=x onerror=alert(23)&gt;");
+    expect(html).toContain("&lt;script&gt;alert(35)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert");
     expect(html).not.toContain("<img src=x");
   });
@@ -447,6 +492,59 @@ describe("lecture component UX contracts", () => {
               locator: { line: 13 },
               component: { type: "diagram", diagram_type: "flowchart", title: "Diagram", code: "graph LR\n  A --> B" }
             },
+            { kind: "component", locator: { line: 14 }, component: { type: "glossary_term", term: "Schema", definition: "A contract." } },
+            {
+              kind: "component",
+              locator: { line: 15 },
+              component: {
+                type: "tabs",
+                title: "Modes",
+                tabs: [
+                  { label: "CLI", content: "Validate." },
+                  { label: "Browser", content: "Preview." }
+                ]
+              }
+            },
+            {
+              kind: "component",
+              locator: { line: 16 },
+              component: { type: "accordion", title: "Details", items: [{ title: "More", body: "Extra detail." }] }
+            },
+            {
+              kind: "component",
+              locator: { line: 17 },
+              component: {
+                type: "timeline",
+                title: "Steps",
+                orientation: "vertical",
+                items: [
+                  { label: "Draft", detail: "Write." },
+                  { label: "Review", detail: "Check." }
+                ]
+              }
+            },
+            { kind: "component", locator: { line: 18 }, component: { type: "checklist", title: "Ready", items: ["Validate"], storage: "session" } },
+            { kind: "component", locator: { line: 19 }, component: { type: "flashcard", prompt: "Prompt?", answer: "Answer." } },
+            {
+              kind: "component",
+              locator: { line: 20 },
+              component: { type: "worked_example", title: "Example", problem: "Problem.", walkthrough: ["Step"], solution: "Solution." }
+            },
+            {
+              kind: "component",
+              locator: { line: 21 },
+              component: { type: "mistake_correction", title: "Fix", mistake: "Wrong.", why_it_fails: "Breaks.", correction: "Right." }
+            },
+            {
+              kind: "component",
+              locator: { line: 22 },
+              component: { type: "resource_links", title: "Links", links: [{ label: "Docs", url: "https://example.com/docs" }] }
+            },
+            {
+              kind: "component",
+              locator: { line: 23 },
+              component: { type: "instructor_note", title: "Teach", body: "Mention review.", audience: "both" }
+            },
             { kind: "paragraph", text: "After components.", locator: { line: 14 } }
           ]
         }}
@@ -471,7 +569,47 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("diagram-card");
     expect(html).toContain("diagram-svg-container");
     expect(html).toContain("Diagram source code");
+    expect(html).toContain("Glossary");
+    expect(html).toContain("Tabs");
+    expect(html).toContain("More detail");
+    expect(html).toContain("Timeline");
+    expect(html).toContain("Checklist");
+    expect(html).toContain("Flashcard");
+    expect(html).toContain("Worked example");
+    expect(html).toContain("Common mistake");
+    expect(html).toContain("Resources");
+    expect(html).toContain("Instructor note");
     expect(html).toContain("After components.");
+  });
+
+  it("renders advanced component labels, core content, and print hooks", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <GlossaryTerm component={{ type: "glossary_term", term: "Schema", definition: "A contract.", aliases: ["Template contract"] }} />
+        <Tabs component={{ type: "tabs", title: "Modes", tabs: [{ label: "CLI", content: "Validate." }, { label: "Browser", content: "Preview." }] }} />
+        <Accordion component={{ type: "accordion", title: "Details", default_open: "Open", items: [{ title: "Open", body: "Visible detail." }] }} />
+        <Timeline component={{ type: "timeline", title: "Sequence", orientation: "vertical", items: [{ label: "One", detail: "Start." }, { label: "Two", detail: "Finish." }] }} />
+        <Checklist component={{ type: "checklist", title: "Ready", items: ["Validate"], storage: "session", reset_label: "Reset" }} instanceId="test" />
+        <Flashcard component={{ type: "flashcard", prompt: "Prompt?", answer: "Answer.", hint: "Think." }} />
+        <WorkedExample component={{ type: "worked_example", title: "Example", problem: "Problem.", walkthrough: ["Step"], solution: "Solution.", takeaway: "Remember." }} />
+        <MistakeCorrection component={{ type: "mistake_correction", title: "Fix", mistake: "Wrong.", why_it_fails: "Breaks.", correction: "Right." }} />
+        <ResourceLinks component={{ type: "resource_links", title: "Links", links: [{ label: "Docs", url: "https://example.com/docs", description: "Read more." }] }} />
+        <InstructorNote component={{ type: "instructor_note", title: "Teach", body: "Mention review.", audience: "both", timing: "Before class" }} />
+      </>
+    );
+
+    for (const text of ["Glossary", "Tabs", "More detail", "Timeline", "Checklist", "Flashcard", "Worked example", "Common mistake", "Resources", "Instructor note"]) {
+      expect(html).toContain(text);
+    }
+    expect(html).toContain("accordion-print-body");
+    expect(html).toContain("flashcard-answer");
+    expect(html).toContain('<div id="_');
+    expect(html).not.toContain('class="flashcard-answer" hidden=""');
+    expect(html).toContain("resource-link-url");
+    expect(html).toContain("resource-link-full-url");
+    expect(html).toContain("https://example.com/docs");
+    expect(html).toContain("example.com");
+    expect(html).not.toContain("<script>");
   });
 
   it("renders Diagram accessible markup with role, aria-label, and figcaption", () => {
@@ -561,7 +699,7 @@ describe("lecture component UX contracts", () => {
 
     expect(html).toContain("Assessment index");
     expect(html).toContain("Course progress");
-    expect(html).toContain("0 of 6 sections completed (0%)");
+    expect(html).toContain("0 of 7 sections completed (0%)");
     expect(html).toContain("Progress unavailable until this lecture validates.");
     expect(html).toContain('/lectures/01-demo#check-understanding-components-question-set-component-review-questions');
     expect(html).not.toContain("/lectures/02-invalid#");

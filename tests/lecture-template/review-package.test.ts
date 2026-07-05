@@ -181,7 +181,41 @@ describe("review package helpers", () => {
 
     const readme = renderReviewPackageReadme(manifest);
     expect(readme).toContain("Learner progress is runtime browser `localStorage` state.");
+    expect(readme).toContain("Checklist completion state is also browser-local learner state.");
     expect(readme).toContain("Expected collection key prefix: `lecture-progress:collection:<collection-id>`");
+  });
+
+  it("summarizes advanced component counts, resource links, and instructor notes", async () => {
+    copyFixture("examples/component-demo.template.md", "content/lecture.template.md");
+    const preflight = await runReviewPackagePreflight();
+    expect(preflight.valid).toBe(true);
+
+    const lecture = preflight.lectures[0];
+    expect(lecture.componentCounts.glossary_term).toBe(1);
+    expect(lecture.componentCounts.tabs).toBe(1);
+    expect(lecture.componentCounts.resource_links).toBe(1);
+    expect(lecture.instructorNoteCount).toBe(1);
+    expect(lecture.resourceLinks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Example documentation", kind: "external", status: "not_checked" }),
+        expect.objectContaining({ label: "Local README", kind: "local" })
+      ])
+    );
+
+    const manifest = createReviewPackageManifest(preflight, {
+      runtimeMetadata: {
+        gitCommit: "unavailable",
+        gitDirtyStatus: "unavailable",
+        npmVersion: "unavailable"
+      }
+    });
+    const markdown = renderReviewPackageManifestMarkdown(manifest);
+    expect(markdown).toContain("## Advanced Component Review");
+    expect(markdown).toContain("Component counts:");
+    expect(markdown).toContain("glossary_term=1");
+    expect(markdown).toContain("Resource links: 2");
+    expect(markdown).toContain("Instructor notes: 1");
+    expect(markdown).toContain("Example documentation: https://example.com/docs (external, not_checked)");
   });
 
   it("marks missing raw source evidence in package manifests without failing assembly", async () => {
@@ -363,6 +397,9 @@ describe("review package helpers", () => {
       "lectures/01-introduction/raw-lecture.txt",
       "lectures/02-core-concepts/raw-lecture.txt"
     ]);
+    for (const renderedPage of result.manifest.contents.renderedPages) {
+      expect(pathExists(path.join(result.packageDir, renderedPage)), renderedPage).toBe(true);
+    }
   });
 
   it("includes valid course metadata in collection package manifests and copied sources", async () => {

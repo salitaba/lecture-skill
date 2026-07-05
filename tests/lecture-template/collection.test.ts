@@ -21,7 +21,17 @@ const supportedComponentTypes = [
   "question_set",
   "free_response",
   "practice_task",
-  "diagram"
+  "diagram",
+  "glossary_term",
+  "tabs",
+  "accordion",
+  "timeline",
+  "checklist",
+  "flashcard",
+  "worked_example",
+  "mistake_correction",
+  "resource_links",
+  "instructor_note"
 ];
 let tempRoot = "";
 
