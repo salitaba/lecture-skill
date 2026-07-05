@@ -9,6 +9,7 @@ import { ConceptCard } from "../../src/components/lecture-kit/ConceptCard";
 import { Diagram } from "../../src/components/lecture-kit/Diagram";
 import { FreeResponse } from "../../src/components/lecture-kit/FreeResponse";
 import { LectureHeader } from "../../src/components/lecture-kit/LectureHeader";
+import { LecturePage } from "../../src/components/lecture-kit/LecturePage";
 import { PracticeTask } from "../../src/components/lecture-kit/PracticeTask";
 import { QuestionSet } from "../../src/components/lecture-kit/QuestionSet";
 import { Quiz } from "../../src/components/lecture-kit/Quiz";
@@ -87,6 +88,27 @@ describe("lecture component UX contracts", () => {
       expect(html).toContain("Component</dt><dd>callout</dd>");
       expect(html).toContain("Hint");
     }
+  });
+
+  it("renders lecture progress controls without changing authored section anchors", () => {
+    const lecture = validLecture("content/lecture.template.md");
+    const html = renderToStaticMarkup(<LecturePage lecture={lecture} templatePath="content/lecture.template.md" />);
+
+    expect(html).toContain("Lecture progress");
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain('aria-label="Lecture progress"');
+    expect(html).toContain('aria-valuemin="0"');
+    expect(html).toContain('aria-valuemax="100"');
+    expect(html).toContain('aria-valuenow="0"');
+    expect(html).toContain("0 of 4 sections completed");
+    expect(html).toContain("Reset progress");
+    expect(html).toContain(`id="${lecture.sections[0].anchor}"`);
+    expect(html).toContain(`aria-labelledby="${lecture.sections[0].anchor}-heading"`);
+    expect(html).toContain(`aria-label="Mark ${lecture.sections[0].title} complete"`);
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain("section-completion-print");
+    expect(html).not.toContain("Overview complete");
+    expect(html).not.toContain("Key Takeaways complete");
   });
 
   it("renders every supported component label and core content", () => {
@@ -538,6 +560,9 @@ describe("lecture component UX contracts", () => {
     );
 
     expect(html).toContain("Assessment index");
+    expect(html).toContain("Course progress");
+    expect(html).toContain("0 of 6 sections completed (0%)");
+    expect(html).toContain("Progress unavailable until this lecture validates.");
     expect(html).toContain('/lectures/01-demo#check-understanding-components-question-set-component-review-questions');
     expect(html).not.toContain("/lectures/02-invalid#");
   });

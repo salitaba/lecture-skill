@@ -32,8 +32,18 @@ describe("doctor readiness report", () => {
     expect(report.templatePaths).toEqual(["content/lecture.template.md"]);
     expect(report.validationPassed).toBe(true);
     expect(report.readiness.preview).toBe(true);
+    expect(report.progressTracking).toMatchObject({
+      configured: true,
+      storageModel: "browser localStorage",
+      runtimeInspection: "browser-only",
+      singleLectureKeyPrefix: "lecture-progress:<lecture-id>",
+      collectionKeyPrefix: "lecture-progress:collection:<collection-id>"
+    });
     expect(output).toContain("Mode: single-lecture");
     expect(output).toContain("Schema validation: passed");
+    expect(output).toContain("Progress tracking:");
+    expect(output).toContain("CLI cannot read a learner's browser localStorage");
+    expect(output).toContain("single lecture key prefix: lecture-progress:<lecture-id>");
   });
 
   it("reports collection metadata, lecture count, and missing raw source warnings", async () => {

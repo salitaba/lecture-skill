@@ -12,14 +12,19 @@ import { Quiz } from "./Quiz";
 import { Quote } from "./Quote";
 import { StepList } from "./StepList";
 import { Summary } from "./Summary";
+import { SectionCompletionToggle } from "./progress/SectionCompletionToggle";
+import { SectionProgressFrame } from "./progress/SectionProgressFrame";
 
 export function SectionRenderer({ section, index }: { section: LectureSection; index: number }) {
   return (
-    <section id={section.anchor} className="lecture-section" aria-labelledby={`${section.anchor}-heading`}>
+    <SectionProgressFrame anchor={section.anchor}>
       <p className="section-number">Section {index + 1}</p>
-      <h2 id={`${section.anchor}-heading`}>{section.title}</h2>
+      <div className="section-heading-row">
+        <h2 id={`${section.anchor}-heading`}>{section.title}</h2>
+        <SectionCompletionToggle anchor={section.anchor} title={section.title} />
+      </div>
       <RenderBlocks blocks={section.blocks} />
-    </section>
+    </SectionProgressFrame>
   );
 }
 

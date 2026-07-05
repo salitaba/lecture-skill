@@ -4,6 +4,7 @@ import os from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isCollectionMode, scanLectureCollection, validateCollection } from "../../src/lib/lecture-template/collection";
 import { collectCollectionAssessments, collectLectureAnswerKey, collectLectureAssessments } from "../../src/lib/lecture-template/assessments";
+import { calculateCollectionProgress, validateCollectionProgress } from "../../src/lib/lecture-template/progress";
 import { parseCourseMetadata } from "../../src/lib/lecture-template/courseMetadata";
 import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
 
@@ -248,6 +249,32 @@ describe("collection scanning", () => {
 
     expect(summaries).toHaveLength(4);
     expect(new Set(summaries.map((summary) => summary.lectureSlug))).toEqual(new Set(["01-demo"]));
+  });
+
+  it("normalizes collection progress for valid lecture summaries", () => {
+    const lectures = [
+      { slug: "01-introduction", sections: [{ anchor: "intro" }, { anchor: "setup" }] },
+      { slug: "02-core", sections: [{ anchor: "model" }] }
+    ];
+
+    const progress = validateCollectionProgress(
+      {
+        "01-introduction": { intro: true, setup: false, unknown: true },
+        "02-core": { model: true },
+        "03-invalid": { missing: true }
+      },
+      lectures
+    );
+
+    expect(progress).toEqual({
+      "01-introduction": { intro: true, setup: false },
+      "02-core": { model: true }
+    });
+    expect(calculateCollectionProgress(progress, lectures)).toMatchObject({
+      completedSections: 2,
+      totalSections: 3,
+      percentComplete: 67
+    });
   });
 });
 

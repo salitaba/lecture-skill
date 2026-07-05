@@ -11,6 +11,7 @@ import {
   collectionRawSourcePath
 } from "./sourceReview";
 import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
+import { collectionProgressKey, singleLectureProgressKey } from "./progress";
 import { validateTemplateSource } from "./validateTemplate";
 import type { CourseMetadataValidationResult } from "./types";
 
@@ -37,6 +38,13 @@ export interface DoctorReport {
     preview: boolean;
     sourceFidelityReview: boolean;
     staticPackage: boolean;
+  };
+  progressTracking: {
+    configured: true;
+    storageModel: "browser localStorage";
+    runtimeInspection: "browser-only";
+    singleLectureKeyPrefix: string;
+    collectionKeyPrefix: string;
   };
   warnings: string[];
 }
@@ -119,6 +127,7 @@ export async function createDoctorReport(): Promise<DoctorReport> {
       sourceFidelityReview: validationPassed && rawSource.missing.length === 0,
       staticPackage: validationPassed
     },
+    progressTracking: createProgressTrackingReport(),
     warnings
   };
 }
@@ -155,7 +164,14 @@ export function renderDoctorReport(report: DoctorReport): string {
     "Readiness:",
     `- preview: ${report.readiness.preview ? "ready" : "not ready"}`,
     `- source-fidelity review: ${report.readiness.sourceFidelityReview ? "ready" : "not ready"}`,
-    `- static package: ${report.readiness.staticPackage ? "ready" : "not ready"}`
+    `- static package: ${report.readiness.staticPackage ? "ready" : "not ready"}`,
+    "",
+    "Progress tracking:",
+    `- configured: ${report.progressTracking.configured ? "yes" : "no"}`,
+    `- storage model: ${report.progressTracking.storageModel}`,
+    `- runtime inspection: ${report.progressTracking.runtimeInspection}; CLI cannot read a learner's browser localStorage`,
+    `- single lecture key prefix: ${report.progressTracking.singleLectureKeyPrefix}`,
+    `- collection key prefix: ${report.progressTracking.collectionKeyPrefix}`
   );
 
   if (report.warnings.length > 0) {
@@ -163,6 +179,16 @@ export function renderDoctorReport(report: DoctorReport): string {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function createProgressTrackingReport(): DoctorReport["progressTracking"] {
+  return {
+    configured: true,
+    storageModel: "browser localStorage",
+    runtimeInspection: "browser-only",
+    singleLectureKeyPrefix: singleLectureProgressKey("<lecture-id>"),
+    collectionKeyPrefix: collectionProgressKey("<collection-id>")
+  };
 }
 
 async function readPackageJson(): Promise<{ engines?: { node?: string } }> {

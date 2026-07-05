@@ -1,0 +1,240 @@
+Implementation Plan: Progress Tracking (spec/012-progress-tracking.txt)
+
+## Summary
+
+Add local-first learner progress tracking to the Lecture Site Engine. Learners can mark authored lecture sections complete, see a lecture progress bar and summary, reset progress, resume after returning to the page, and see per-lecture/course progress in collection mode. All state stays in browser `localStorage` under namespaced keys and must degrade to the normal static reading experience when JavaScript or storage is unavailable.
+
+This is runtime learner convenience only. It does not change the authoring schema, template validation rules, review package source artifacts, accounts, sync, grading, analytics, gating, import/export, or server-side storage.
+
+## Product Decisions For P0
+
+- Progress tracks only authored `lecture.sections`, not Overview, Learning Objectives, Key Takeaways, answer keys, or assessment reveal state.
+- Single lecture storage uses `lecture-progress:{lectureId}`. In this repository, use a stable sanitized id derived from `templatePath` plus lecture metadata title fallback so the same template keeps the same key across reloads.
+- Collection storage uses `lecture-progress:collection:{collectionId}` and stores `{ [lectureSlug]: { [sectionAnchor]: boolean } }`. Use a stable collection id derived from collection base/course metadata context already available to validation, falling back to `"default"` when no better identifier exists.
+- The provider will be a client component. Server components pass section anchors/titles and storage identity into it; all `window`, `localStorage`, `confirm`, keyboard, and scroll work happens after mount.
+- When localStorage is unavailable or corrupted, progress UI remains non-blocking: render the page normally, disable or hide storage-dependent controls as appropriate, and log a console warning.
+- Debounced persistence writes the full validated progress object 300ms after updates. Reset writes immediately by removing the current key and clearing in-memory state.
+- Collection landing progress is read-only in P0 except for optional reset/bulk controls deferred to P1. Per-section toggles live on lecture pages.
+- P1 keyboard shortcuts, resume prompt, milestones, live announcements, print status, bulk collection controls, and doctor/package-review reporting should be implemented after the P0 storage/rendering contract is stable.
+
+## Relevant Existing Files
+
+### Rendering entry points
+- `src/app/page.tsx` - Chooses collection mode vs single lecture mode. Single mode renders `LecturePage`; collection mode wraps `CollectionLanding` in `PageShell`.
+- `src/components/lecture-kit/LecturePage.tsx` - Current server component rendering lecture header, navigation, authored sections, key takeaways, and answer key appendix. This is where the progress provider and lecture-level progress UI should be mounted for single-lecture pages.
+- `src/components/lecture-kit/SectionRenderer.tsx` - Current authored-section renderer. Add progress completion state, toggle rendering, completed visual class, and print label here or through a small wrapper around it.
+- `src/components/lecture-kit/CollectionLanding.tsx` - Current collection summary and lecture list. Add collection-level provider/read model and per-lecture progress bars/status here.
+- `src/components/lecture-kit/LectureHeader.tsx` - Candidate location for a reset control only if it remains visually restrained. Prefer placing progress controls below the nav/header boundary so the header component stays metadata-focused.
+- `src/components/lecture-kit/PageShell.tsx` - No expected API changes; progress UI should fit inside existing page shell constraints.
+
+### Data and validation models
+- `src/lib/lecture-template/types.ts` - `LectureTemplate.sections` already includes stable `anchor` and `title` values needed for progress. No authoring schema changes expected.
+- `src/lib/lecture-template/collection.ts` and `src/lib/lecture-template/courseMetadata.ts` - Existing collection validation and metadata are the source of lecture slugs, titles, and section counts for collection progress aggregation.
+- `src/lib/lecture-template/navigationTargets.ts` - Existing fixed anchors for overview/objectives/takeaways should remain outside completion tracking.
+
+### CLI/reporting
+- `src/lib/lecture-template/doctor.ts` and `scripts/doctor.ts` - Add static/runtime capability reporting text for progress tracking without trying to inspect a user's browser localStorage from Node.
+- `src/lib/lecture-template/reviewPackage.ts` and `scripts/packageReview.ts` - Add review-package manifest/README/checklist note that progress tracking is runtime localStorage behavior, not packaged state; validate that rendered HTML includes the expected client progress hooks.
+
+### Styling and docs
+- `src/app/globals.css` - Add progress bar, section toggle, completed state, collection mini-bars, resume prompt, toast/live-region, reduced-motion, responsive, and print styles.
+- `README.md` - Document progress tracking behavior, storage keys, privacy model, reset workflow, no-JavaScript behavior, collection aggregation, and keyboard shortcuts.
+- `SKILL.md` - Update agent guidance to say progress tracking is automatic and authors do not add template syntax for it.
+
+### Tests
+- `tests/lecture-template/lecture-components.test.tsx` - Static markup tests for progress bar, section toggles, collection progress indicators, ARIA attributes, and print hooks.
+- `tests/lecture-template/quiz-interaction.test.tsx` / `assessment-interaction.test.tsx` - Keep assessment interaction tests separate; add a new focused progress interaction test instead of mixing progress into quiz behavior.
+- `tests/lecture-template/collection.test.ts` - Collection progress aggregation can use normalized validation results and section counts.
+- `tests/lecture-template/doctor.test.ts` - Add doctor report output coverage for progress capability lines.
+- `tests/lecture-template/review-package.test.ts` - Add static package/review metadata coverage for progress runtime notes and rendered hooks.
+- `tests/lecture-template/backward-compat.test.tsx` - Add assertions that existing lectures render correctly when progress JS is not active or storage is unavailable.
+
+## Proposed Implementation Steps
+
+### Step 1: Add a small progress model and storage module
+- Create `src/lib/lecture-template/progress.ts` or `src/lib/progress.ts` with pure helpers:
+  - `type LectureProgress = Record<string, boolean>`;
+  - `type CollectionProgress = Record<string, LectureProgress>`;
+  - `singleLectureProgressKey(lectureId: string): string`;
+  - `collectionProgressKey(collectionId: string): string`;
+  - `sanitizeProgressId(value: string): string`;
+  - `validateLectureProgress(value, allowedAnchors): LectureProgress`;
+  - `validateCollectionProgress(value, lectures): CollectionProgress`;
+  - `calculateLectureProgress(progress, sections): { totalSections, completedSections, percentComplete }`;
+  - `calculateCollectionProgress(progress, lectures): { completedSections, totalSections, percentComplete, lectures }`.
+- Keep this module free of browser APIs so it is easy to unit test and reuse from server-rendered collection components for deterministic default state.
+- Validation should drop unknown section anchors, coerce nothing, require boolean values, and reset malformed root values to empty.
+
+### Step 2: Implement browser storage and `ProgressProvider`
+- Create `src/components/lecture-kit/progress/ProgressProvider.tsx` as a client component.
+- Expose the spec contract through context: `{ progress, toggleSection, resetProgress, totalSections, completedSections, percentComplete }`.
+- Include provider props for `scope`, `storageKey`, `sections`, optional `lectureSlug`, and optional initial collection lecture list.
+- On mount:
+  - verify `window.localStorage` can be accessed;
+  - read the storage key;
+  - parse JSON with try/catch;
+  - validate against allowed section anchors;
+  - set `storageAvailable` false and warn if access fails.
+- Debounce writes at 300ms after toggle/bulk changes. Do not write before the initial storage read completes.
+- Reset should confirm at the UI boundary, clear state, remove the storage key immediately, and announce "Progress reset."
+- Avoid hydration mismatches by rendering 0%/empty progress on the server and updating after mount.
+
+### Step 3: Add lecture progress UI
+- Create focused client components under `src/components/lecture-kit/progress/`:
+  - `LectureProgressBar.tsx` - progressbar role, summary text, reset button, optional milestones.
+  - `SectionCompletionToggle.tsx` - button with `aria-pressed`, accessible label using section title, and completed label/checkmark.
+  - `ProgressLiveRegion.tsx` - polite announcements for toggle/reset changes.
+  - `ResumePrompt.tsx` - P1 banner that appears for partial progress and jumps to the first incomplete or most recently completed section.
+- Update `LecturePage.tsx` to wrap the lecture content with `ProgressProvider`, pass `lecture.sections`, and render `LectureProgressBar` below the header and above `.lecture-layout`.
+- Update `SectionRenderer.tsx` to render the completion toggle next to each authored section heading while preserving heading hierarchy and existing section anchors.
+- Add a completed class such as `lecture-section-complete` to the section element without dimming body text.
+
+### Step 4: Add collection progress aggregation
+- Create `CollectionProgressProvider.tsx` or generalize `ProgressProvider` to support collection storage shape.
+- Update `CollectionLanding.tsx` to derive lecture summaries from `validation.results`:
+  - use only valid lectures with `result.template` for section totals;
+  - keep invalid lectures visible with validation status but no progress percentage or with a "Progress unavailable until valid" label;
+  - show overall course percent across all valid lecture sections;
+  - show each lecture row's completion percentage and mini progress bar.
+- If collection lecture pages are added or already present in a later branch, pass the same collection storage key and `lectureSlug` into `LecturePage` so per-section toggles update the collection object. In this checkout only `src/app/page.tsx` exists under `src/app`, so the implementation should not assume a concrete `src/app/lectures/[slug]/page.tsx` file without first adding or finding it.
+- Defer "Mark all complete" and "Mark all incomplete" collection bulk controls to the P1 task unless product scope requires them in the first implementation pass.
+
+### Step 5: Add keyboard, resume, reset, and accessibility polish
+- Add `Alt+M` in the provider or a small hook to toggle the current visible section. Determine current section from `IntersectionObserver` over authored section ids; if unavailable, fall back to the first incomplete section.
+- Add `Alt+R` to trigger the same reset confirmation used by the visible reset control.
+- Add an ARIA live region that announces "Section marked complete. X of Y sections finished.", "Section marked incomplete...", and "Progress reset."
+- Add the resume prompt after initial storage load when percent is between 1 and 99. Store dismissal in component state only for the current session.
+- Respect `prefers-reduced-motion` for progress transitions, milestone feedback, and completion toast animation.
+
+### Step 6: Add styles and print behavior
+- In `src/app/globals.css`, add:
+  - `.lecture-progress`, `.lecture-progress-bar`, `.lecture-progress-fill`, `.lecture-progress-summary`, `.progress-reset-button`;
+  - `.section-heading-row`, `.section-completion-toggle`, `.section-completion-label`, `.lecture-section-complete`;
+  - `.collection-progress`, `.collection-progress-mini`, `.collection-progress-fill`;
+  - `.resume-progress-prompt`, `.progress-toast`, `.progress-live-region`.
+- Match the existing palette: `--accent`, `--accent-strong`, `--border`, `--surface`, and 8px or smaller radii.
+- Keep controls touch-friendly and non-overlapping at mobile widths.
+- In print styles, show completion status text next to section headings and hide interactive reset/toggle buttons when appropriate.
+
+### Step 7: Add doctor and review-package progress notes
+- Extend `DoctorReport` with a `progressTracking` object that reports:
+  - feature configured: yes;
+  - storage model: browser localStorage;
+  - runtime inspection: browser-only, unavailable from CLI;
+  - active mode and expected storage key prefix.
+- Render doctor output lines that make this inspectable without pretending Node can read a user's browser localStorage.
+- Extend review-package metadata/readme/checklist output to note:
+  - progress state is not included in the package;
+  - reviewers can verify in the browser by toggling a section and inspecting `localStorage`;
+  - expected key prefix for single and collection modes.
+- Add package tests around generated reviewer text rather than trying to assert browser state in Node.
+
+### Step 8: Update documentation and agent guidance
+- Update `README.md` with a "Progress Tracking" section covering:
+  - one-click section completion;
+  - localStorage keys and JSON shapes;
+  - privacy/non-sync behavior;
+  - reset workflow;
+  - collection aggregation;
+  - storage corruption recovery;
+  - no-JavaScript fallback;
+  - `Alt+M` and `Alt+R` shortcuts if P1 is implemented.
+- Update `SKILL.md` to tell agents that progress tracking is automatic for rendered sections and requires no authoring changes.
+- Make clear that progress is not grading, not analytics, and not exported in review packages.
+
+### Step 9: Write focused tests
+- Add `tests/lecture-template/progress-model.test.ts` for pure storage-key, validation, and calculation helpers.
+- Add `tests/lecture-template/progress-provider.test.tsx` for jsdom localStorage read, corrupted JSON reset, unavailable storage, debounce writes, toggle, reset confirmation, and live announcements.
+- Add lecture rendering tests in `lecture-components.test.tsx` for progress bar markup, ARIA attributes, toggle labels, completed class, and print-only completion text.
+- Add collection rendering tests for overall and per-lecture percentages, invalid lecture handling, empty collections, and mini progress bar ARIA/text.
+- Add keyboard/resume tests after the base provider behavior is stable.
+- Add doctor and review-package tests for progress reporting text.
+- Keep existing assessment, validation, and review-package tests passing without changing template schema expectations.
+
+### Step 10: Verification
+- Run focused tests while implementing:
+  - `npm run test -- tests/lecture-template/progress-model.test.ts`
+  - `npm run test -- tests/lecture-template/progress-provider.test.tsx`
+  - `npm run test -- tests/lecture-template/lecture-components.test.tsx`
+  - `npm run test -- tests/lecture-template/collection.test.ts`
+  - `npm run test -- tests/lecture-template/doctor.test.ts`
+  - `npm run test -- tests/lecture-template/review-package.test.ts`
+- Run final verification:
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run validate`
+
+## Data Model And Storage Changes
+
+No template schema migration is required. Progress is a runtime browser data model.
+
+```typescript
+export interface LectureProgress {
+  [sectionAnchor: string]: boolean;
+}
+
+export interface CollectionProgress {
+  [lectureSlug: string]: LectureProgress;
+}
+```
+
+Storage keys:
+
+```typescript
+const SINGLE_LECTURE_KEY = `lecture-progress:${lectureId}`;
+const COLLECTION_KEY = `lecture-progress:collection:${collectionId}`;
+```
+
+Validation rules:
+- root value must be a non-array object;
+- lecture progress values must be booleans;
+- keys must match known authored section anchors for the current lecture;
+- collection root keys must match known valid lecture slugs;
+- malformed JSON or invalid root shape resets to `{}` and logs a warning;
+- unknown anchors/slugs can be dropped during validation to handle changed templates.
+
+## API And Component Contract
+
+The provider should expose exactly the P0 contract from the spec for lecture consumers:
+
+```typescript
+interface ProgressContextValue {
+  progress: Record<string, boolean>;
+  toggleSection: (sectionAnchor: string) => void;
+  resetProgress: () => void;
+  totalSections: number;
+  completedSections: number;
+  percentComplete: number;
+}
+```
+
+Implementation may include internal fields such as `storageAvailable`, `loaded`, `setAllSections`, `announce`, or collection summaries, but public components should not depend on raw localStorage.
+
+## Test Plan
+
+- Pure helper tests for keys, id sanitization, validation, corruption recovery decisions, percentage rounding, empty-section behavior, unknown anchor dropping, and collection aggregation.
+- Provider jsdom tests for initial load, localStorage writes, 300ms debounce via fake timers, reset confirmation, unavailable localStorage, quota errors, and live-region messages.
+- Rendering tests for lecture progress bar `role="progressbar"`, `aria-valuenow`, summary text, reset control, toggle `aria-pressed`, labels with section titles, completed visual class, and print status text.
+- Collection tests for valid/invalid lecture rows, per-lecture mini-bars, overall aggregation, zero-section lectures, and no progress data.
+- Interaction tests for click toggles, keyboard operation, `Alt+M`, `Alt+R`, resume prompt jump/dismiss behavior, and reduced-motion-safe toast lifecycle.
+- CLI/report tests for doctor and package review wording.
+- Backward compatibility tests proving existing templates render and validate without authoring changes.
+
+## Risks, Assumptions, And Open Questions
+
+- Collection lecture routing is not present in this checkout under `src/app`; collection progress on individual lecture pages depends on adding or finding that route before wiring collection-scope toggles outside the landing page.
+- localStorage is browser-only, so doctor/package-review commands can report capability and expected keys but cannot report a real user's current completion state from Node.
+- Stable `lectureId` and `collectionId` need a product decision. Path-derived ids are predictable for local projects but can change if files move; metadata-derived ids can collide. The implementation should centralize id generation so this can be changed later.
+- Debounced writes can race with reset if implemented carelessly. Reset should cancel pending writes before removing storage.
+- React server/client boundaries matter: do not import browser-only modules into server components except as client components.
+- The resume prompt's "where you left off" requires either last-toggled tracking or an inference. P0 can skip it; P1 should define whether to store a separate last anchor or infer first incomplete section.
+- Progress for changed templates should be forgiving: unknown old anchors are dropped, new sections start incomplete, and empty lectures should avoid divide-by-zero.
+
+## Deferred P2 Enhancements
+
+- Time-based progress and reading-time estimates.
+- Session history and completion timestamps.
+- Per-section persisted notes.
+- Progress export/import.
+- Progress-based reading suggestions beyond the P1 resume prompt.

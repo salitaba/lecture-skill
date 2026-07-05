@@ -6,6 +6,7 @@ import {
   assembleReviewPackage,
   createReviewPackageManifest,
   renderReviewPackageManifestMarkdown,
+  renderReviewPackageReadme,
   rewriteExportedHtmlForFileProtocol,
   runReviewPackagePreflight,
   verifyReviewPackageSourceSnapshot
@@ -156,6 +157,14 @@ describe("review package helpers", () => {
       gitDirtyStatus: "unavailable",
       npmVersion: "unavailable"
     });
+    expect(manifest.progressTracking).toEqual({
+      storageModel: "browser localStorage",
+      stateIncludedInPackage: false,
+      syncedOrExported: false,
+      singleLectureKeyPrefix: "lecture-progress:<lecture-id>",
+      collectionKeyPrefix: "lecture-progress:collection:<collection-id>",
+      reviewerVerification: "Toggle a section in the browser and inspect localStorage for the expected key prefix."
+    });
     expect(JSON.stringify(manifest)).not.toContain("You are about to use Codex");
 
     const markdown = renderReviewPackageManifestMarkdown(manifest);
@@ -164,8 +173,15 @@ describe("review package helpers", () => {
     expect(markdown).toContain("Entry file: index.html");
     expect(markdown).toContain("Source: content/lecture.template.md");
     expect(markdown).toContain("## Raw Source Evidence");
+    expect(markdown).toContain("## Progress Tracking");
+    expect(markdown).toContain("Progress state included in package: no");
+    expect(markdown).toContain("Single lecture key prefix: lecture-progress:<lecture-id>");
     expect(markdown).toContain("content/raw-lecture.txt: present -> source/content/raw-lecture.txt");
     expect(markdown).toContain("Package path: review-packages/2026-07-04-0130-lecture-site");
+
+    const readme = renderReviewPackageReadme(manifest);
+    expect(readme).toContain("Learner progress is runtime browser `localStorage` state.");
+    expect(readme).toContain("Expected collection key prefix: `lecture-progress:collection:<collection-id>`");
   });
 
   it("marks missing raw source evidence in package manifests without failing assembly", async () => {
@@ -300,6 +316,8 @@ describe("review package helpers", () => {
     expect(pathExists(path.join(result.packageDir, "REVIEW_WORKSHEET.md"))).toBe(true);
     expect(pathExists(path.join(result.packageDir, "REVIEW_CHECKLIST.md"))).toBe(true);
     expect(readFileSync(path.join(result.packageDir, "README.md"), "utf8")).toContain("REVIEW_WORKSHEET.md");
+    expect(readFileSync(path.join(result.packageDir, "REVIEW_CHECKLIST.md"), "utf8")).toContain("Runtime Progress Tracking");
+    expect(readFileSync(path.join(result.packageDir, "REVIEW_CHECKLIST.md"), "utf8")).toContain("Inspect browser localStorage");
     expect(result.manifest.contents.reviewerFiles).toContain("REVIEW_WORKSHEET.md");
   });
 

@@ -176,6 +176,49 @@ The generated package is designed to open directly from the filesystem. Send rev
 
 The command owns Next's generated `out/` directory for the current run. If `out/` already exists before packaging starts, the command stops and asks you to move or remove it rather than overwriting a user-owned export.
 
+## Progress Tracking
+
+Rendered lecture pages automatically include local learner progress controls for authored `## Section:` blocks. Learners can mark a section complete, see a lecture progress bar, reset lecture progress, use a resume prompt for partial progress, and use keyboard shortcuts:
+
+- `Alt+M`: mark the current visible section complete or incomplete.
+- `Alt+R`: reset progress after confirmation.
+
+Progress is browser-only convenience state. It is not grading, analytics, account data, synced data, source evidence, or review-package content. Authors do not add progress fields or template syntax.
+
+Storage uses `localStorage`:
+
+```json
+{
+  "section-anchor": true
+}
+```
+
+Single lecture keys use:
+
+```text
+lecture-progress:<lecture-id>
+```
+
+Collection landing pages read aggregate progress from:
+
+```text
+lecture-progress:collection:<collection-id>
+```
+
+Collection values are shaped as:
+
+```json
+{
+  "lecture-slug": {
+    "section-anchor": true
+  }
+}
+```
+
+Unknown lecture slugs, unknown section anchors, malformed JSON, arrays, null roots, and non-boolean values are ignored so changed templates recover cleanly. If storage is unavailable or blocked, the page remains readable and progress controls continue as unsaved session UI where possible. Without JavaScript, the static lecture content still renders; interactive progress controls do not persist.
+
+Use the visible `Reset progress` button or `Alt+R` to clear the current lecture key. Clearing the relevant `localStorage` key in browser developer tools has the same effect after reload.
+
 ## Template Schema
 
 The engine supports one template schema: YAML frontmatter plus Markdown body sections.

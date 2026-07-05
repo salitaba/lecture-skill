@@ -6,6 +6,7 @@ import path from "node:path";
 import { isCollectionMode, validateCollection } from "./collection";
 import { COURSE_METADATA_PATH } from "./courseMetadata";
 import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
+import { collectionProgressKey, singleLectureProgressKey } from "./progress";
 import {
   COLLECTION_SHARED_RAW_SOURCE_PATH,
   SINGLE_RAW_SOURCE_PATH,
@@ -123,11 +124,21 @@ export interface ReviewPackageManifest {
   courseMetadata?: CourseMetadata;
   lectures: ReviewPackageLecture[];
   rawEvidence: Omit<ReviewPackageRawEvidenceRecord, "contents">[];
+  progressTracking: ReviewPackageProgressTracking;
   ignoredInactiveTemplatePaths: string[];
   gitCommit: string;
   gitDirtyStatus: string;
   nodeVersion: string;
   npmVersion: string;
+}
+
+export interface ReviewPackageProgressTracking {
+  storageModel: "browser localStorage";
+  stateIncludedInPackage: false;
+  syncedOrExported: false;
+  singleLectureKeyPrefix: string;
+  collectionKeyPrefix: string;
+  reviewerVerification: string;
 }
 
 export interface SourceSnapshotVerification {
@@ -272,6 +283,7 @@ export function createReviewPackageManifest(
     courseMetadata: preflight.courseMetadata?.status === "valid" ? preflight.courseMetadata.metadata : undefined,
     lectures: preflight.lectures,
     rawEvidence: preflight.rawEvidence.map(({ contents: _contents, ...source }) => source),
+    progressTracking: createReviewPackageProgressTracking(),
     ignoredInactiveTemplatePaths: preflight.ignoredInactiveTemplatePaths,
     gitCommit: runtimeMetadata.gitCommit,
     gitDirtyStatus: runtimeMetadata.gitDirtyStatus,
@@ -316,6 +328,15 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
         source.lectureSlug ? ` (${source.lectureSlug}, ${source.role})` : ` (${source.role})`
       }`
     ),
+    "",
+    "## Progress Tracking",
+    "",
+    `- Storage model: ${manifest.progressTracking.storageModel}`,
+    `- Progress state included in package: ${manifest.progressTracking.stateIncludedInPackage ? "yes" : "no"}`,
+    `- Synced or exported: ${manifest.progressTracking.syncedOrExported ? "yes" : "no"}`,
+    `- Single lecture key prefix: ${manifest.progressTracking.singleLectureKeyPrefix}`,
+    `- Collection key prefix: ${manifest.progressTracking.collectionKeyPrefix}`,
+    `- Reviewer verification: ${manifest.progressTracking.reviewerVerification}`,
     "",
     "## Lectures",
     ""
@@ -373,12 +394,32 @@ export function renderReviewPackageReadme(manifest: ReviewPackageManifest): stri
     "- `REVIEW_WORKSHEET.md`: source fidelity worksheet. Start here when comparing raw source evidence to rendered output.",
     "- `REVIEW_CHECKLIST.md`: review checklist for educational quality and source fidelity.",
     "",
+    "## Progress Tracking",
+    "",
+    "Learner progress is runtime browser `localStorage` state. It is not included in this package, synced, exported, or shared.",
+    "",
+    `Expected single-lecture key prefix: \`${manifest.progressTracking.singleLectureKeyPrefix}\``,
+    `Expected collection key prefix: \`${manifest.progressTracking.collectionKeyPrefix}\``,
+    "",
+    "To verify it, open a rendered page in a browser, mark a section complete, and inspect localStorage for the expected key prefix.",
+    "",
     `Package path recorded at export time: ${manifest.packagePath}`,
     `Source mode: ${manifest.sourceMode}`,
     manifest.courseMetadata ? `Course title: ${manifest.courseMetadata.title}` : "Course metadata: not declared",
     `Lecture count: ${manifest.lectureCount}`,
     ""
   ].join("\n");
+}
+
+function createReviewPackageProgressTracking(): ReviewPackageProgressTracking {
+  return {
+    storageModel: "browser localStorage",
+    stateIncludedInPackage: false,
+    syncedOrExported: false,
+    singleLectureKeyPrefix: singleLectureProgressKey("<lecture-id>"),
+    collectionKeyPrefix: collectionProgressKey("<collection-id>"),
+    reviewerVerification: "Toggle a section in the browser and inspect localStorage for the expected key prefix."
+  };
 }
 
 export function createFilesystemSafeTimestamp(date = new Date()): string {
@@ -948,9 +989,9 @@ async function readReviewChecklist(sourcePath?: string): Promise<string> {
   const checklistPath = sourcePath ?? defaultChecklistPath;
 
   try {
-    return await readFile(checklistPath, "utf8");
+    return appendProgressChecklist(await readFile(checklistPath, "utf8"));
   } catch {
-    return [
+    return appendProgressChecklist([
       "# Review Checklist",
       "",
       "- [ ] Open `index.html` directly from the package folder.",
@@ -959,8 +1000,22 @@ async function readReviewChecklist(sourcePath?: string): Promise<string> {
       "- [ ] Inspect copied files under `source/` when comparing rendered output with authored content.",
       "- [ ] Record any educational quality, source fidelity, or navigation issues.",
       ""
-    ].join("\n");
+    ].join("\n"));
   }
+}
+
+function appendProgressChecklist(contents: string): string {
+  const trimmed = contents.trimEnd();
+  return [
+    trimmed,
+    "",
+    "## Runtime Progress Tracking",
+    "",
+    "- [ ] Toggle an authored section in the browser and confirm the progress bar updates.",
+    `- [ ] Inspect browser localStorage for \`${singleLectureProgressKey("<lecture-id>")}\` or \`${collectionProgressKey("<collection-id>")}\`.`,
+    "- [ ] Confirm progress state is not included in the review package, source snapshots, or manifest source contents.",
+    ""
+  ].join("\n");
 }
 
 function toPosixPath(value: string): string {

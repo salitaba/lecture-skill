@@ -288,6 +288,251 @@ summary .nav-summary-count {
   border-top: 4px solid var(--border-strong);
 }
 
+.lecture-progress,
+.collection-progress {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin-top: 20px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.lecture-progress-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.lecture-progress h2,
+.collection-progress h2 {
+  margin-bottom: 6px;
+  font-size: 1.2rem;
+}
+
+.lecture-progress-summary,
+.collection-progress p,
+.collection-progress-mini p,
+.collection-progress-unavailable {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.lecture-progress-bar,
+.collection-progress-bar,
+.collection-progress-mini-bar {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.lecture-progress-fill,
+.collection-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 180ms ease;
+}
+
+.lecture-progress-milestones {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lecture-progress-milestones li {
+  min-width: 0;
+  padding: 6px 8px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.lecture-progress-milestones .milestone-complete {
+  color: var(--accent-strong);
+  background: var(--surface-accent);
+  border-color: var(--accent);
+}
+
+.progress-reset-button,
+.resume-progress-actions button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 13px;
+  color: var(--accent-strong);
+  background: var(--surface-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.progress-reset-button:hover,
+.resume-progress-actions button:hover {
+  background: var(--surface-accent);
+}
+
+.progress-reset-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.section-heading-row {
+  display: flex;
+  min-width: 0;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.section-heading-row h2 {
+  margin-bottom: 14px;
+}
+
+.section-completion {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+}
+
+.section-completion-toggle {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: #ffffff;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.section-completion-toggle:hover {
+  border-color: var(--accent);
+}
+
+.section-completion-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+}
+
+.section-completion-label,
+.section-completion-print {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.section-completion-print {
+  display: none;
+}
+
+.lecture-section-complete {
+  border-top-color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--surface-accent);
+}
+
+.resume-progress-prompt {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--surface-accent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.resume-progress-prompt p {
+  margin: 0;
+}
+
+.resume-progress-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resume-progress-actions .resume-dismiss-button {
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.progress-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.progress-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20;
+  max-width: min(360px, calc(100% - 36px));
+  padding: 12px 14px;
+  color: #ffffff;
+  background: var(--accent-strong);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(19, 78, 74, 0.22);
+  font-weight: 800;
+  animation: progress-toast-in 160ms ease-out;
+}
+
+.collection-progress {
+  margin: 0 0 20px;
+}
+
+.collection-progress-mini {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.collection-progress-mini-bar {
+  height: 9px;
+}
+
+@keyframes progress-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .lecture-section > :last-child,
 .lecture-panel > :last-child,
 .lecture-component > :last-child {
@@ -1124,6 +1369,22 @@ td {
     padding: 20px 0 22px;
   }
 
+  .lecture-progress-header,
+  .section-heading-row,
+  .resume-progress-prompt {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .progress-reset-button,
+  .resume-progress-actions button {
+    width: 100%;
+  }
+
+  .section-completion {
+    align-self: flex-start;
+  }
+
   .lecture-layout {
     gap: 18px;
     padding-top: 18px;
@@ -1191,6 +1452,15 @@ td {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .lecture-progress-fill,
+  .collection-progress-fill,
+  .progress-toast {
+    transition: none;
+    animation: none;
+  }
+}
+
 @media print {
   body {
     background: #ffffff;
@@ -1225,8 +1495,31 @@ td {
   .quiz-reveal-button,
   .quiz-noscript,
   .assessment-reveal-button,
-  .assessment-noscript {
+  .assessment-noscript,
+  .progress-reset-button,
+  .section-completion-toggle,
+  .resume-progress-prompt,
+  .progress-toast {
     display: none;
+  }
+
+  .lecture-progress,
+  .collection-progress {
+    border-color: #666666;
+  }
+
+  .lecture-progress-fill,
+  .collection-progress-fill {
+    background: #000000;
+  }
+
+  .section-completion-label {
+    display: none;
+  }
+
+  .section-completion-print {
+    display: inline;
+    color: #000000;
   }
 
   .quiz-answer,
