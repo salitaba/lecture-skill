@@ -13,7 +13,7 @@ export function Quiz({ component }: { component: QuizComponent }) {
   const hasSelection = selected !== null;
 
   return (
-    <aside id={component.anchor} className="lecture-component quiz-card">
+    <aside id={component.anchor} className="lecture-component surface-emphasis quiz-card">
       <p className="component-label">Quiz: Knowledge check</p>
       <h3 className="quiz-question">{component.question}</h3>
       <fieldset className="quiz-options-fieldset">

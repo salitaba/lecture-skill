@@ -2,7 +2,7 @@ import type { MistakeCorrectionComponent } from "@/lib/lecture-template/types";
 
 export function MistakeCorrection({ component }: { component: MistakeCorrectionComponent }) {
   return (
-    <aside className="lecture-component mistake-correction">
+    <aside className="lecture-component surface-card mistake-correction">
       <p className="component-label">Common mistake</p>
       <h3>{component.title}</h3>
       <div className="mistake-correction-grid">

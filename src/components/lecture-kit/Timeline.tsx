@@ -2,7 +2,7 @@ import type { TimelineComponent } from "@/lib/lecture-template/types";
 
 export function Timeline({ component }: { component: TimelineComponent }) {
   return (
-    <aside className={`lecture-component timeline timeline-${component.orientation}`}>
+    <aside className={`lecture-component surface-card timeline timeline-${component.orientation}`}>
       <p className="component-label">Timeline</p>
       <h3>{component.title}</h3>
       <ol className="timeline-items">

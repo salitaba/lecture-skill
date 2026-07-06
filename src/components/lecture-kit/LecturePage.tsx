@@ -1,5 +1,6 @@
 import { AnswerKeyAppendix } from "@/components/lecture-kit/AnswerKeyAppendix";
 import { GlossaryIndex } from "@/components/lecture-kit/GlossaryIndex";
+import { Icon } from "@/components/lecture-kit/Icon";
 import { LectureHeader } from "@/components/lecture-kit/LectureHeader";
 import { LectureNavigation, type NavTarget } from "@/components/lecture-kit/LectureNavigation";
 import { PageShell } from "@/components/lecture-kit/PageShell";
@@ -82,7 +83,7 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
               <SectionRenderer key={section.anchor} section={section} index={index} lectureId={lectureId} />
             ))}
 
-            <section className="takeaways-section lecture-panel" aria-labelledby={lectureNavigationTargets.takeaways.id}>
+            <section className="takeaways-section lecture-panel surface-emphasis" aria-labelledby={lectureNavigationTargets.takeaways.id}>
               <p className="section-kicker">Review</p>
               <h2 id={lectureNavigationTargets.takeaways.id}>{lectureNavigationTargets.takeaways.label}</h2>
               <ul>
@@ -128,7 +129,7 @@ function CollectionTopNav({
         </a>
         {next ? (
           <a className="lecture-nav-link lecture-nav-next" href={`/lectures/${next.slug}`}>
-            {next.title} →
+            {next.title} <Icon name="arrow-next" />
           </a>
         ) : null}
       </div>

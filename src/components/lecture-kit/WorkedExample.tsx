@@ -3,7 +3,7 @@ import { CodeBlock } from "./CodeBlock";
 
 export function WorkedExample({ component }: { component: WorkedExampleComponent }) {
   return (
-    <aside className="lecture-component worked-example">
+    <aside className="lecture-component surface-card worked-example">
       <p className="component-label">Worked example</p>
       <h3>{component.title}</h3>
       <section className="worked-example-region">

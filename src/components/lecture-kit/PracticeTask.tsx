@@ -14,7 +14,7 @@ export function PracticeTask({ component }: { component: PracticeTaskComponent }
   const solutionLabelId = `${baseId}-solution-label`;
 
   return (
-    <aside id={component.anchor} className="lecture-component assessment-card practice-task-card">
+    <aside id={component.anchor} className="lecture-component surface-emphasis assessment-card practice-task-card">
       <p className="component-label">Practice task</p>
       <h3>{component.title}</h3>
       {component.scenario ? (

@@ -41,7 +41,7 @@ export function Tabs({ component }: { component: TabsComponent }) {
   }
 
   return (
-    <aside className="lecture-component tabs" data-enhanced={enhanced ? "true" : "false"}>
+    <aside className="lecture-component surface-card tabs" data-enhanced={enhanced ? "true" : "false"}>
       <p className="component-label">Tabs</p>
       <h3>{component.title}</h3>
       <div className="tabs-list" role="tablist" aria-label={component.title}>

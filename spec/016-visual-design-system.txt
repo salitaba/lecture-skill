@@ -1,0 +1,240 @@
+Feature: Visual Design System — Typography, Color Tokens, and Component Hierarchy
+
+Authors: senior UI/UX designer.
+Relationship to prior work: layered on top of `spec/014-senior-ui-ux-polish.txt` and `spec/015-learner-experience-primitives.txt`, which shipped the information-architecture and interaction layer (collection CTA, lecture navigation wiring, selectable quiz, resume prompt, reading time, glossary index, assessment disclosure). Those specs fixed *what happens and in what order*. This spec fixes *what it looks like*: the site currently renders with the system font stack, no color tokens beyond a single accent, and ~20 visually identical bordered-card components. 015's own "Out Of Scope" section deferred further work to a future `spec/016`; this is that spec. It does not re-litigate IA or interaction decisions already made in 014/015, and it does not block on `015-A3` (active-section state), which remains unimplemented and out of scope here — this spec adds a *different* nav signal (per-item completion) that is additive to whatever current-location treatment eventually ships.
+
+## Product Summary
+
+The Lecture Site Engine renders correct, accessible, responsive HTML, but it looks like an engine preview: `body { font-family: Arial, Helvetica, sans-serif }` (no loaded typeface), a single teal `--accent` token surrounded by roughly fifteen ad hoc hex colors hardcoded per component (`#2563eb`, `#7c3aed`, `#4f46e5`, `#b45309`, `#0369a1`, `#64748b`, `#a16207`, and more), and one repeated card silhouette — rounded box, colored left border, tinted background — applied uniformly to over twenty unrelated component types (`Callout`, `ConceptCard`, `Quote`, `Tabs`, `Accordion`, `Timeline`, `Flashcard`, `WorkedExample`, `MistakeCorrection`, `ResourceLinks`, `InstructorNote`, and the rest). The result is a long scroll of equal-weight gray-and-color boxes where nothing is more important than anything else, no dark mode, no elevation, and almost no motion feedback on interaction.
+
+This is not a component-vocabulary problem and not an information-architecture problem — both are already strong. It is a design-token and visual-hierarchy problem: the site has never had a typography system, a constrained semantic color palette, or a rule for when a piece of content deserves a heavier or lighter visual treatment.
+
+The primary product outcome is: the rendered course reads as one coherent, deliberately designed product — typeset with intention, colored with restraint and meaning, and weighted so the reader's eye goes to what matters (the lesson, the quiz, the takeaway) before what doesn't (a metadata tile, a reset button, a glossary aside).
+
+## Product Outcome
+
+- The page is set in a real typeface with a deliberate scale and weight range, not the system default.
+- A single small semantic color palette (brand, info, success, warning, neutral) replaces the ~15 hardcoded per-component hex values; every component color traces to a token.
+- Component surfaces have at least two distinct visual "altitudes" so low-stakes content (definitions, asides) and high-stakes content (quizzes, takeaways) don't compete equally for attention.
+- The product works correctly in a dark color scheme, not just light.
+- Metadata (audience, duration, level, section count) reads as a compact inline row, not a grid of bordered stat tiles.
+- Section navigation reflects completion state the app already tracks, so the sidebar doubles as a progress map.
+- Primary actions (quiz check, assessment reveal, resume, course CTA) share one action color instead of three unrelated blues.
+- Interactive reveal/expand components (accordion, tabs, quiz feedback) animate on state change instead of snapping.
+- A small, consistent icon set replaces ad hoc unicode glyphs (`▸`, `▶`, `→`) used for chevrons and directional cues.
+- Primary content panels get subtle elevation so "the page" and "the content" read as distinct layers on the flat background.
+
+## Users And Jobs
+
+Primary users: same as 014/015 — learners reading a collection or lecture, educators previewing courses, reviewers checking handoff readiness, AI agents using rendered output as a quality target.
+
+Jobs to be done:
+
+- As a learner, I want the page to be pleasant and comfortable to read for an extended session, not just technically legible.
+- As a learner, I want visual weight to tell me what's important without reading every label.
+- As a learner in a dark environment, I want a dark theme so the page doesn't glare.
+- As a learner, I want the sidebar to show me what I've already finished so I don't re-read sections by accident.
+- As an educator, I want the rendered course to look credible enough to hand to students without a "this is a dev preview" impression.
+- As a reviewer, I want visual regressions (broken tokens, color drift, contrast issues) to be easy to spot because the system is small and consistent.
+
+## Problem
+
+Concrete, file-grounded issues:
+
+- No loaded typeface. `src/app/globals.css:37` sets `font-family: Arial, Helvetica, sans-serif` and no font is registered via `next/font` in `src/app/layout.tsx`. Every visual hierarchy decision (h1 through h3, `.description`, `.muted`) rides entirely on size and two boldness levels (700/800) of a system font.
+- No semantic color system. `--accent`, `--accent-strong`, `--warning` are the only real tokens (`globals.css:1-20`). Everything else is a component-local hardcoded hex: `.callout-note` (`#2563eb`), `.concept-card` (`#7c3aed`), `.tabs` (`#4f46e5`), `.quote-card`/`.flashcard` (`#b45309`), `.quiz-card`/`.worked-example` (`#0369a1`), `.accordion` (`#64748b`), `.instructor-note` (`#a16207`), and several more. New component authors have no palette to draw from and no reason not to invent another hue.
+- One silhouette, twenty uses. `.lecture-component` (`globals.css:714-723`) — border, left-border accent, radius, tinted background — is the base class for every content block regardless of whether it is a one-line definition or a graded-feeling quiz. Nothing signals relative importance except color, and color is inconsistent (see above).
+- No dark mode. `color-scheme: light` is hardcoded at `globals.css:2` with no `prefers-color-scheme: dark` block anywhere in the stylesheet, despite the codebase already handling `prefers-reduced-motion` (`globals.css:26-30`, `2237-2247`) and print (`globals.css:2249-2414`) with care.
+- Stat-tile overuse. `LectureHeader.tsx` renders Audience/Duration/Level/Sections/Reading-time as five bordered boxes in a 4-column grid (`.metadata-grid`, `globals.css:133-146`), and `.lecture-list-meta` repeats the same pattern per lecture card (`globals.css:1951-1965`). Five short facts do not need five bordered surfaces.
+- Section nav shows only current-location styling, never completion. `.nav-item` / `.nav-item-active` (`globals.css:242-278`) style the active link but there is no visual reflection of `ProgressProvider`'s per-section completion state inside `SectionNavigation`, even though that data already exists and drives `LectureProgressBar` and `SectionCompletionToggle` elsewhere on the same page.
+- Three unrelated "primary action" colors. Quiz reveal (`#0369a1` / `#075985`, `globals.css:978-990`), assessment reveal (`--accent-strong`, `globals.css:1138-1159`), and the resume/collection CTA (`--accent-strong`, `globals.css:634-643`, `1730-1747`) do not share one visual identity for "the button that moves the learner forward."
+- No motion on state change. Only `.lecture-progress-fill` / `.collection-progress-fill` (`globals.css:472`) and `.progress-toast` (`globals.css:680`) transition. `.tabs-panel`, `.accordion-body`, `.flashcard-answer`, `.quiz-answer`, `.assessment-hidden-region` all snap open/closed with no transition, despite `prefers-reduced-motion` already being wired up as a pattern to extend.
+- No iconography. Directional and disclosure cues are literal characters: `▸` (`globals.css:224`), `\25B6` (`globals.css:291`), `→` (`LecturePage.tsx:131`). Functional, but it reads as unstyled rather than designed.
+- Flat elevation everywhere. Every surface — `.lecture-panel`, `.lecture-section`, `.lecture-component`, nested cards inside cards — uses `1px solid var(--border)` and no shadow (`globals.css` throughout), except the one-off `.progress-toast` box-shadow (`globals.css:678`). Primary reading surfaces and incidental UI chrome are visually indistinguishable in depth.
+
+## Goals
+
+- G1. Load a real typeface (variable font via `next/font/google` or a self-hosted variable font, no new runtime network dependency in production) and define a deliberate type scale and weight system covering h1-h3, body, `.description`, `.muted`, and component labels.
+- G2. Replace all component-local hardcoded hex colors with a small semantic token set (`--brand`, `--info`, `--success`, `--warning`, `--neutral`, each with a background/border/text triad) defined once in `:root`.
+- G3. Introduce at least two card "altitudes" (e.g. `.surface-quiet` for low-stakes inline content, `.surface-card` for the current default, `.surface-emphasis` for quizzes/takeaways) and reassign existing components to the altitude that matches their actual importance, not their historical color.
+- G4. Add a `prefers-color-scheme: dark` token block (and, if useful, a manual override hook) covering every existing `--variable` in `:root`, verified for contrast in both themes.
+- G5. Replace `.metadata-grid` and `.lecture-list-meta` bordered-tile layouts with a compact inline metadata row (icon/label pairs separated by a hairline or middot).
+- G6. Surface per-section completion state (already tracked by `ProgressProvider`) as a visual cue in `SectionNavigation`'s `.nav-item`s — distinct from and additive to whatever current-location cue `015-A3` eventually ships.
+- G7. Unify the three primary-action colors into one action token used by quiz check/reveal, assessment reveal, resume CTA, and collection CTA.
+- G8. Add transitions (150-200ms, respecting `prefers-reduced-motion`) to accordion, tabs, quiz feedback, and assessment reveal state changes.
+- G9. Introduce a small (8-12 icon) inline SVG icon set for chevrons, checkmarks, warnings, and directional nav, replacing unicode glyphs.
+- G10. Add subtle elevation (a restrained shadow scale, 2-3 steps) to primary content panels (`.lecture-panel`, `.lecture-section`) only — not to every nested component card — so page structure and content read as distinct layers.
+
+## Non-Goals
+
+- No new `lecture-component` types and no new authoring schema or frontmatter fields.
+- No re-litigating IA or flow decisions from 014/015 (CTA placement, resume logic, quiz interaction model, assessment index placement) — this spec is visual only.
+- No implementing `015-A3` (active-section IntersectionObserver state); that remains a separate, already-scoped piece of work.
+- No new runtime dependency for icons or fonts beyond what `next/font` and inline SVG already provide.
+- No rebrand — the existing teal identity is refined into a system, not replaced with a different brand color.
+- No decorative redesign that reduces information density or adds animation for its own sake.
+- No removal of print, no-JS, or static-export behavior; all visual changes must degrade the same way current styles do.
+- No accessibility regressions — every contrast, focus, and tap-target guarantee already in place must hold in both light and dark themes.
+
+## Product Decisions
+
+- Tokens before components. Every new color or type value is added to `:root` (and its dark counterpart) first; component CSS only ever references a token, never a literal hex or literal font stack.
+- Two or three altitudes is enough. Resist adding a fourth or fifth surface weight; if a component doesn't clearly fit quiet/card/emphasis, default to `.surface-card`.
+- Dark mode is derived, not designed twice. Dark tokens are computed to preserve the same relative contrast and semantic meaning as light tokens — this is a token pass, not a second design pass per component.
+- Completion cues in nav must not rely on color alone (same rule already established for other state cues in 014/015) — use a check glyph or dot plus a color, and an `aria-label` or `sr-only` text equivalent.
+- Motion is a finishing touch, not a feature. Every transition added here must already have a `prefers-reduced-motion: reduce` fallback that removes it, matching the existing pattern at `globals.css:2237-2247`.
+- Icons are inline SVG, not an icon font or external package — keeps bundle size and offline/static-export behavior unchanged.
+- The component demo/gallery page may be denser than production lecture pages (same allowance 014 already grants), but must use the same tokens — it is a review fixture for the same design system, not an excuse to skip it.
+
+## UX Designer Notes
+
+This is a "fewer, better" pass. The instinct on a components-heavy codebase like this one is to keep adding distinct visual treatments per component; the actual fix is the opposite — collapse twenty ad hoc treatments into a system of three or four that every component maps onto.
+
+Design principles for this pass:
+
+- One typeface family for reading, one (optionally) for display/headings if it earns its place — not zero, as today.
+- A color's job is to mean something (info, success, warning, brand-action, neutral), never to differentiate one component from its neighbor for novelty's sake.
+- Visual weight should track pedagogical weight: a quiz or takeaway should feel heavier than a glossary aside or a resource link, and today it does not.
+- Dark mode is a contrast/luminance remap, not a redesign — if a component needs bespoke dark-mode treatment beyond token substitution, that's a sign the light-mode design leaned on a literal color rather than a token.
+- Motion should confirm state changes the user already caused (opened an accordion, checked a quiz answer) — never motion that runs on page load or scroll without user action, to respect both `prefers-reduced-motion` and the "calm workspace" tone set in 014.
+- Icons replace characters used for meaning (chevrons, checks, warnings) but should not be added where text already does the job well (e.g. don't iconify every metadata label).
+
+## Priority
+
+### P0: Typography, Color Tokens, and Card Hierarchy
+
+The foundational pass everything else in this spec builds on.
+
+Requirements:
+
+- Load a real typeface via `next/font` in `src/app/layout.tsx`; apply it as the body font and expose it as a CSS variable consumed by `globals.css` rather than hardcoding the font name in multiple places.
+- Define a type scale: confirm/adjust h1/h2/h3 sizes so each step is unambiguously distinct (h3 at `1.08rem` next to body at `~1rem` is currently too close), and introduce at least one intermediate weight (500 or 600) so not everything is regular or 700/800.
+- Add semantic color tokens to `:root`: `--brand`, `--info`, `--success`, `--warning`, `--neutral`, each exposing a background, border, and text-safe variant. Retire all component-local hex values in favor of these tokens.
+- Reassign every existing "colored left border" component to one of the semantic tokens based on actual meaning (e.g. `InstructorNote` → neutral/info, not a bespoke yellow; `MistakeCorrection`'s mistake side → warning, correction side → success; `ConceptCard` → info or brand, not an arbitrary purple) rather than preserving today's per-component hue simply because it existed.
+- Introduce `.surface-quiet`, `.surface-card` (existing default), and `.surface-emphasis` altitude classes; move quizzes, key takeaways, and validation panels to `.surface-emphasis`, and move low-stakes asides (glossary terms, resource links, instructor notes) to `.surface-quiet`.
+- Verify every text/background pairing still meets WCAG AA contrast after tokens are introduced.
+
+### P1: Dark Mode, Elevation, and Action Color Unification
+
+Requirements:
+
+- Add a `prefers-color-scheme: dark` block defining dark counterparts for every `:root` variable currently in `globals.css:1-20`, preserving semantic meaning (warning still reads as warning, brand accent still reads as the same brand).
+- Add a 2-3 step shadow scale and apply it to `.lecture-panel` and `.lecture-section` only; nested `.lecture-component` cards keep flat borders so elevation communicates page structure, not component-level competition.
+- Introduce one `--action` (or reuse `--accent-strong` consistently) token and repoint `.quiz-reveal-button`, `.assessment-reveal-button`, `.resume-prompt-action`, and `.collection-primary-action` to it so every forward-moving CTA in the product shares one color identity.
+- Replace `.metadata-grid` (`LectureHeader.tsx`) and `.lecture-list-meta` bordered-tile layouts with a compact inline row: icon or label + value pairs separated by a hairline divider or middot, same information, lighter visual footprint.
+- Confirm dark mode passes the same contrast and focus-visibility checks as light mode, including on code blocks, diagrams, and quiz/assessment states.
+
+### P2: Motion, Iconography, and Progress-Aware Navigation
+
+Requirements:
+
+- Add 150-200ms transitions to `.tabs-panel`, `.accordion-body`, `.flashcard-answer`, `.quiz-answer`, and `.assessment-hidden-region` open/close and feedback-reveal state changes, all gated by the existing `prefers-reduced-motion` pattern (`globals.css:2237-2247`).
+- Build a small inline SVG icon set (chevron, check, warning, arrow-prev/next, external-link) and replace the unicode glyphs currently used for `.learning-path-chevron`, `.learning-path-mobile summary::after`, `.assessment-index-disclosure`, and lecture-nav prev/next arrows.
+- Add a completion cue to `SectionNavigation`'s `.nav-item`s reflecting `ProgressProvider` per-section completion state: a check icon or filled dot plus a token color, with an `sr-only` "Completed" label — additive to (not a replacement for) whatever current-location treatment `015-A3` eventually adds.
+
+## Recommended Experience Direction
+
+### Typography
+
+- Body copy: a humanist sans or a screen-optimized serif at 1rem-1.08rem base size, line-height already at 1.65 (`globals.css:38`) — keep that, it's correct for long-form reading.
+- Headings: same family as body, or one deliberate display pairing if it strengthens hierarchy — not a second unrelated typeface chosen for novelty.
+- Weight scale: 400 (body), 500/600 (labels, `dt`, muted emphasis), 700 (subheadings, nav), 800 (h1, primary CTAs) — currently jumps straight from 400 to 700/800 with nothing between.
+
+### Color Tokens
+
+- `--brand`: the existing teal identity, used for the single primary action color and top-level active states.
+- `--info`: for definitional/explanatory content (concept cards, notes, worked examples).
+- `--success`: for correct-answer feedback, completed states, correction content.
+- `--warning`: for mistakes, validation failures, cautionary callouts — already exists, keep it.
+- `--neutral`: for asides, resource links, instructor/reviewer-only content — visually quieter than the other four.
+- Each token exposes `-bg`, `-border`, `-text` variants so components never reach for a raw hex.
+
+### Card Altitude System
+
+- `.surface-quiet`: no border-left accent, subtle or no background tint, minimal padding — glossary terms, resource links, short asides.
+- `.surface-card` (today's default): current bordered/tinted treatment — most teaching components (comparisons, steps, timelines, worked examples).
+- `.surface-emphasis`: stronger border or shadow, more padding, reserved for quizzes, key takeaways, and validation/error panels — the handful of things that should visually interrupt the reader.
+
+### Dark Mode
+
+- Background/surface/border tokens invert luminance while preserving relative contrast ratios (e.g. `--surface` becomes a dark elevated panel, not pure black).
+- Semantic colors (info/success/warning/brand) shift in lightness, not hue, so their meaning stays recognizable across themes.
+- Code blocks (`--code-bg`/`--code-text`, already dark in light mode) need no change; verify they still contrast correctly against the new dark page background.
+
+### Section Navigation Completion
+
+- Each `.nav-item` gets a small leading indicator: empty ring (not started), filled ring or check (completed), matching the semantics already used by `SectionCompletionToggle`.
+- Indicator sits to the left of the section label, sized to not disrupt the existing 44px tap target.
+- `aria-label` or adjacent `sr-only` text states "Completed" so the cue is not color/icon-only.
+
+### Motion
+
+- Accordion/tabs/quiz-feedback/assessment-reveal: opacity + height or max-height transition, 150-200ms ease, matching the existing `.lecture-progress-fill` timing precedent (`globals.css:472`, 180ms).
+- No motion on page load, scroll, or hover beyond existing focus/hover states — motion only confirms a click the user just made.
+
+## Accessibility Requirements
+
+- Every token pairing (text on background, border against background) meets WCAG AA contrast in both light and dark themes.
+- Focus-visible rings (`globals.css:45-50`) remain at least as visible against new surface/elevation treatments as they are today.
+- Section-nav completion cues are never color-only; pair with an icon shape difference and an `sr-only`/`aria-label` text equivalent.
+- All new motion respects `prefers-reduced-motion: reduce` with the same pattern already used at `globals.css:2237-2247`.
+- Icon replacements for chevrons/checks/arrows retain the same accessible name or `aria-hidden` treatment as the text/unicode they replace — no icon may be the sole carrier of meaning without a text equivalent.
+- Dark mode must not regress any existing print-mode behavior (`@media print`, `globals.css:2249-2414`), which explicitly forces light colors for print regardless of screen theme.
+
+## Responsive Requirements
+
+- Inline metadata row (replacing `.metadata-grid`/`.lecture-list-meta`) must wrap gracefully at 390px without truncation or overlap.
+- Card altitude changes must not alter existing breakpoint behavior already verified in 014/015 at 390px, 768px, and 1280px.
+- New icons must scale/align correctly at all existing breakpoints, including inside the mobile learning-path disclosure and mobile assessment index.
+- Elevation (shadows) on `.lecture-panel`/`.lecture-section` must not introduce horizontal overflow or clipping at 390px.
+- Dark mode must be verified at the same 390px/768px/1280px matrix already used for prior specs.
+
+## Functional Requirements
+
+- Existing valid lecture templates remain valid; no authoring schema changes.
+- No new runtime network dependency; if a web font is used via `next/font/google`, it must be self-hosted at build time per `next/font`'s default behavior (no runtime request to a font CDN).
+- Static export and review package output remain visually consistent with the live site (same tokens, same compiled CSS).
+- No unsafe HTML introduced by icon SVGs — inline SVGs are static, authored assets, not user-generated or dynamically constructed strings.
+- Dark mode preference is read from `prefers-color-scheme` with no new client-side dependency; a manual toggle is optional and out of scope unless trivial to add via the same token system.
+- All existing parser, validator, rendering, progress, collection, review-package, and component tests continue to pass; visual-only class/token renames must not break test selectors (`tests/lecture-template/*` should be checked for class-name coupling before renaming any CSS class).
+
+## Success Metrics / Quality Gates
+
+- A visual diff of the collection landing and a representative lecture page shows a real typeface, not the system default.
+- Grep for hardcoded hex colors in `globals.css` outside of `:root` token definitions returns zero component-level matches.
+- At least two visually distinct card altitudes are observable on a single lecture page (e.g. a glossary term vs. a quiz).
+- Toggling OS-level dark mode changes the rendered page to a verified-contrast dark theme with no unstyled or broken elements.
+- `SectionNavigation` visually distinguishes completed sections from incomplete ones on a partially-progressed lecture.
+- Quiz check, assessment reveal, resume, and collection CTA buttons are visually identical in color treatment.
+- Accordion, tabs, and quiz feedback visibly animate on state change with `prefers-reduced-motion: no-preference`, and do not animate with `reduce` set.
+- Screenshots at 390px, 768px, and 1280px in both light and dark themes show no clipping, overlap, or body-level horizontal overflow.
+- Print output is unchanged in substance (still light, still shows hidden/answer content) despite dark mode existing on screen.
+- Existing test suite passes without modification beyond expected class-name/selector updates tied to intentional visual changes.
+
+## Acceptance Criteria
+
+- `globals.css` defines a font-family CSS variable sourced from a loaded typeface (via `next/font` or equivalent), and `body` uses it instead of the system stack.
+- `:root` defines `--brand`, `--info`, `--success`, `--warning`, `--neutral` tokens (each with background/border/text variants), and no component rule in `globals.css` references a literal hex color for content-type styling.
+- At least three card altitude classes exist (`.surface-quiet`, `.surface-card`, `.surface-emphasis` or equivalently named) and are applied according to component importance, not legacy color choice.
+- A `prefers-color-scheme: dark` block defines dark values for every existing `:root` variable, verified for AA contrast.
+- `.lecture-panel` and `.lecture-section` have a subtle elevation (shadow) distinct from nested `.lecture-component` cards, which remain flat.
+- `.metadata-grid` and `.lecture-list-meta` bordered-tile layouts are replaced with a compact inline metadata presentation.
+- `SectionNavigation`'s `.nav-item`s visually indicate per-section completion state sourced from `ProgressProvider`, with a non-color-only cue and an accessible text equivalent.
+- Quiz check/reveal, assessment reveal, resume CTA, and collection CTA share one action color token.
+- Accordion, tabs, quiz feedback, and assessment reveal transitions animate at 150-200ms and respect `prefers-reduced-motion: reduce`.
+- Unicode-glyph chevrons/arrows (`▸`, `\25B6`, `→`) are replaced with inline SVG icons carrying equivalent accessible semantics.
+- No regression in contrast, focus visibility, tap-target size, print output, or static-export/review-package fidelity.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests still pass or are updated for intentional, documented visual changes.
+- Verification includes browser screenshots for collection landing, a short lecture, and a component-heavy lecture, each captured in both light and dark themes at 390px, 768px, and 1280px.
+
+## Out Of Scope For 016
+
+The following were considered and intentionally deferred:
+
+- `015-A3` active-section `IntersectionObserver` state (separate, already-scoped, unimplemented work from 015).
+- A manual/persisted dark-mode toggle beyond OS-level `prefers-color-scheme` (candidate for a future spec if requested).
+- A second/display typeface distinct from the body face, beyond what's needed for heading weight contrast.
+- Any new `lecture-component` type or authoring schema change.
+- Rebranding away from the existing teal brand identity.
+- Illustration, photography, or decorative imagery.
+- A configurable theming API for course authors (custom brand colors per collection).

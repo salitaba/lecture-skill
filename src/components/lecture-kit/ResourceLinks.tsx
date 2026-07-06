@@ -2,7 +2,7 @@ import type { ResourceLinksComponent } from "@/lib/lecture-template/types";
 
 export function ResourceLinks({ component }: { component: ResourceLinksComponent }) {
   return (
-    <aside className="lecture-component resource-links">
+    <aside className="lecture-component surface-quiet resource-links">
       <p className="component-label">Resources</p>
       <h3>{component.title}</h3>
       <ul>

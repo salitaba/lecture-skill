@@ -1,10 +1,11 @@
 /* @vitest-environment jsdom */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import { SectionNavigation } from "../../src/components/lecture-kit/SectionNavigation";
 import { ProgressProvider } from "../../src/components/lecture-kit/progress/ProgressProvider";
+import { SectionCompletionToggle } from "../../src/components/lecture-kit/progress/SectionCompletionToggle";
 
 const sections = [
   { anchor: "intro", title: "Introduction", blocks: [] },
@@ -74,6 +75,29 @@ describe("section navigation enhancement", () => {
 
     const counts = screen.getAllByText("1 section");
     expect(counts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("marks a nav item complete when its section is toggled, independent of active state", () => {
+    render(
+      <ProgressProvider storageKey="test-nav-complete" sections={sections}>
+        <SectionCompletionToggle anchor="deep-dive" title="Deep Dive" />
+        <SectionNavigation sections={sections} />
+      </ProgressProvider>
+    );
+
+    const introLink = screen.getAllByRole("link", { name: /Introduction/ })[0];
+    const deepDiveLinkBefore = screen.getAllByRole("link", { name: /Deep Dive/ })[0];
+    expect(introLink.closest("li")).not.toHaveClass("nav-item-complete");
+    expect(deepDiveLinkBefore.closest("li")).not.toHaveClass("nav-item-complete");
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark Deep Dive complete" }));
+
+    const deepDiveLinkAfter = screen.getAllByRole("link", { name: /Deep Dive/ })[0];
+    expect(deepDiveLinkAfter.closest("li")).toHaveClass("nav-item-complete");
+    expect(deepDiveLinkAfter).toHaveTextContent("(completed)");
+    expect(screen.getAllByRole("link", { name: /Introduction/ })[0].closest("li")).not.toHaveClass(
+      "nav-item-complete"
+    );
   });
 });
 

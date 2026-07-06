@@ -227,6 +227,23 @@ Unknown lecture slugs, unknown section anchors, malformed JSON, arrays, null roo
 
 Use the visible `Reset progress` button or `Alt+R` to clear the current lecture key. Clearing the relevant `localStorage` key in browser developer tools has the same effect after reload.
 
+## Visual Design System
+
+All styling lives in `src/app/globals.css`. There is no Tailwind, CSS Modules, or CSS-in-JS. New components and styles should follow the existing token and altitude system rather than inventing new colors or card treatments:
+
+- **Body typeface**: loaded via `next/font/google` in `src/app/layout.tsx` and exposed as the `--font-body` CSS variable. Do not hardcode a font name in component CSS.
+- **Semantic color tokens**: every content-type color traces to one of five tokens defined in `:root` (and mirrored for `prefers-color-scheme: dark`): `--brand`, `--info`, `--success`, `--warning`, `--neutral`, each with `-bg`, `-border`, and `-text` variants. Pick the token by what the content means (a definition is `--info`, a correct-answer state is `--success`, a mistake is `--warning`, an aside is `--neutral`, a primary learner action is `--brand`) — never add a new literal hex color to a component rule.
+- **Card altitude system**: every `.lecture-component` also carries one altitude class:
+  - `.surface-quiet` — low-stakes asides (glossary terms, resource links, instructor notes, quotes): border-top divider, no background tint.
+  - `.surface-card` — the default teaching-component treatment (comparisons, steps, timelines, worked examples, tabs, accordions).
+  - `.surface-emphasis` — the handful of things that should visually interrupt the reader (quizzes, question sets, practice tasks, free response, key takeaways, validation panels): heavier left border and a subtle shadow.
+  When adding a new component, pick the altitude that matches its pedagogical weight, not its historical color.
+- **Action color**: `--action`/`--action-hover` back every forward-moving control (quiz check/reveal, assessment reveal, resume prompt, collection primary action) so they share one visual identity.
+- **Elevation**: `--shadow-sm`/`--shadow-md` are reserved for page-level surfaces (`.lecture-panel`, `.lecture-section`, `.validation-panel`, and `.surface-emphasis`). Nested component cards stay flat so elevation communicates page structure, not per-component competition.
+- **Dark mode**: driven entirely by `prefers-color-scheme: dark` token overrides in `:root`; there is no separate dark-mode design pass per component. Print output (`@media print`) is unaffected and always forces light, high-contrast colors regardless of screen theme.
+- **Motion**: reveal/expand interactions (`Tabs`, `Quiz`, assessment reveal regions, `Flashcard`, `Accordion`) use the `reveal-fade-in` keyframe animation, which fires correctly the moment `[hidden]`/`[open]` flips `display` away from `none` (a CSS transition cannot do this; a CSS animation can). All of it is disabled under `prefers-reduced-motion: reduce`.
+- **Icons**: `src/components/lecture-kit/Icon.tsx` is the only source of inline SVG icons (chevron, check, warning, arrow-prev, arrow-next). Icons are decorative (`aria-hidden`) — the adjacent text always carries the accessible name.
+
 ## Template Schema
 
 The engine supports one template schema: YAML frontmatter plus Markdown body sections.

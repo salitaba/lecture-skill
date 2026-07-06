@@ -20,7 +20,7 @@ export function QuestionSet({ component, enableShuffle = true }: { component: Qu
   }, [enableShuffle]);
 
   return (
-    <aside id={component.anchor} className="lecture-component assessment-card question-set-card">
+    <aside id={component.anchor} className="lecture-component surface-emphasis assessment-card question-set-card">
       <p className="component-label">Assessment: Question set</p>
       <h3>{component.title}</h3>
       {component.instructions ? <p className="assessment-instructions">{component.instructions}</p> : null}

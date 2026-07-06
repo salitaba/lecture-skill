@@ -12,7 +12,7 @@ export function FreeResponse({ component }: { component: FreeResponseComponent }
   const guidanceLabelId = `${baseId}-guidance-label`;
 
   return (
-    <aside id={component.anchor} className="lecture-component assessment-card free-response-card">
+    <aside id={component.anchor} className="lecture-component surface-emphasis assessment-card free-response-card">
       <p className="component-label">Assessment: Free response</p>
       <h3>{component.title}</h3>
       <p>{component.prompt}</p>

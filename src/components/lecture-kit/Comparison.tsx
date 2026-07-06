@@ -8,7 +8,7 @@ export function Comparison({ component }: { component: ComparisonComponent }) {
   const rightLabelId = `${idPrefix}-comparison-right-label`;
 
   return (
-    <aside className="lecture-component comparison">
+    <aside className="lecture-component surface-card comparison">
       <p className="component-label">Comparison</p>
       <h3>{component.title}</h3>
       <div className="comparison-list">

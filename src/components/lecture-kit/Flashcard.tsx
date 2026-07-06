@@ -10,7 +10,7 @@ export function Flashcard({ component }: { component: FlashcardComponent }) {
   const answerId = `${id}-flashcard-answer`;
 
   return (
-    <aside className="lecture-component flashcard">
+    <aside className="lecture-component surface-card flashcard">
       <p className="component-label">Flashcard{component.category ? `: ${component.category}` : ""}</p>
       <h3>{component.prompt}</h3>
       {component.hint ? <p className="flashcard-hint">Hint: {component.hint}</p> : null}

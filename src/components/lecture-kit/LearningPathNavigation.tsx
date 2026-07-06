@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LectureSection } from "@/lib/lecture-template/types";
 import { lectureNavigationTargets } from "@/lib/lecture-template/navigationTargets";
 import { useProgressOptional } from "./progress/ProgressProvider";
+import { Icon } from "./Icon";
 
 const nonAuthoredAnchors = [
   lectureNavigationTargets.overview.href.slice(1),
@@ -48,6 +49,11 @@ export function LearningPathNavigation({
   }, [allAnchors]);
 
   const currentAnchor = progressContext?.currentSectionAnchor ?? activeAnchor;
+  const completedAnchors = useMemo(() => {
+    const progress = progressContext?.progress;
+    if (!progress) return undefined;
+    return new Set(Object.keys(progress).filter((anchor) => progress[anchor] === true));
+  }, [progressContext?.progress]);
 
   const items = [
     {
@@ -84,7 +90,7 @@ export function LearningPathNavigation({
         <p className="nav-summary-count">
           {sections.length} {sections.length === 1 ? "section" : "sections"}
         </p>
-        <NavigationList items={items} activeAnchor={currentAnchor} />
+        <NavigationList items={items} activeAnchor={currentAnchor} completedAnchors={completedAnchors} />
       </div>
       <details className="learning-path learning-path-mobile">
         <summary>
@@ -93,10 +99,10 @@ export function LearningPathNavigation({
             <span className="nav-summary-count">
               {sections.length} {sections.length === 1 ? "section" : "sections"}
             </span>
-            <span className="learning-path-chevron" aria-hidden="true" />
+            <Icon name="chevron" className="learning-path-chevron" />
           </span>
         </summary>
-        <NavigationList items={items} activeAnchor={currentAnchor} />
+        <NavigationList items={items} activeAnchor={currentAnchor} completedAnchors={completedAnchors} />
       </details>
     </nav>
   );
@@ -104,7 +110,8 @@ export function LearningPathNavigation({
 
 function NavigationList({
   items,
-  activeAnchor
+  activeAnchor,
+  completedAnchors
 }: {
   items: Array<{
     key: string;
@@ -114,23 +121,31 @@ function NavigationList({
     minutes?: number;
   }>;
   activeAnchor?: string;
+  completedAnchors?: Set<string>;
 }) {
   return (
     <ol>
       {items.map((item) => {
         const anchor = item.href.startsWith("#") ? item.href.slice(1) : undefined;
         const isActive = anchor !== undefined && anchor === activeAnchor;
+        const isComplete = anchor !== undefined && completedAnchors?.has(anchor) === true;
         return (
-          <li className="nav-item" key={item.key}>
+          <li className={`nav-item${isComplete ? " nav-item-complete" : ""}`} key={item.key}>
             <a
               href={item.href}
               {...(isActive ? { "aria-current": "location" } : {})}
               className={isActive ? "nav-item-active" : undefined}
             >
-              <span className="nav-prefix">{item.prefix}</span>
-              <span>{item.label}</span>
-              {item.minutes ? <span className="nav-section-minutes">~{item.minutes} min</span> : null}
-              {isActive ? <span className="sr-only"> (current)</span> : null}
+              <span className="nav-item-status" aria-hidden="true">
+                {isComplete ? <Icon name="check" /> : null}
+              </span>
+              <span className="nav-item-text">
+                <span className="nav-prefix">{item.prefix}</span>
+                <span>{item.label}</span>
+                {item.minutes ? <span className="nav-section-minutes">~{item.minutes} min</span> : null}
+                {isComplete ? <span className="sr-only"> (completed)</span> : null}
+                {isActive ? <span className="sr-only"> (current)</span> : null}
+              </span>
             </a>
           </li>
         );

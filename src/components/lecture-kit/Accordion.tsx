@@ -2,7 +2,7 @@ import type { AccordionComponent } from "@/lib/lecture-template/types";
 
 export function Accordion({ component }: { component: AccordionComponent }) {
   return (
-    <aside className="lecture-component accordion">
+    <aside className="lecture-component surface-card accordion">
       <p className="component-label">More detail</p>
       <h3>{component.title}</h3>
       <div className="accordion-items">

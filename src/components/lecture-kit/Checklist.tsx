@@ -33,7 +33,7 @@ export function Checklist({ component, instanceId }: { component: ChecklistCompo
   }
 
   return (
-    <aside className="lecture-component checklist">
+    <aside className="lecture-component surface-card checklist">
       <p className="component-label">Checklist</p>
       <h3>{component.title}</h3>
       <ul className="checklist-items">

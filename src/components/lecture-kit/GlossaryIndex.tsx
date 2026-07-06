@@ -1,4 +1,5 @@
 import type { GlossaryEntry } from "@/lib/lecture-template/glossaryIndex";
+import { Icon } from "./Icon";
 
 export interface GlossaryIndexProps {
   entries: GlossaryEntry[];
@@ -25,7 +26,7 @@ export function GlossaryIndex({ entries, id = "glossary-index", title = "Glossar
           <span className="glossary-index-summary-text">{title}</span>
           <span className="learning-path-summary-meta">
             <span className="nav-summary-count">{countLabel}</span>
-            <span className="learning-path-chevron" aria-hidden="true" />
+            <Icon name="chevron" className="learning-path-chevron" />
           </span>
         </summary>
         <GlossaryList entries={entries} scope={scope} />

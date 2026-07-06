@@ -1,0 +1,206 @@
+Implementation Plan: Visual Design System (spec/016-visual-design-system.txt)
+
+Plan status: draft pending tech-lead review
+
+## Brief Summary
+
+`spec/016` is a visual-only pass layered on top of `spec/014-senior-ui-ux-polish.txt` and `spec/015-learner-experience-primitives.txt`, both already implemented in this checkout. It does not touch information architecture, resume logic, quiz interaction model, or component vocabulary. It replaces the system font stack with a real typeface, collapses ~15 hardcoded per-component hex colors into a small semantic token set, introduces a card "altitude" system so quizzes and takeaways outweigh glossary asides, adds dark mode, unifies the three unrelated primary-action colors, replaces bordered stat-tile metadata with inline rows, adds completion cues to the section nav, adds motion to reveal/expand interactions, and replaces unicode-glyph chevrons/arrows with inline SVG icons.
+
+The plan is organized as twelve steps, roughly following the spec's P0 → P1 → P2 priority order: tokens first (typography, color, altitude), then dark mode/elevation/action-color/metadata, then motion/icons/nav-completion, then docs and verification. Every step edits `src/app/globals.css` and a small number of already-existing component files; no new `lecture-component` type, authoring field, or runtime dependency is introduced.
+
+## Correction To Spec 016's Assumption About 015-A3
+
+Before planning, verify current behavior: `src/components/lecture-kit/LearningPathNavigation.tsx` already implements active-section state — `aria-current="location"` (line 127), a client `IntersectionObserver` (lines 29-48) with server-safe fallback via `useProgressOptional()?.currentSectionAnchor`, and a non-color cue via `.nav-item-active` (bold + left rule, `globals.css:265-278`). `ProgressProvider.tsx` also runs its own `IntersectionObserver` (lines 128-147) and exposes `currentSectionAnchor`. In other words, `015-A3` is done, not open — spec 016's "Relationship to prior work" and "Out Of Scope" sections describe it as unimplemented, which is now incorrect.
+
+This does not change what 016 needs to build: G6 ("per-section completion cue in the nav") is a genuinely separate signal — it comes from `progress[section.anchor]` (a completion boolean), not `currentSectionAnchor` (a scroll-position pointer) — and nothing in the current `LearningPathNavigation`/`NavigationList` code renders it today. The plan proceeds with G6 as originally scoped, built additively next to the existing active-state code. Flag the spec text discrepancy to whoever owns `spec/016-visual-design-system.txt` so its prose can be corrected in a follow-up edit; it is not blocking for implementation.
+
+## Relevant Existing Files
+
+- `src/app/globals.css` - the entire stylesheet (2415 lines). Every step in this plan edits it. No CSS Modules, no Tailwind, no CSS-in-JS — this is the single source of truth for all visual rules, breakpoints, print rules, and the `prefers-reduced-motion` pattern this plan extends.
+- `src/app/layout.tsx` - currently renders `<html lang="en"><body>{children}</body></html>` with no font setup. Step 1 adds a `next/font` import and applies its variable/className here.
+- `src/components/lecture-kit/PageShell.tsx` - trivial wrapper (`<main className="page-shell">`); no changes expected, listed for completeness since it wraps every page.
+- `src/components/lecture-kit/LectureHeader.tsx` - renders `.metadata-grid` (Audience/Duration/Reading time/Level/Sections as five bordered `<div>`s). Step 7 replaces this layout.
+- `src/components/lecture-kit/CollectionLanding.tsx` - renders `.lecture-list-meta` twice: once for course-level metadata (lines 50-70) and once per lecture card (lines 103-122). Step 7 replaces both. Also renders `CollectionPrimaryAction`, `AssessmentIndexDisclosure`, `CollectionGlossaryIndex` — untouched by this spec except for shared token/altitude classes.
+- `src/components/lecture-kit/LecturePage.tsx` - composes `LectureHeader`, `ResumePrompt`, `LectureProgressBar`, `SectionNavigation`, `RenderBlocks`/`SectionRenderer`, `GlossaryIndex`, `AnswerKeyAppendix`. No structural change; some sections get reassigned to a new altitude class (overview/objectives/takeaways currently `.lecture-panel`, takeaways may move to `.surface-emphasis`).
+- `src/components/lecture-kit/SectionNavigation.tsx` - thin wrapper around `LearningPathNavigation`. No changes; listed for completeness.
+- `src/components/lecture-kit/LearningPathNavigation.tsx` - owns `NavigationList` (lines 105-140), the active-anchor `IntersectionObserver`, and `aria-current="location"`. Step 8 extends `NavigationList` to also read completion state and render a per-item indicator, using `useProgressOptional()?.progress` (already imported in this file) — no new prop required for the lecture-page case; the mobile/desktop duplication (`learning-path-desktop` / `learning-path-mobile`) means both `NavigationList` call sites automatically pick up the change since they share the same component.
+- `src/components/lecture-kit/progress/ProgressProvider.tsx` - already exposes `progress: LectureProgress` (a `Record<anchor, boolean>`) and `sections: ProgressSection[]` via context (lines 12-28, 289-324). Step 8 consumes `progress` as-is; no provider change needed.
+- `src/components/lecture-kit/Quiz.tsx` - `.quiz-reveal-button` (line 46) is one of the three action colors to unify (Step 6) and one of the reveal surfaces to animate (Step 9, via `.quiz-answer` and `.quiz-feedback`).
+- `src/components/lecture-kit/AssessmentIndexDisclosure.tsx`, `AnswerKeyAppendix.tsx`, `GlossaryIndex.tsx`, `CollectionGlossaryIndex.tsx` - all use `<details>`/`<summary>` disclosure patterns whose chevrons are candidates for the icon set (Step 10) and whose open/close could optionally animate (Step 9, lower priority — `details` height animation is non-trivial without JS; see Risks).
+- `src/components/lecture-kit/Accordion.tsx`, `Tabs.tsx` - `.accordion-body` open/close and `.tabs-panel` switch are the two clearest motion targets (Step 9) since `Tabs` already tracks `hidden` state in React (not native `<details>`), making a CSS transition straightforward.
+- `src/components/lecture-kit/Callout.tsx`, `ConceptCard.tsx`, `Quote.tsx`, `StepList.tsx`, `Comparison.tsx`, `Summary.tsx`, `WorkedExample.tsx`, `MistakeCorrection.tsx`, `ResourceLinks.tsx`, `InstructorNote.tsx`, `Timeline.tsx`, `Checklist.tsx`, `Flashcard.tsx`, `GlossaryTerm.tsx`, `CodeBlock.tsx`, `Diagram.tsx` - every one of these emits a `lecture-component <type>` className whose modifier class today carries a hardcoded left-border hex (`globals.css:730-1610`). Step 2 and Step 3 retarget each modifier class to a semantic token and an altitude class; none of these `.tsx` files need code changes since the classNames stay the same strings — only `globals.css` rules change (a CSS-only migration is intentional so the React tree and tests keyed on class names are undisturbed).
+- `src/components/lecture-kit/progress/LectureProgressBar.tsx`, `CollectionProgressBar.tsx`, `ResumePrompt.tsx` - `.progress-reset-button`, `.resume-prompt-action` are candidates for Step 6 (action color) and Step 9 (motion already exists on the fill bar; no new motion needed here beyond what 014/015 shipped).
+- `src/components/lecture-kit/CollectionPrimaryAction.tsx` - `.collection-primary-action` is the fourth Step 6 target.
+- `tests/lecture-template/*.test.tsx` (all 22 files) - none assert on color values or computed styles today (confirmed by spec/014 and spec/015 plans, which relied on class-name and DOM-structure assertions). This plan must not rename any existing CSS class used as a test selector; new classes are additive. `tests/lecture-template/visual-hierarchy.test.tsx` and `tests/lecture-template/progress-ui-enhancement.test.tsx` are the most likely to need new assertions for the altitude system and nav completion cue, respectively.
+- `README.md`, `SKILL.md` - document the component vocabulary and authoring model for humans and AI agents. Step 11 documents the new token names so future component authors reach for tokens, not hex values.
+- `next.config.ts` - confirm it does not disable `next/font` or set an `output: "export"` mode that would conflict with `next/font/google`'s build-time font fetch (Step 1 must verify this before committing to `next/font/google` vs. a self-hosted variable font file).
+
+## Proposed Implementation Steps
+
+### Step 1: Load a real typeface and define the type scale
+
+- Inspect `next.config.ts` to confirm the static-export path (`npm run build` / `scripts/packageReview.ts`) is compatible with `next/font/google`, which fetches font files at build time and self-hosts them — no runtime network request either way, but confirm the review-package script does not run in an environment without network access at build time. If it does, fall back to a self-hosted variable font file under `src/app/fonts/` loaded via `next/font/local`.
+- In `src/app/layout.tsx`, import the chosen font, instantiate it with the weight range needed (400/500/600/700/800), and apply its CSS variable (e.g. `--font-body`) to the `<html>` or `<body>` element's className.
+- In `src/app/globals.css`:
+  - Replace `font-family: Arial, Helvetica, sans-serif` (`globals.css:37`) with `font-family: var(--font-body), Arial, Helvetica, sans-serif` (keep the system stack as a fallback, not as the primary).
+  - Add a `500`/`600` weight rule for `dt`, `.muted`, and any label currently forced to 700/800 by default, so the weight scale has an intermediate step (currently 400 → 700/800 with nothing between, per the spec's P0 requirement).
+  - Adjust `h3` (`globals.css:113-116`, `1.08rem`) so it is unambiguously distinct from body text (`~1rem`/`1.08rem` per `.description`) — increase to roughly `1.15-1.2rem` or add a weight/letter-spacing distinction if size alone stays tight.
+- Do not introduce a second display typeface unless the chosen body face is visually weak at h1 size (spec's Out Of Scope explicitly defers a second typeface unless needed for heading contrast).
+- Verification: `npm run build` succeeds with no network-dependent runtime behavior; visually confirm h1/h2/h3/body/label read as distinct steps on the collection landing and a lecture page.
+
+### Step 2: Introduce semantic color tokens and retire hardcoded hex values
+
+- In `globals.css:1-20`, extend `:root` with semantic tokens, each exposing `-bg`, `-border`, `-text` variants: `--brand-bg/-border/-text` (derived from the existing `--accent`/`--accent-strong`), `--info-bg/-border/-text`, `--success-bg/-border/-text`, `--warning-bg/-border/-text` (map to existing `--warning`/`--warning-bg`), `--neutral-bg/-border/-text`.
+- Build a mapping table (document it in the PR description, not in code comments) from every current hardcoded hex to its new semantic token, based on actual content meaning rather than preserving historical hue:
+  - `.callout-note` (`#2563eb`) → `--info`
+  - `.callout-insight` (uses `--accent`, already token-based) → `--success` (insight/correct framing) or keep `--brand` if "insight" reads as brand-voice; pick `--success` since insight callouts pair with positive/encouraging framing elsewhere (quiz-feedback-correct already uses `--accent-strong`/`--insight-bg`).
+  - `.callout-warning` (already `--warning`) → unchanged, confirm token usage.
+  - `.concept-card` (`#7c3aed`) → `--info`
+  - `.step-list` (`--accent-strong`, already token) → `--brand`
+  - `.comparison` (`--accent`) → `--brand`
+  - `.quote-card` (`#b45309`) → `--neutral`
+  - `.quiz-card` (`#0369a1`) → `--brand` (quizzes are a primary learner action, not incidental info)
+  - `.tabs` (`#4f46e5`) → `--info`
+  - `.accordion` (`#64748b`) → `--neutral`
+  - `.timeline` (`--accent-strong`) → `--brand`
+  - `.checklist` (`--accent`) → `--success`
+  - `.flashcard` (`#b45309`) → `--neutral`
+  - `.worked-example` (`#0369a1`) → `--info`
+  - `.mistake-correction` (`--warning`) → unchanged; `.mistake-region` → `--warning`, `.correction-region` (`--accent`) → `--success`
+  - `.resource-links` (`#2563eb`) → `--neutral`
+  - `.instructor-note` (`#a16207`) → `--neutral`
+  - `.glossary-term` (`--accent-strong`) → `--info`
+  - `.summary-card` (`--border-strong`) → `--neutral`
+  - `.assessment-card` (`--accent`) → `--brand`
+- Replace each component's `border-left-color` (and any matching background tint like `.quote-card { background: #fffbeb }`) with the corresponding token's `-border`/`-bg` value. Leave `.lecture-component` (`globals.css:714-723`) as the shared base rule; only the per-type modifier rules change.
+- Verification: `grep -Eo "#[0-9a-fA-F]{3,6}" src/app/globals.css` outside the `:root` block returns no component-styling matches (a few literal hexes may remain for print-only rules like `#000000`/`#ffffff`, which are intentional and out of scope for tokenization).
+- Run WCAG AA contrast checks (manual or a quick script) for every new `-text` on `-bg` pairing before moving to Step 3.
+
+### Step 3: Introduce the card altitude system
+
+- Add three altitude classes to `globals.css`, composed from the existing `.lecture-component` base:
+  - `.surface-quiet` - no left-border accent, transparent or `--surface-soft` background, reduced padding (e.g. `12px 0` with a `border-top` divider instead of a full border box).
+  - `.surface-card` - today's default treatment (border, left-border accent, `--surface-soft` background, `18px` padding) — effectively a rename/alias of the current `.lecture-component` look so no visual regression occurs for components that stay here.
+  - `.surface-emphasis` - stronger left-border width (e.g. 6-8px vs. 5px), slightly larger padding, and (pending Step 5) elevation.
+- Reassign components by editing only their `.tsx` root className string (a one-line change per file, no structural change):
+  - Move to `.surface-quiet`: `GlossaryTerm.tsx`, `ResourceLinks.tsx`, `InstructorNote.tsx`, `Quote.tsx` (asides), `Summary.tsx` if it reads as a wrap-up aside rather than a graded moment.
+  - Keep on `.surface-card`: `Callout.tsx`, `ConceptCard.tsx`, `StepList.tsx`, `Comparison.tsx`, `Timeline.tsx`, `Checklist.tsx`, `Flashcard.tsx`, `Tabs.tsx`, `Accordion.tsx`, `WorkedExample.tsx`, `MistakeCorrection.tsx`.
+  - Move to `.surface-emphasis`: `Quiz.tsx` (`.quiz-card`), `QuestionSet.tsx`, `PracticeTask.tsx`, `FreeResponse.tsx` (assessment-card family), `ValidationScreen.tsx` panels, and the `.takeaways-section` in `LecturePage.tsx` (already `.lecture-panel`; add `.surface-emphasis` alongside).
+- Each `.tsx` file keeps its existing type-specific modifier class (e.g. `callout-note`) for the semantic-color hook from Step 2; the altitude class is additive (`className="lecture-component surface-card callout callout-note"`).
+- Verification: on the component demo page (`examples/component-demo.template.md` rendered route), visually confirm at least two clearly different weights are present on one screen (a quiet glossary term next to a card-weight callout next to an emphasis quiz), matching the spec's success metric.
+
+### Step 4: Add dark mode tokens
+
+- Add a `@media (prefers-color-scheme: dark) { :root { ... } }` block mirroring every variable defined in `globals.css:1-20`, plus the five semantic tokens and their `-bg/-border/-text` variants from Step 2. Invert luminance (light surfaces become dark elevated panels, not pure black) while preserving each semantic token's relative lightness ordering so meaning (warning still reads "louder" than neutral) survives the swap.
+- Remove the hardcoded `color-scheme: light` (`globals.css:2`) and replace with `color-scheme: light dark` so native form controls (checkboxes, radios already using `accent-color`, scrollbars) also adapt.
+- Verify `--code-bg`/`--code-text` (already dark-on-light today) still contrast correctly against the new dark page background — likely needs a slightly lighter `--code-bg` in dark mode so code blocks remain visually distinct from the page background instead of blending in.
+- Confirm the existing `@media print` block (`globals.css:2249-2414`) is unaffected — print rules already force explicit light colors (`background: #ffffff`, `color: #000000`) regardless of screen theme, so no changes should be needed there, but re-run a print preview to confirm no dark-mode variable leaks through.
+- Verification: toggle OS dark mode (or use browser devtools' "prefers-color-scheme" emulation) on the collection landing, a short lecture, and a component-heavy lecture; confirm no unstyled flashes, no illegible text, and focus rings remain visible.
+
+### Step 5: Add elevation to primary panels only
+
+- Add a two-to-three-step shadow scale as tokens (`--shadow-sm`, `--shadow-md`) in `:root` and dark-mode equivalents (typically a darker, more diffuse shadow or a subtle border-only treatment in dark mode, since box-shadows read poorly on dark backgrounds).
+- Apply `--shadow-sm` to `.lecture-panel` and `.lecture-section` (`globals.css:321-329`) only. Do not apply shadows to `.lecture-component`, `.surface-quiet`, `.surface-card`, or `.surface-emphasis` — the spec is explicit that nested component cards stay flat so elevation communicates page structure, not per-component competition.
+- Verification: confirm no new horizontal overflow at 390px from shadow blur radius; confirm `.lecture-panel`/`.lecture-section` read as a distinct layer from the page background without visually competing with `.surface-emphasis`'s border-weight cue.
+
+### Step 6: Unify the primary action color
+
+- Confirm/introduce `--action` as an alias for `--accent-strong` (or promote `--accent-strong` itself as the canonical action token if no new name is needed) in `:root` and the dark-mode block from Step 4.
+- Update `globals.css` rules for `.quiz-reveal-button` (currently `#0369a1`/`#075985`, lines 978-990) to use `var(--action)`/`var(--action-hover)` instead of the bespoke sky-blue.
+- Confirm `.assessment-reveal-button` (already `--accent-strong`, lines 1138-1159), `.resume-prompt-action` (already `--accent-strong`, lines 634-643), and `.collection-primary-action` (already `--accent-strong`, lines 1730-1747) all reference the same token name after Step 4's token pass — no `.tsx` changes needed, this is a CSS-only consistency pass, with the one real behavior change being the quiz button's color.
+- Verification: screenshot all four buttons side by side (quiz check/reveal, assessment reveal, resume CTA, collection CTA) and confirm identical color treatment.
+
+### Step 7: Replace bordered metadata grids with inline rows
+
+- Design one shared CSS pattern, e.g. `.metadata-inline` — a flex row of `label: value` pairs separated by a `·` or a 1px vertical hairline, no per-item border/background.
+- Update `src/components/lecture-kit/LectureHeader.tsx`: replace the `<dl className="metadata-grid">` block (lines 17-42) with `<dl className="metadata-inline">`, keeping the same `<dt>`/`<dd>` pairs (Audience, Duration, Reading time, Level, Sections) — data and conditionals (`readingMinutes ? ... : null`) are unchanged, only the wrapping class and its CSS.
+- Update `src/components/lecture-kit/CollectionLanding.tsx`: replace both `.lecture-list-meta` usages (course-level metadata block, lines 50-70, and the per-lecture-card metadata block, lines 103-122) with `.metadata-inline`, keeping the same conditional rendering logic.
+- Update `globals.css`: remove or repurpose `.metadata-grid` (lines 133-146) and `.lecture-list-meta` (lines 1951-1965) grid rules in favor of the new `.metadata-inline` flex rule; keep the class names removed from CSS only after confirming no test asserts on `.metadata-grid`/`.lecture-list-meta` presence (grep `tests/` first).
+- Verify responsive wrapping at 390px: the inline row must wrap onto multiple lines gracefully (flex-wrap) rather than needing the 2-column grid fallback that existed at `globals.css:2052-2054` and `2110-2114` — remove those now-dead breakpoint rules once the new pattern is confirmed to wrap correctly on its own.
+- Verification: `npm run test -- tests/lecture-template/lecture-components.test.tsx tests/lecture-template/collection-lecture-navigation.test.tsx` (or whichever tests touch `LectureHeader`/`CollectionLanding` metadata) still pass; visual check at 390px/768px/1280px shows no truncation or overlap.
+
+### Step 8: Add per-section completion cues to the learning-path nav
+
+- In `src/components/lecture-kit/LearningPathNavigation.tsx`, read `progressContext?.progress` (already available via the existing `useProgressOptional()` call at line 21) alongside the existing `currentSectionAnchor` read.
+- Pass a `completedAnchors: Set<string>` (or the raw `progress` map) down to `NavigationList` as a new prop.
+- In `NavigationList` (lines 105-140), for each authored-section item (`anchor` matches a key in `progress`), render a small leading indicator before `<span className="nav-prefix">`: an empty-circle glyph when incomplete, a filled/check glyph when `progress[anchor] === true`. Use the same glyph approach chosen in Step 10 (inline SVG) if that step lands first; otherwise stub with a CSS-only dot (`::before` content) that Step 10 later upgrades to an SVG icon, to avoid two full rewrites of the same markup.
+- Add an `sr-only` "Completed" suffix next to the indicator (distinct from the existing "(current)" `sr-only` suffix used for active state, lines 132-133) so screen reader users get both signals independently. Overview/objectives/takeaways nav items (`nonAuthoredAnchors`) do not get a completion indicator since `ProgressProvider` only tracks authored `sections`.
+- Update `globals.css`: add `.nav-item-complete` (or an attribute selector like `[data-complete="true"]`) styling for the indicator, sized to not disrupt the existing 44px tap target on `.nav-item a` (`globals.css:246-257`).
+- Verification: add or extend `tests/lecture-template/progress-ui-enhancement.test.tsx` (or `section-navigation-enhancement.test.tsx`) to assert that toggling a section's completion via `SectionCompletionToggle` updates the corresponding nav item's completion indicator and its accessible label, independent of which section is currently active/in-view.
+
+### Step 9: Add motion to reveal/expand state changes
+
+- Extend the existing `@media (prefers-reduced-motion: reduce)` block (`globals.css:2237-2247`) with the new transition properties added below, so the single opt-out rule continues to cover every animated surface in the app.
+- `.tabs-panel` (`Tabs.tsx` toggles `hidden` via React state, not the DOM `hidden` attribute's native no-transition behavior) — add an opacity/transform transition keyed off a data attribute or class toggle instead of the `hidden` attribute directly, since `display: none` cannot transition. The simplest correct approach: keep `hidden` for the inactive panels (so they are unreachable by keyboard/AT) but wrap the *active* panel's entrance in a short `opacity`/`translateY` transition via a class added on mount (e.g. a `data-enhanced` + CSS animation on `[role="tabpanel"]:not([hidden])`).
+- `.accordion-body` (native `<details>`/`<summary>`) — CSS cannot transition `<details>` open/close height without JS (a well-known platform limitation). Two options: (a) accept a instant open/close for `<details>`-based accordion/glossary/assessment disclosures per platform constraints, documenting this as a deliberate scope limit, or (b) add a small client-side height transition using the `ResizeObserver`/`requestAnimationFrame` pattern. Given the spec's "finishing touch, not a feature" product decision and the Non-Goals ban on new dependencies, default to option (a) for `<details>`-based components and reserve real transitions for React-state-driven components (Tabs, Quiz) where CSS transitions work natively.
+- `.quiz-answer` / `.quiz-feedback` (`Quiz.tsx` toggles via `hidden={!revealed}` and conditional render) — same `hidden`-attribute limitation as accordion. Since `Quiz` already conditionally renders `.quiz-feedback` (not just `hidden`-toggles it), add a CSS `@keyframes` fade-in similar to the existing `.progress-toast` pattern (`globals.css:697-706`) applied on render, which does not require changing the `hidden` toggle for `.quiz-answer`.
+- `.assessment-hidden-region`, `.flashcard-answer` - same `hidden`-attribute constraint as accordion; apply the fade-in-on-render pattern only where the component conditionally renders rather than toggles `hidden`, and leave `hidden`-toggled regions as an instant show/hide (documented limitation, not a broken promise, since the spec's reduced-motion principle already treats motion as optional polish).
+- Verification: with `prefers-reduced-motion: no-preference`, confirm the tab switch and quiz feedback reveal visibly animate; with `reduce` set, confirm they do not; run the existing `tests/lecture-template/quiz-interaction.test.tsx` and `advanced-components-interaction.test.tsx` unchanged (motion is a CSS-only addition and must not change any DOM assertions).
+
+### Step 10: Build a small inline SVG icon set
+
+- Add `src/components/lecture-kit/Icon.tsx`, a single component accepting `name: "chevron" | "check" | "warning" | "arrow-prev" | "arrow-next" | "external-link"` (extend the union only as real usages appear) and rendering the matching inline `<svg aria-hidden="true" focusable="false">` from a small internal path map. No external icon package; paths are hand-authored or sourced from an already-licensed-compatible open icon set and inlined as literal JSX.
+- Replace usages:
+  - `.learning-path-chevron::after` (`globals.css:223-228`) and `.learning-path-mobile summary::after` (`globals.css:290-297`) — swap the CSS `content` glyphs for an `<Icon name="chevron" />` rendered inside `LearningPathNavigation.tsx`'s `<summary>` markup, with the existing `transform: rotate(90deg)` on `details[open]` kept as a CSS rule targeting the new icon's wrapper span instead of `::after`.
+  - `.assessment-index-disclosure-label-open/-closed` (`globals.css:1842-1845`) — no glyph today (text-only labels), leave as-is; optionally prepend a chevron icon for visual parity with the learning-path pattern.
+  - `LecturePage.tsx`'s `→` in `CollectionTopNav` (line 131) and `LectureNavigation.tsx`'s prev/next arrows — replace literal `→`/`←` characters with `<Icon name="arrow-next" />`/`<Icon name="arrow-prev" />`, keeping the visible text label alongside (icons are decorative/`aria-hidden`, the text carries the accessible name, per the spec's "no icon may be the sole carrier of meaning" rule).
+  - `CollectionLanding.tsx`'s `✓`/`✕` validation badge glyphs (lines 86, 98) — optionally replace with `<Icon name="check" />`/a warning-style icon, though these are lower priority since the adjacent `PASS`/`FAIL` text already carries full meaning; only do this if it does not add visual noise per the spec's restraint principle.
+- Verification: confirm every icon usage keeps (or improves) its existing accessible name — run an axe/accessibility check or manual screen-reader spot check on the learning-path disclosure and lecture nav after the swap.
+
+### Step 11: Update docs, component demo, and design-token documentation
+
+- Update `README.md`/`SKILL.md` to document the new semantic token names (`--brand`, `--info`, `--success`, `--warning`, `--neutral`, each `-bg/-border/-text`), the altitude classes (`.surface-quiet`/`.surface-card`/`.surface-emphasis`), and the rule that new components must reach for a token and an altitude class rather than inventing a new hex value or card treatment.
+- Confirm `examples/component-demo.template.md` (the regression gallery) renders every component type at least once so the token/altitude remap is visually verifiable in one place; add any missing component instances if the demo currently skips one.
+- No authoring schema or CLI script changes are required; `scripts/validate.ts`, `scripts/doctor.ts`, `scripts/reviewSource.ts`, `scripts/packageReview.ts` operate on content, not styling, and need no changes.
+
+### Step 12: Verification
+
+- Run focused automated tests during implementation:
+  - `npm run test -- tests/lecture-template/visual-hierarchy.test.tsx`
+  - `npm run test -- tests/lecture-template/progress-ui-enhancement.test.tsx`
+  - `npm run test -- tests/lecture-template/section-navigation-enhancement.test.tsx`
+  - `npm run test -- tests/lecture-template/quiz-interaction.test.tsx`
+  - `npm run test -- tests/lecture-template/quiz-feedback-styles.test.tsx`
+  - `npm run test -- tests/lecture-template/advanced-components-interaction.test.tsx`
+  - `npm run test -- tests/lecture-template/lecture-components.test.tsx`
+  - `npm run test -- tests/lecture-template/collection-lecture-navigation.test.tsx`
+- Run broad verification: `npm run test`, `npm run typecheck`, `npm run lint`, `npm run validate`, `npm run build`, `npm run package:review`.
+- Manual/browser verification at 390px, 768px, and 1280px, in both light and dark OS theme, for: collection landing, a short lecture, a component-heavy lecture (via `examples/component-demo.template.md`), and a print preview of one lecture. Confirm `document.documentElement.scrollWidth <= document.documentElement.clientWidth` at each viewport and theme.
+- Confirm print output is visually unchanged from before this spec (still forces light colors, still shows hidden/answer content) despite dark mode existing on screen.
+
+## Data Model, API, Persistence, Event, Or Domain Changes
+
+- Template schema: no changes.
+- Parser, validator, renderMarkdown, progress model: no changes.
+- Component props: `NavigationList`/`LearningPathNavigation` gains an internal read of `progressContext?.progress` (already available in context, no new context field); no public prop-surface change to any component consumed by authored content.
+- New file: `src/components/lecture-kit/Icon.tsx` (presentational, no state, no persistence).
+- New CSS custom properties in `:root` and its dark-mode counterpart: semantic color tokens, altitude-related sizing, shadow scale, `--font-body`. No runtime JS reads these; they are pure CSS.
+- Persistence: none new. No new `localStorage`/`sessionStorage` keys.
+- External services: none. If `next/font/google` is used, fonts are fetched and self-hosted at build time only (standard `next/font` behavior), consistent with the spec's "no new runtime network dependency" requirement.
+- Static export and review package: must remain visually consistent with the live site since both consume the same compiled `globals.css` and the same component tree.
+
+## Test Plan
+
+- Token/CSS regression (grep-based, run manually or wired into CI as a lint step):
+  - No literal hex colors remain in component-styling rules in `globals.css` outside `:root`/dark-mode/print blocks.
+  - Every `-bg`/`-text` pairing in the five semantic tokens (light and dark) passes a WCAG AA contrast check (manual spot check or a small contrast-ratio script during implementation; not part of the automated Vitest suite).
+- Component/DOM tests (Vitest + Testing Library, extending existing files rather than adding many new ones since this is mostly a CSS/class-name pass):
+  - `LearningPathNavigation`/`NavigationList` renders a completion indicator only for authored sections whose `progress[anchor] === true`, independent of `currentSectionAnchor`; the indicator carries an accessible "Completed" text equivalent.
+  - `LectureHeader` and `CollectionLanding` metadata render the same data (audience/duration/level/sections/reading-time) after the `.metadata-inline` class swap — assert on text content, not on the removed `.metadata-grid`/`.lecture-list-meta` class names.
+  - `Icon` renders the correct `<svg>` for each `name` and is `aria-hidden="true"` by default.
+  - Existing quiz, tabs, accordion, assessment-disclosure tests continue to pass unmodified, confirming the motion/icon/token changes are additive at the DOM level.
+- Visual/manual checks (not automated in this stack — no Playwright/visual-regression tooling exists in the repo today, confirmed via `package.json`):
+  - Screenshots at 390px/768px/1280px, light and dark, for collection landing, short lecture, component-heavy lecture.
+  - Print preview of one lecture confirms light-forced colors and unchanged hidden-content visibility.
+  - Side-by-side screenshot of the four unified action buttons.
+  - Side-by-side screenshot of one `.surface-quiet`, one `.surface-card`, and one `.surface-emphasis` component on the same page.
+
+## Risks, Assumptions, And Open Questions
+
+- **Spec/code mismatch on `015-A3`**: as documented above, active-section state is already implemented; the spec's prose needs a follow-up correction. This plan proceeds assuming the correction is cosmetic (spec text only) and does not change any of the twelve steps.
+- **`<details>`-based motion is platform-limited**: native `<details>`/`<summary>` cannot CSS-transition open/close height without JavaScript. Step 9 explicitly scopes real transitions to React-state-driven components (Tabs, Quiz) and treats `<details>`-based components (Accordion, GlossaryIndex, AssessmentIndexDisclosure) as an accepted instant-toggle limitation rather than adding a JS-based height-animation dependency, per the spec's "finishing touch, not a feature" instruction and the Non-Goals ban on new dependencies. Flag this trade-off explicitly in the PR description so it is a documented decision, not a missed requirement.
+- **Font choice and static export**: `next/font/google` needs network access at build time to fetch font files once (then self-hosts them). If CI or the review-package build pipeline runs offline, this plan falls back to `next/font/local` with a self-hosted variable font checked into the repo. Confirm the build environment before committing to one path; this should be resolved in Step 1 before any dependent visual work (headings, weight scale) proceeds.
+- **Color remap is a judgment call**: the semantic mapping table in Step 2 reassigns several components away from their historical hue (e.g. `.quiz-card` from sky-blue to brand teal, `.concept-card` from purple to info-blue). This is intentional per the spec's instruction to map by meaning rather than preserve legacy color, but it is the single largest visible change in this spec and should be reviewed against real rendered screenshots before merging, not just against the CSS diff.
+- **Dark-mode shadow treatment**: box-shadows read poorly on dark backgrounds; Step 5's dark-mode shadow token may need to be a lighter border-based cue instead of a shadow, decided empirically during implementation rather than specified exactly here.
+- **No visual-regression tooling exists**: the repo has no Playwright or screenshot-diff setup (confirmed via `package.json`'s devDependencies, which cover Vitest/Testing Library/jsdom only). All screenshot verification in this plan is manual. If the team wants automated visual regression for a token-heavy change like this, that is a larger, separate infrastructure decision outside this spec's scope.
+- **Icon set scope creep**: Step 10's icon list should stay small (5-6 icons) per the spec's explicit `8-12` ceiling; resist adding icons to metadata labels or other places text already reads clearly, per the spec's own restraint principle.
