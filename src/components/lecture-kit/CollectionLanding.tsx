@@ -1,8 +1,9 @@
 import type { CollectionValidationResult, LectureValidationResult } from "@/lib/lecture-template/types";
 import { collectCollectionAssessments } from "@/lib/lecture-template/assessments";
 import { LECTURES_DIR } from "@/lib/lecture-template/readTemplate";
-import { collectionProgressKey, progressIdFromCollectionBase } from "@/lib/lecture-template/progress";
+import { collectionProgressKey, progressIdFromCollectionBase, type ProgressLecture } from "@/lib/lecture-template/progress";
 import { CollectionProgressBar, CollectionLectureProgress } from "./progress/CollectionProgressBar";
+import { CollectionPrimaryAction } from "./CollectionPrimaryAction";
 import { CollectionProgressProvider } from "./progress/CollectionProgressProvider";
 
 export interface CollectionLandingProps {
@@ -18,7 +19,7 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
     courseMetadata?.description ??
     `${validation.lectureCount} ${validation.lectureCount === 1 ? "lecture" : "lectures"} in authored order.`;
   const assessments = collectCollectionAssessments(validation);
-  const progressLectures = validation.results
+  const progressLectures: ProgressLecture[] = validation.results
     .filter((result) => result.valid && result.template)
     .map((result) => ({
       slug: result.slug,
@@ -60,29 +61,15 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
               ) : null}
             </dl>
           ) : null}
+          <CollectionPrimaryAction lectures={progressLectures} />
+          <a href="#lecture-list" className="collection-view-all-lectures">
+            View all lectures
+          </a>
         </header>
 
         <CollectionProgressBar />
 
-        <section className="assessment-index" aria-labelledby="assessment-index-title">
-          <h2 id="assessment-index-title">Assessment index</h2>
-          {assessments.length > 0 ? (
-            <ol>
-              {assessments.map((assessment) => (
-                <li key={`${assessment.lectureSlug}-${assessment.anchor}`}>
-                  <a href={`/lectures/${assessment.lectureSlug}#${assessment.anchor}`}>{assessment.title}</a>
-                  <span>
-                    {labelForAssessment(assessment.type)} • {assessment.lectureTitle} • {assessment.sectionTitle}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p>No assessment components found in valid lectures.</p>
-          )}
-        </section>
-
-        <ol className="lecture-list">
+        <ol className="lecture-list" id="lecture-list">
           {validation.results.map((result, index) => {
             const template = result.template ?? fallbackTemplate(result);
             const lectureNumber = lectureNumberFromSlug(result.slug, index);
@@ -95,14 +82,14 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
               <li key={result.slug} className="lecture-list-item">
                 <article aria-labelledby={`lecture-${result.slug}-title`}>
                   <div className="lecture-list-header">
-                    <span className={`validation-badge ${statusClass}`}>
-                      {statusIcon} {statusLabel}
-                    </span>
                     <h2 id={`lecture-${result.slug}-title`}>
                       <a className="lecture-list-link" href={`/lectures/${result.slug}`}>
                         {lectureNumber}. {lectureTitle}
                       </a>
                     </h2>
+                    <span className={`validation-badge ${statusClass}`}>
+                      {statusIcon} {statusLabel}
+                    </span>
                     <p className="lecture-list-description">{template.metadata.description}</p>
                   </div>
 
@@ -132,6 +119,33 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
             );
           })}
         </ol>
+
+        <details className="assessment-index-disclosure">
+          <summary>Assessment locations for reviewers</summary>
+          {assessments.length > 0 ? (
+            <ol className="assessment-group-list">
+              {groupAssessmentsByLecture(assessments).map(({ lectureTitle, lectureSlug, items }) => (
+                <li key={lectureSlug ?? lectureTitle} className="assessment-group">
+                  <h3 className="assessment-group-title">{lectureTitle}</h3>
+                  <ol className="assessment-group-items">
+                    {items.map((assessment) => (
+                      <li key={`${assessment.lectureSlug}-${assessment.anchor}`}>
+                        <a href={`/lectures/${assessment.lectureSlug}#${assessment.anchor}`} title={assessment.title}>
+                          {truncateTitle(assessment.title)}
+                        </a>
+                        <span className="assessment-group-meta">
+                          {labelForAssessment(assessment.type)}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>No assessments found in valid lectures.</p>
+          )}
+        </details>
       </section>
     </CollectionProgressProvider>
   );
@@ -142,6 +156,28 @@ function labelForAssessment(type: string): string {
   if (type === "question_set") return "Question set";
   if (type === "free_response") return "Free response";
   return "Practice task";
+}
+
+function truncateTitle(title: string): string {
+  return title.length > 60 ? title.slice(0, 57) + "\u2026" : title;
+}
+
+interface AssessmentGroup {
+  lectureTitle: string;
+  lectureSlug: string | undefined;
+  items: ReturnType<typeof collectCollectionAssessments>;
+}
+
+function groupAssessmentsByLecture(assessments: ReturnType<typeof collectCollectionAssessments>): AssessmentGroup[] {
+  const map = new Map<string, AssessmentGroup>();
+  for (const assessment of assessments) {
+    const key = assessment.lectureSlug ?? assessment.lectureTitle ?? "unknown";
+    if (!map.has(key)) {
+      map.set(key, { lectureTitle: assessment.lectureTitle ?? key, lectureSlug: assessment.lectureSlug, items: [] });
+    }
+    map.get(key)!.items.push(assessment);
+  }
+  return Array.from(map.values());
 }
 
 function parseDurationMinutes(result: LectureValidationResult): number {

@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe("quiz reveal interaction", () => {
-  it("starts collapsed with accessible disclosure wiring and reveals feedback on click", async () => {
+  it("starts with Show answer, changes to Check answer on selection, and reveals with feedback", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <Quiz
@@ -27,7 +27,7 @@ describe("quiz reveal interaction", () => {
 
     expect(screen.getByText("Quiz: Knowledge check")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Which command validates?" })).toBeInTheDocument();
-    expect(screen.getByRole("list")).toHaveClass("quiz-options");
+    expect(screen.getByRole("radiogroup")).toHaveClass("quiz-options");
     expect(screen.getByText("npm run dev")).toBeVisible();
 
     const button = screen.getByRole("button", { name: "Show answer" });
@@ -49,31 +49,81 @@ describe("quiz reveal interaction", () => {
     expect(answerRegion).toHaveTextContent("npm run validate");
     expect(answerRegion).toHaveTextContent("Validation checks the template.");
 
-    await user.tab();
-    expect(button).toHaveFocus();
-    await user.keyboard("{Enter}");
+    expect(screen.queryByRole("button", { name: "Check answer" })).not.toBeInTheDocument();
 
-    expect(screen.getByRole("button", { name: "Hide answer" })).toHaveAttribute("aria-expanded", "true");
-    expect(answerRegion).not.toHaveAttribute("hidden");
+    const options = screen.getAllByRole("radio");
+    await user.click(options[0]);
+    expect(options[0]).toBeChecked();
 
-    await user.keyboard(" ");
+    expect(screen.getByRole("button", { name: "Check answer" })).toHaveAttribute("aria-expanded", "false");
 
-    expect(screen.getByRole("button", { name: "Show answer" })).toHaveAttribute("aria-expanded", "false");
-    expect(answerRegion).toHaveAttribute("hidden");
-
-    await user.click(button);
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
 
     expect(screen.getByRole("button", { name: "Hide answer" })).toHaveAttribute("aria-expanded", "true");
     expect(answerRegion).not.toHaveAttribute("hidden");
     expect(answerRegion).toBeVisible();
     expect(screen.getByText("Answer")).toBeVisible();
     expect(screen.getByText("Validation checks the template.")).toBeVisible();
+    expect(screen.getByText("Correct!")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Hide answer" }));
 
-    expect(screen.getByRole("button", { name: "Show answer" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Check answer" })).toHaveAttribute("aria-expanded", "false");
     expect(answerRegion).toHaveAttribute("hidden");
     expect(answerRegion).not.toBeVisible();
+  });
+
+  it("shows Not quite feedback when wrong option is selected", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Quiz
+        component={{
+          type: "quiz",
+          anchor: "quiz-wrong",
+          question: "Which command validates?",
+          options: ["npm run validate", "npm run dev"],
+          answer: "npm run validate"
+        }}
+      />
+    );
+
+    const options = screen.getAllByRole("radio");
+    await user.click(options[1]);
+    expect(options[1]).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: "Check answer" }));
+
+    expect(screen.getByText("Not quite.")).toBeInTheDocument();
+    const answerRegionId = screen.getByRole("button", { name: "Hide answer" }).getAttribute("aria-controls");
+    const answerRegion = container.ownerDocument.getElementById(answerRegionId ?? "");
+    expect(answerRegion).not.toHaveAttribute("hidden");
+    expect(answerRegion).toHaveTextContent("npm run validate");
+  });
+
+  it("reveals answer without scolding when no option is selected", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Quiz
+        component={{
+          type: "quiz",
+          anchor: "quiz-nosel",
+          question: "Which command validates?",
+          options: ["npm run validate", "npm run dev"],
+          answer: "npm run validate"
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show answer" }));
+
+    expect(screen.getByRole("button", { name: "Hide answer" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByText("Correct!")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not quite.")).not.toBeInTheDocument();
+
+    const answerRegionId = screen.getByRole("button", { name: "Hide answer" }).getAttribute("aria-controls");
+    const answerRegion = container.ownerDocument.getElementById(answerRegionId ?? "");
+    expect(answerRegion).not.toHaveAttribute("hidden");
+    expect(answerRegion).toHaveTextContent("npm run validate");
   });
 
   it("keeps multiple quizzes independent with distinct answer regions", async () => {
@@ -125,5 +175,33 @@ describe("quiz reveal interaction", () => {
     expect(secondRegion).toHaveAttribute("hidden");
     expect(firstRegion).toHaveTextContent("First answer");
     expect(secondRegion).toHaveTextContent("Second answer");
+  });
+
+  it("supports keyboard navigation through radio options", async () => {
+    const user = userEvent.setup();
+    render(
+      <Quiz
+        component={{
+          type: "quiz",
+          anchor: "quiz-keyboard",
+          question: "Test question?",
+          options: ["Option A", "Option B"],
+          answer: "Option A"
+        }}
+      />
+    );
+
+    const firstRadio = screen.getAllByRole("radio")[0];
+    firstRadio.focus();
+    await user.keyboard("{ArrowDown}");
+
+    expect(screen.getAllByRole("radio")[1]).toBeChecked();
+    expect(screen.getByRole("button", { name: "Check answer" })).toBeInTheDocument();
+
+    await user.tab();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("button", { name: "Hide answer" })).toBeInTheDocument();
+    expect(screen.getByText("Not quite.")).toBeInTheDocument();
   });
 });

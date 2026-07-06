@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   calculateLectureProgress,
   type LectureProgress,
+  type ProgressLecture,
   type ProgressSection,
   validateLectureProgress
 } from "@/lib/lecture-template/progress";
@@ -30,13 +31,15 @@ export interface ProgressProviderProps {
   storageKey: string;
   sections: ProgressSection[];
   children: ReactNode;
+  collectionStorageKey?: string;
+  collectionLectures?: ProgressLecture[];
 }
 
 const ProgressContext = createContext<ProgressContextValue | undefined>(undefined);
 const writeDelayMs = 300;
 const toastDelayMs = 1500;
 
-export function ProgressProvider({ storageKey, sections, children }: ProgressProviderProps) {
+export function ProgressProvider({ storageKey, sections, children, collectionStorageKey, collectionLectures }: ProgressProviderProps) {
   const [progress, setProgress] = useState<LectureProgress>({});
   const [loaded, setLoaded] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
@@ -48,6 +51,8 @@ export function ProgressProvider({ storageKey, sections, children }: ProgressPro
   const skipNextWriteRef = useRef(false);
   const writeTimerRef = useRef<number | undefined>(undefined);
   const toastTimerRef = useRef<number | undefined>(undefined);
+  const collectionStorageKeyRef = useRef(collectionStorageKey);
+  const collectionLecturesRef = useRef(collectionLectures);
   const sectionAnchors = useMemo(() => sections.map((section) => section.anchor), [sections]);
   const sectionAnchorKey = sectionAnchors.join("\u001f");
   const summary = useMemo(() => calculateLectureProgress(progress, sections), [progress, sections]);
@@ -141,6 +146,46 @@ export function ProgressProvider({ storageKey, sections, children }: ProgressPro
     return () => observer.disconnect();
   }, [sectionAnchorKey, sectionAnchors]);
 
+  useEffect(() => {
+    collectionStorageKeyRef.current = collectionStorageKey;
+    collectionLecturesRef.current = collectionLectures;
+  }, [collectionStorageKey, collectionLectures]);
+
+  useEffect(() => {
+    if (!loaded || !collectionStorageKeyRef.current || !collectionLecturesRef.current) return undefined;
+    if (skipNextWriteRef.current) return undefined;
+
+    const collectionKey = collectionStorageKeyRef.current;
+    const lectures = collectionLecturesRef.current;
+    const lectureSlug = lectures.find((lecture) => lecture.sections.some((section) => section.anchor === sections[0]?.anchor))?.slug;
+    if (!lectureSlug) return undefined;
+
+    const timer = window.setTimeout(() => {
+      try {
+        const existing = window.localStorage.getItem(collectionKey);
+        let collection: Record<string, LectureProgress> = {};
+        if (existing) {
+          try {
+            const parsed = JSON.parse(existing);
+            if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+              collection = parsed;
+            }
+          } catch {
+            collection = {};
+          }
+        }
+        collection[lectureSlug] = progress;
+        window.localStorage.setItem(collectionKey, JSON.stringify(collection));
+      } catch {
+        /* collection write is best-effort */
+      }
+    }, writeDelayMs);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [loaded, progress, sections]);
+
   const announce = useCallback((message: string) => {
     setAnnouncement(message);
     setToast(message);
@@ -181,7 +226,27 @@ export function ProgressProvider({ storageKey, sections, children }: ProgressPro
       setStorageAvailable(false);
       console.warn("Lecture progress could not be reset in localStorage.", error);
     }
-  }, [announce, storageKey]);
+
+    const cKey = collectionStorageKeyRef.current;
+    const cLectures = collectionLecturesRef.current;
+    if (cKey && cLectures) {
+      const lectureSlug = cLectures.find((lecture) => lecture.sections.some((section) => section.anchor === sections[0]?.anchor))?.slug;
+      if (lectureSlug) {
+        try {
+          const existing = window.localStorage.getItem(cKey);
+          if (existing) {
+            const parsed = JSON.parse(existing);
+            if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+              delete parsed[lectureSlug];
+              window.localStorage.setItem(cKey, JSON.stringify(parsed));
+            }
+          }
+        } catch {
+          /* collection reset is best-effort */
+        }
+      }
+    }
+  }, [announce, sections, storageKey]);
 
   const firstIncompleteSection = useMemo(
     () => sections.find((section) => progress[section.anchor] !== true),

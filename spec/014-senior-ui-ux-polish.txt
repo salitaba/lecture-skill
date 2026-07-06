@@ -1,0 +1,356 @@
+Feature: Senior UI/UX Polish
+
+## Product Summary
+
+Improve the Lecture Site Engine from a well-structured preview into a polished learning product with clear learner journeys, stronger visual hierarchy, better course navigation, and more active practice interactions.
+
+The current site already has strong foundations: local validation, multi-lecture collections, static review packages, progress tracking, responsive lecture pages, rich teaching components, diagrams, assessments, and print support. The next gap is not another component vocabulary expansion. The gap is product-level experience quality: the site should make the next action obvious, keep learners oriented, reduce card noise, and make course and lecture pages feel designed as one coherent education surface.
+
+The primary product outcome is: a learner or reviewer can open the collection, know exactly where to start or resume, move through lectures without friction, practice with meaningful feedback, and read comfortably on desktop or phone without UI chrome competing with the lesson.
+
+This feature is a senior UI/UX polish pass over the existing experience. It is not a CMS, LMS, hosted platform, analytics layer, browser editor, AI tutor, or new authoring schema.
+
+## Product Outcome
+
+Learners should experience the rendered course as a guided learning path:
+
+- The collection page answers "what is this course, how long is it, and what should I do next?"
+- The lecture page answers "where am I, what should I read now, and how do I continue?"
+- Progress helps orientation without dominating the page.
+- Navigation is visible, predictable, and useful on both desktop and mobile.
+- Assessments feel like active practice, not only answer reveal cards.
+- Components communicate their teaching role without making the page look like a stack of equal-weight boxes.
+- Review and validation affordances remain available for educators without distracting learner-facing pages.
+
+Educators and reviewers should gain a clearer review surface:
+
+- Course structure is easy to scan before opening individual lectures.
+- Assessment locations are discoverable without overwhelming the landing page.
+- Validation and authoring status are visible when useful, but do not read as learner content.
+- The component demo remains useful as a regression gallery, but production course pages feel learner-first.
+
+## Users And Jobs
+
+Primary users:
+
+- Learners reading a local or static lecture collection.
+- Technical educators previewing course flow before teaching.
+- Reviewers checking whether generated lecture pages are ready for handoff.
+- AI coding agents using the rendered output as a quality target.
+
+Jobs to be done:
+
+- As a learner, I want to know the next best action immediately so I can start or resume without hunting.
+- As a learner, I want to move from one lecture to the next without returning to the course page every time.
+- As a learner, I want progress to reassure me, not interrupt the lesson.
+- As a learner, I want mobile navigation to expose structure without blocking the first content.
+- As a learner, I want quizzes and practice blocks to tell me whether I understood the material.
+- As an educator, I want the course page to separate learner actions from author/reviewer status.
+- As a reviewer, I want to identify UX regressions from a small set of screenshots and fixtures.
+
+## Problem
+
+The current UI is functional and accessible-minded, but it still feels like an engine preview more than a finished learning product.
+
+Observed UX gaps:
+
+- The collection page has no strong primary action. Lecture titles are links, but there is no obvious `Start course`, `Resume course`, or `Continue` action.
+- The collection page shows progress and assessment index before the lecture list, which can make the first screen feel administrative instead of action-oriented.
+- Lecture-to-lecture navigation exists as a component, but the rendered lecture page does not currently use it.
+- Progress panels occupy a large amount of space before lesson content, especially on mobile.
+- Mobile learning-path navigation is compact, but it looks like a static card and does not clearly invite expansion.
+- The side navigation does not show active section state, so long lectures lose orientation after scrolling.
+- Many content panels and components share similar borders, spacing, and visual weight. Overview, objectives, sections, callouts, assessments, and progress compete for attention.
+- Section completion controls feel small and secondary on mobile, even though completing a section is a meaningful learner action.
+- Quiz behavior is still closer to "show answer" than active practice. Some assessment components support selection or response, but the overall system lacks consistent feedback hierarchy.
+- Author/review UI such as validation pass badges can be useful, but it reads as noise on learner-facing pages.
+
+The result is a site that works, but asks users to infer too much about priority, flow, and interaction.
+
+## Goals
+
+- Make the next learner action obvious on the collection page and lecture pages.
+- Add a first-class start/resume/continue flow using existing local progress data where possible.
+- Render previous/back/next lecture navigation in multi-lecture mode.
+- Reduce the first-screen footprint of progress UI while preserving accessible progress information.
+- Improve mobile navigation discoverability and scan speed.
+- Add active section state or an equivalent current-location affordance for long lectures.
+- Strengthen visual hierarchy across page regions so learner content reads before administrative UI.
+- Improve assessment interactions so practice cards communicate selection, correctness, feedback, and next steps.
+- Separate learner-facing content from author/reviewer status without removing review value.
+- Preserve local-first, static-export, no-account, accessible, print-friendly behavior.
+
+## Non-Goals
+
+- No new lecture template schema is required.
+- No new component type is required.
+- No LMS, accounts, authentication, analytics, grading, scoring, certificates, or learner reporting.
+- No hosted service or runtime network dependency.
+- No browser authoring editor.
+- No AI-generated feedback inside the browser.
+- No decorative redesign that reduces density or maintainability.
+- No removal of validation, review package, print, or authoring workflows.
+- No secure hiding of answers or instructor material.
+
+## Product Decisions
+
+- The learner journey should be optimized before adding more visual decoration.
+- Course and lecture pages should be learner-first by default, with author/reviewer status presented as secondary status or review-mode UI.
+- Progress is useful context, not the primary content.
+- Navigation should be normal links and anchors first; JavaScript enhancements must degrade gracefully.
+- Mobile should prioritize immediate content access over showing every navigation destination upfront.
+- Assessment feedback should teach. It should not imply formal grading or remote submission.
+- Existing component-kit ownership should remain intact; route composition may pass additional context into shared components.
+- The component demo may remain denser than normal course content because it is a review fixture, but it should not define the learner-facing visual weight.
+
+## UX Designer Notes
+
+Design the product as a calm technical learning workspace. It should feel dense, clear, and intentional, not like a marketing landing page and not like raw generated output.
+
+Experience principles:
+
+- Action before inventory. The first screen should prioritize start/resume/continue over indexes and status.
+- Orientation without interruption. Progress and navigation should help users know where they are without delaying reading.
+- One visual system, multiple content roles. Cards, borders, colors, and labels should express hierarchy, not only containment.
+- Mobile is a first-class reading mode. Stacked desktop cards are not enough.
+- Practice should feel interactive and educational, even when it stays local and ungraded.
+- Review signals should be visible to educators but not dominate learners.
+- All changes must remain accessible, keyboard reachable, printable, and static-export friendly.
+
+## Priority
+
+### P0: Learner Flow And Orientation
+
+P0 fixes the highest-impact journey problems.
+
+Requirements:
+
+- Add a primary collection CTA near the title area:
+  - `Start course` when no progress exists.
+  - `Resume course` when progress indicates a likely next section or lecture.
+  - `Continue course` when progress exists but a precise resume target is unavailable.
+- Link the primary CTA to the first incomplete lecture or section when that can be derived locally.
+- Add a secondary `View all lectures` or equivalent anchor only if the lecture list is not visible near the first viewport.
+- Move or visually compress collection progress so it supports the CTA instead of competing with it.
+- Keep total lectures, total duration, and passing/validation status scannable but secondary.
+- Render lecture-to-lecture navigation for collection lecture routes:
+  - First lecture: back to course and next lecture.
+  - Middle lecture: previous, back to course, and next.
+  - Last lecture: previous and back to course.
+- Ensure lecture navigation appears at least after key takeaways and preferably also has a compact top affordance where useful.
+- Add or expose active/current section state in desktop learning-path navigation.
+- On mobile, make the learning-path disclosure visibly interactive with a chevron or `Open contents` label.
+- At 390px width, the first lecture content should appear without excessive progress/navigation chrome.
+
+### P1: Visual Hierarchy And Mobile Reading
+
+P1 makes the interface feel like a coherent product.
+
+Requirements:
+
+- Establish a clearer hierarchy between:
+  - Course header.
+  - Primary course action.
+  - Progress summary.
+  - Assessment index.
+  - Lecture cards.
+  - Lecture content.
+  - Section progress controls.
+  - Teaching components.
+- Reduce repeated equal-weight card styling. Use fewer full bordered surfaces when a divider, compact metadata row, or inline status is sufficient.
+- Tune progress UI:
+  - Collapse milestone boxes on mobile or replace them with a compact text summary.
+  - Keep reset actions secondary and away from the primary reading path.
+  - Avoid making `Reset progress` the largest visible action on mobile.
+- Make section completion controls clearer:
+  - Use a larger mobile-friendly action area.
+  - Label the action in plain language.
+  - Preserve `aria-pressed` or equivalent state semantics.
+- Improve side navigation:
+  - Current section state must not rely on color alone.
+  - Long section labels must wrap without making the nav feel broken.
+  - Required anchors such as overview/objectives/takeaways should be visually grouped from authored sections.
+- Improve spacing rhythm:
+  - Overview and objectives should feel like starting aids, not generic cards.
+  - Authored sections should feel like the main reading path.
+  - Takeaways and answer key should feel like end-of-lesson review.
+- Preserve no horizontal overflow at 390px, 768px, and 1280px.
+
+### P2: Assessment And Review Experience
+
+P2 improves interaction quality and author/reviewer separation.
+
+Requirements:
+
+- Upgrade `quiz` to support selectable options before answer reveal.
+- Show selected answer state clearly.
+- Show correctness feedback after reveal when the answer can be matched to an option.
+- Provide feedback copy that teaches, not only `correct` or `incorrect`.
+- Keep quiz behavior local-only and ungraded.
+- Keep no-JavaScript and print output useful by showing answers and explanations with clear labels.
+- Align quiz, question set, free response, and practice task feedback hierarchy:
+  - Prompt or task.
+  - Learner input or selection.
+  - Reveal or compare action.
+  - Feedback, guidance, answer, or solution.
+- Rework the collection assessment index:
+  - Group by lecture or assessment type.
+  - Shorten very long link labels where possible.
+  - Keep metadata secondary and readable on mobile.
+  - Consider moving it below the lecture list or behind a disclosure when the learner's main job is starting the course.
+- Separate author/reviewer status from learner content:
+  - Keep validation pass/fail information available.
+  - Do not let `PASS` badges read as the primary state of a learner course card.
+  - Consider a compact review status row, review-mode treatment, or author-only framing.
+
+## Recommended Experience Direction
+
+### Collection Landing
+
+The collection landing should behave like a course dashboard, not a report page.
+
+Preferred first-screen order:
+
+1. Eyebrow and course title.
+2. Short description.
+3. Compact metadata: lecture count, duration, level/audience when available.
+4. Primary CTA: start, resume, or continue.
+5. Compact progress summary.
+6. Lecture list or a visible jump to the lecture list.
+
+Assessment index and validation status should remain accessible, but should not displace the main learner action unless the page is explicitly in review mode.
+
+Collection lecture cards should make the lecture title and start action obvious. Metadata should support the decision, not dominate the card.
+
+### Lecture Page
+
+The lecture page should prioritize reading.
+
+Preferred flow:
+
+1. Lecture title, description, and compact metadata.
+2. Compact progress/resume context.
+3. Learning path navigation.
+4. Overview and objectives.
+5. Authored sections.
+6. Takeaways.
+7. Answer key appendix.
+8. Previous/back/next lecture navigation.
+
+Progress should not make `Reset progress` the most prominent action. Resume should be primary only when there is a meaningful resume target.
+
+### Mobile Navigation
+
+The mobile learning path should be a clear control:
+
+- Show `Learning path` plus section count.
+- Add an obvious chevron or text action.
+- Use at least 44px tap target height.
+- When opened, links should be easy to tap and should close or leave the user at the selected anchor without layout surprise.
+- Do not push the first meaningful content far below the fold.
+
+### Active Section State
+
+Desktop navigation should communicate current location during scroll.
+
+Requirements:
+
+- Use `aria-current="location"` or equivalent on the active anchor.
+- Add a non-color cue such as a left rule, bold label, or `Current` text for screen reader-only or visible use.
+- Degrade to normal anchor navigation when JavaScript is unavailable.
+- Avoid scroll spying that causes layout shift or excessive re-rendering.
+
+### Assessment UX
+
+Assessment components should teach through interaction.
+
+Quiz target behavior:
+
+- The learner can select one option.
+- The selected option is visually marked.
+- The reveal button changes to a feedback action such as `Check answer` when a selection exists.
+- Feedback identifies the expected answer and explains why.
+- If the learner reveals without selecting, the UI should still work and should not scold.
+- Print and no-JavaScript output should show answer and explanation clearly.
+
+Question sets, free responses, and practice tasks should continue to avoid formal grading language unless there is a local, deterministic check.
+
+### Visual System
+
+The design should reduce equal-weight surfaces.
+
+Guidance:
+
+- Use strong surfaces for major page regions only.
+- Use lighter treatments for metadata and progress summaries.
+- Avoid nested card stacks.
+- Keep component colors restrained and meaningful.
+- Use typography, spacing, and grouping before adding more borders.
+- Keep the page professional and quiet; the content should be the strongest element.
+
+## Accessibility Requirements
+
+- All primary and secondary actions must be keyboard reachable.
+- All interactive controls must have visible focus.
+- Course CTA, progress bars, navigation disclosures, section completion controls, and assessment buttons must have accessible names.
+- Active navigation state must not rely on color alone.
+- Mobile controls should meet comfortable tap target expectations, with 44px minimum height where practical.
+- Progress must expose text equivalents, not only bars.
+- Assessment feedback must be announced or reachable after reveal.
+- Reduced motion preferences must be respected for scroll or progress transitions.
+- Print output must preserve hidden answers, guidance, and review material with clear labels.
+
+## Responsive Requirements
+
+- At 390px, no text, metadata, buttons, progress bars, code blocks, diagrams, or assessment options may create body-level horizontal overflow.
+- At 390px, the primary course CTA must be visible near the top of the collection page.
+- At 390px, `Reset progress` must not be the dominant action before the learner reaches content.
+- At 768px, lecture navigation and content should not form awkward narrow columns.
+- At 1280px and wider, the reading column should remain comfortable and the side navigation should not overpower content.
+- Long quiz questions, assessment links, lecture titles, metadata values, URLs, code, and diagram labels must wrap or scroll inside their own containers.
+
+## Functional Requirements
+
+- Existing valid lecture templates must remain valid.
+- Existing collection routes must continue to render from `lectures/`.
+- Single-lecture mode must continue to render from the active template path.
+- Static export and review package behavior must remain compatible.
+- Local progress storage remains local-only.
+- Start/resume/continue routing must work without remote state.
+- Previous/back/next lecture navigation must be derived from authored collection order.
+- If JavaScript is unavailable, course and lecture pages must remain navigable through normal links and anchors.
+- No unsafe HTML rendering may be introduced.
+- No new runtime network dependency may be introduced.
+
+## Success Metrics / Quality Gates
+
+- In the first five seconds on the collection page, a learner can identify what the course is and where to start.
+- On a partially completed course, a learner can resume from the collection page in one click.
+- On any collection lecture, a learner can reach the previous or next lecture without returning to the collection page.
+- At mobile width, the first meaningful lecture content appears without excessive progress or navigation overhead.
+- In a long lecture, a learner can tell which section they are currently reading from the navigation or current-location affordance.
+- Quiz interaction supports selection, reveal, and feedback without implying remote submission or grading.
+- The collection page remains useful for reviewers but no longer feels like a validation report first.
+- Screenshots at 390px, 768px, and 1280px show no clipping, overlap, or body-level horizontal overflow.
+- Print output remains useful for instructor review and includes answers, guidance, and hidden content where applicable.
+
+## Acceptance Criteria
+
+- Collection landing renders a primary `Start course`, `Resume course`, or `Continue course` action near the course title.
+- Collection CTA links to a valid lecture route or section anchor based on available progress and collection order.
+- Collection progress is visually secondary to the primary learner action.
+- Collection lecture cards still expose validation status, but validation status does not dominate learner-facing card hierarchy.
+- Lecture pages in collection mode render previous/back/next navigation according to lecture order.
+- Lecture pages preserve normal anchor navigation for overview, objectives, sections, and takeaways.
+- Desktop learning path exposes a current-location state or equivalent orientation aid.
+- Mobile learning path clearly indicates it can be expanded.
+- Progress UI is compact enough that mobile learners can reach content quickly.
+- Section completion control is keyboard accessible, touch-friendly, and clearly labeled.
+- Quiz supports selecting an option, checking/revealing feedback, and showing answer/explanation.
+- Assessment feedback remains local-only, ungraded, and print-friendly.
+- Assessment index is easier to scan on mobile and does not block the main course-start journey.
+- Visual hierarchy distinguishes course action, progress, navigation, content, assessments, and review material.
+- No body-level horizontal overflow occurs at 390px, 768px, or 1280px.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests still pass or are updated for intentional behavior.
+- Verification includes browser screenshots for collection landing, a short lecture, a long/component-heavy lecture, and mobile assessment interaction.
+

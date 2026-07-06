@@ -1,0 +1,262 @@
+Implementation Plan: Senior UI/UX Polish (spec/014-senior-ui-ux-polish.txt)
+
+Plan status: draft pending tech-lead review
+
+## Brief Summary
+
+Polish the Lecture Site Engine from a functional preview surface into a learner-first course experience. The change should make the course start/resume action obvious, wire collection lecture pages into the existing `/lectures/{slug}` route contract, render previous/back/next lecture navigation, compress progress and review signals, improve section orientation, and make quiz practice feel selectable and feedback-driven.
+
+This plan preserves the existing authoring schema, parser, validator, local-only progress model, static export, review package, no-account behavior, and print-friendly output. It is primarily route composition, React component behavior, visual hierarchy CSS, focused test coverage, and browser/screenshot verification.
+
+## Relevant Existing Files
+
+- `src/app/page.tsx` - Currently chooses collection mode vs single-lecture mode. Collection mode renders `CollectionLanding`, and single mode renders `LecturePage`.
+- `src/app/lectures/[slug]/page.tsx` - Expected collection lecture route is missing in this checkout even though links and review packaging assume `/lectures/{slug}` output. Add this route or verify it exists before wiring navigation.
+- `src/lib/lecture-template/collection.ts` - Scans `lectures/`, validates ordered collection entries, and exposes slugs, template paths, valid templates, and preview templates for invalid lectures.
+- `src/components/lecture-kit/CollectionLanding.tsx` - Renders the collection header, progress bar, assessment index, lecture cards, validation badges, and lecture links. Add the primary course CTA here.
+- `src/components/lecture-kit/LecturePage.tsx` - Renders lecture header, progress, section navigation, content, takeaways, and answer key. Extend its props for optional collection context and render lecture navigation.
+- `src/components/lecture-kit/LectureNavigation.tsx` - Existing previous/back/next component, currently tested but not used by `LecturePage`.
+- `src/components/lecture-kit/SectionNavigation.tsx` - Server-rendered desktop and mobile learning path. Add a client enhancement for active/current section state while keeping anchor fallback.
+- `src/components/lecture-kit/progress/ProgressProvider.tsx` - Already tracks current visible section with `IntersectionObserver`, progress, resume target, shortcuts, and localStorage writes for single lecture.
+- `src/components/lecture-kit/progress/CollectionProgressProvider.tsx` and `CollectionProgressBar.tsx` - Read collection progress from localStorage and summarize course/lecture completion.
+- `src/components/lecture-kit/progress/LectureProgressBar.tsx` - Current lecture progress card includes milestones and a prominent reset action. Compress this for learner-first mobile reading.
+- `src/components/lecture-kit/progress/SectionCompletionToggle.tsx` - Current completion control is accessible but visually small on mobile.
+- `src/components/lecture-kit/Quiz.tsx` - Current quiz supports reveal but not option selection or correctness feedback.
+- `src/components/lecture-kit/QuestionSet.tsx`, `FreeResponse.tsx`, and `PracticeTask.tsx` - Already have local interaction patterns; align visual hierarchy and feedback language with the upgraded quiz.
+- `src/components/lecture-kit/AnswerKeyAppendix.tsx` - Keep print/review usefulness while ensuring answer-key/review UI reads as end-of-lesson appendix, not primary content.
+- `src/app/globals.css` - Owns layout, visual hierarchy, progress, assessment, lecture navigation, responsive, reduced-motion, and print styles.
+- `src/lib/lecture-template/reviewPackage.ts` - Expects collection lecture outputs under `out/lectures/{slug}/index.html` and rewrites links for static review packages.
+- `tests/lecture-template/lecture-components.test.tsx` - Static markup contracts for lecture layout, navigation, progress, collection landing, components, and answer key.
+- `tests/lecture-template/lecture-navigation.test.tsx` - Existing isolated tests for `LectureNavigation`.
+- `tests/lecture-template/progress-provider.test.tsx`, `progress-model.test.ts`, and `collection.test.ts` - Existing progress and collection behavior coverage.
+- `tests/lecture-template/quiz-interaction.test.tsx` and `assessment-interaction.test.tsx` - Existing jsdom interaction tests for quiz and assessment components.
+- `tests/lecture-template/backward-compat.test.tsx` and `review-package.test.ts` - Guard single lecture, collection mode, and review package assumptions.
+- `examples/multi-lecture/` and `examples/component-demo.template.md` - Use as manual and screenshot fixtures for course landing, multi-lecture navigation, long/component-heavy lecture, and assessment interaction.
+
+## Proposed Implementation Steps
+
+### Step 1: Add a collection lecture route and route context
+
+- Create `src/app/lectures/[slug]/page.tsx`.
+- Use `scanLectureCollection()` or `validateCollection()` to derive ordered lecture entries from `lectures/`.
+- Implement `generateStaticParams()` from the collection scan so static export emits `out/lectures/{slug}/index.html`.
+- For a requested slug:
+  - return a validation screen or `notFound()` for missing slugs;
+  - validate the selected lecture source;
+  - render `ValidationScreen` for invalid lecture templates without breaking the rest of the collection;
+  - render `LecturePage` for valid lectures.
+- Compute previous and next lectures from authored collection order, preferring valid templates for titles but falling back to humanized slugs when needed.
+- Pass collection context into `LecturePage`, including current slug, `templatePath`, previous/next nav targets, collection storage key, and optional course title for a compact "Back to course" label.
+- Keep `src/app/page.tsx` single-lecture behavior unchanged when `lectures/` is absent.
+- Add tests proving collection mode renders the landing at `/`, collection lecture pages render by slug, and single-lecture mode still renders from `content/lecture.template.md`.
+
+### Step 2: Add primary course CTA and resume targeting
+
+- Extend `CollectionProgressProvider` or add a small client component such as `CollectionPrimaryAction` that can read loaded collection progress and choose a CTA.
+- Determine CTA label:
+  - `Start course` when no known section progress exists;
+  - `Resume course` when progress identifies an incomplete section target in the first partially complete lecture;
+  - `Continue course` when progress exists but no precise target is available.
+- Determine href:
+  - first valid lecture when no progress exists;
+  - first incomplete section anchor within the first partially complete or first incomplete lecture when possible;
+  - first valid lecture when collection progress is malformed, empty, or all completed and no better target exists.
+- Use the existing collection progress helpers from `src/lib/lecture-template/progress.ts`; add pure helper tests for CTA target calculation rather than embedding all logic in a React component.
+- Render the primary CTA near the collection title and description before progress, assessment index, and lecture list.
+- Keep total lecture count, total duration, level/audience, and validation/pass count visible as compact secondary metadata.
+- If the lecture list is pushed below the first viewport after the CTA and compact metadata, add a secondary `View all lectures` anchor to `#lecture-list`.
+- Move the assessment index below the lecture list or put it behind a disclosure so it does not block the learner start path.
+- Make validation/pass badges subordinate to lecture card title/action text.
+
+### Step 3: Render lecture-to-lecture navigation in collection mode
+
+- Update `LecturePage` props with optional `collectionNavigation?: { previous?: NavTarget; next?: NavTarget; backHref: string; backLabel?: string }`.
+- Render a compact top affordance only when collection context exists, such as a restrained row below the lecture header or progress summary linking back to course and next lecture.
+- Render the full `LectureNavigation` after key takeaways and answer key, using:
+  - first lecture: back to course and next lecture;
+  - middle lecture: previous, back to course, and next;
+  - last lecture: previous and back to course.
+- Update `LectureNavigation` if needed to accept `backHref` and `backLabel` instead of hard-coding `/` and `Back to course`.
+- Keep links as normal anchors so no-JavaScript navigation works and review-package link rewriting continues to work.
+- Add component and route tests for first, middle, and last lecture nav states.
+
+### Step 4: Improve active section and mobile learning-path navigation
+
+- Convert `SectionNavigation` into a client component or split it into a server wrapper plus a client `LearningPathNavigation`.
+- Reuse `ProgressProvider.currentSectionAnchor` for authored sections when available; for overview/objectives/takeaways, add a small observer inside the navigation component so fixed anchors can also become current.
+- Render `aria-current="location"` on the active anchor.
+- Add a non-color cue: left rule, bold text, and either visible `Current` text or screen-reader-only current text.
+- Preserve normal anchor hrefs and usable static markup before JavaScript runs.
+- Update the mobile `details` summary to visibly communicate interactivity: `Learning path`, section count, and either `Open contents` text or a chevron rendered with CSS.
+- Keep `summary` at least 44px high and ensure long section labels wrap.
+- Update tests that currently assert `aria-current` is absent.
+
+### Step 5: Compress progress and strengthen completion controls
+
+- Refactor `LectureProgressBar` markup so progress reads as compact context instead of a large card above the lesson.
+- On mobile, collapse milestone boxes into a concise text summary or hide them from visual layout while preserving accessible progress text.
+- Move `Reset progress` into secondary placement, for example an inline secondary button, details menu, or right-aligned low-emphasis action. It must not be the largest visible action before content at 390px.
+- Keep `role="progressbar"`, text equivalents, localStorage unavailable messaging, resume prompt, and live announcements.
+- Enlarge `SectionCompletionToggle` mobile hit area to at least 44px and make the visible label plain language, such as `Mark complete` / `Completed`.
+- Preserve `aria-pressed` and keyboard operation.
+- Avoid dimming completed section body text; completed state should be a light orientation cue.
+
+### Step 6: Upgrade quiz from reveal-only to selectable practice
+
+- Keep the `QuizComponent` schema unchanged: `question`, `options`, `answer`, optional `explanation`.
+- In `Quiz.tsx`, add local selected-option state.
+- Render options as a radio group or button list with clear selected state.
+- Before reveal:
+  - learner can select one option;
+  - selected option is visually marked and announced by native radio semantics or explicit ARIA;
+  - button text should become `Check answer` when a selection exists and can remain `Show answer` when no selection exists.
+- After reveal:
+  - show expected answer;
+  - if the selected option can be compared exactly to `component.answer`, show `Correct` or `Not quite` feedback without formal grading language;
+  - include teaching feedback from `component.explanation` when present;
+  - if no option was selected, reveal answer/explanation without scolding.
+- Keep hidden answer/feedback mounted for print and no-JavaScript usefulness, as current quiz reveal tests expect.
+- Do not persist quiz state, score learners, add analytics, or change validator semantics.
+- Update jsdom tests for selection, check/reveal, selected state, correctness messaging, no-selection reveal, multiple independent quizzes, keyboard operation, and print/no-JS markup.
+
+### Step 7: Align assessment index and assessment component hierarchy
+
+- Rework collection assessment index to group by lecture first, with assessment type metadata secondary.
+- Shorten very long labels where possible in the UI while preserving full destination via accessible name/title or surrounding context.
+- Move the assessment index below the lecture list or inside a disclosure labeled for reviewers/educators.
+- Align visual hierarchy across `Quiz`, `QuestionSet`, `FreeResponse`, and `PracticeTask`:
+  - prompt/task first;
+  - learner input or selection second;
+  - reveal/compare action third;
+  - answer/guidance/solution/feedback last.
+- Avoid language implying remote submission or formal grading.
+- Keep answer key appendix and hidden assessment feedback visible in print.
+
+### Step 8: Visual hierarchy, responsive, and print polish
+
+- Update `src/app/globals.css` to reduce equal-weight card noise:
+  - reserve strong bordered surfaces for major regions;
+  - use lighter metadata rows and dividers for progress, assessment metadata, and validation/review status;
+  - make overview/objectives feel like starting aids;
+  - make authored sections read as the main reading path;
+  - make takeaways and answer key feel like end-of-lesson review.
+- Add or adjust selectors for:
+  - `.collection-primary-action`, `.collection-action-row`, `.collection-review-status`, `.assessment-index` disclosure/grouping;
+  - active `.nav-item` / `[aria-current="location"]`;
+  - mobile `.learning-path-mobile summary` chevron/open label;
+  - compact `.lecture-progress` and milestone mobile treatment;
+  - larger `.section-completion` mobile hit area;
+  - quiz selected/correct/incorrect feedback states;
+  - lecture top and bottom navigation.
+- Verify no body-level horizontal overflow at 390px, 768px, and 1280px for collection landing, short lecture, long/component-heavy lecture, and assessment interaction.
+- Preserve print rules that reveal answers/guidance and hide interactive-only controls.
+
+### Step 9: Update examples, docs, and review guidance
+
+- Update `README.md` and `SKILL.md` to describe:
+  - collection start/resume/continue behavior;
+  - collection lecture previous/back/next navigation;
+  - local-only progress and assessment feedback;
+  - quiz selection/check behavior;
+  - review status being secondary learner-facing UI;
+  - static export and print behavior.
+- Update `examples/component-demo.template.md` wording only where it describes stale quiz reveal behavior or where reviewer cues should mention selection/check feedback.
+- Keep authoring schema examples unchanged unless wording is stale.
+
+### Step 10: Verification and screenshot evidence
+
+- Run focused automated tests during implementation:
+  - `npm run test -- tests/lecture-template/lecture-components.test.tsx`
+  - `npm run test -- tests/lecture-template/lecture-navigation.test.tsx`
+  - `npm run test -- tests/lecture-template/progress-provider.test.tsx`
+  - `npm run test -- tests/lecture-template/progress-model.test.ts`
+  - `npm run test -- tests/lecture-template/collection.test.ts`
+  - `npm run test -- tests/lecture-template/quiz-interaction.test.tsx`
+  - `npm run test -- tests/lecture-template/assessment-interaction.test.tsx`
+  - `npm run test -- tests/lecture-template/backward-compat.test.tsx`
+  - `npm run test -- tests/lecture-template/review-package.test.ts`
+- Run broad verification:
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run validate`
+  - `npm run build`
+  - `npm run package:review`
+- Add manual/browser verification using the existing multi-lecture fixtures:
+  - collection landing at 390px, 768px, and 1280px;
+  - short lecture route;
+  - long/component-heavy lecture route;
+  - mobile quiz selection/check interaction;
+  - print preview for answer/guidance visibility.
+- Use a browser check such as `document.documentElement.scrollWidth <= document.documentElement.clientWidth` at each viewport.
+- Capture or document screenshot paths for the required review evidence.
+
+## Data Model, API, Persistence, Event, Or Domain Changes
+
+- Template schema changes: none.
+- Parser and validator changes: none expected.
+- Runtime persistence: continues to use browser `localStorage` through existing progress helpers and providers.
+- New pure helper: collection CTA target calculation may be added to `src/lib/lecture-template/progress.ts` or a focused module such as `src/lib/lecture-template/resumeTarget.ts`.
+- Route changes: add collection lecture route `src/app/lectures/[slug]/page.tsx` with static params from authored collection order.
+- Component API changes:
+  - `LecturePage` accepts optional collection navigation/context.
+  - `LectureNavigation` accepts optional `backHref` and `backLabel`.
+  - `SectionNavigation` may become a client component or use a client child for active state.
+- External services: none.
+- Runtime network dependencies: none.
+- Assessment state: quiz selection/reveal remains local component state and is not stored, graded, submitted, or exported.
+- Review package behavior: static export should now include actual collection lecture routes that review packaging already expects.
+
+## Test Plan
+
+- Route tests:
+  - collection landing remains `/`;
+  - `/lectures/{slug}` renders valid lectures from `lectures/`;
+  - missing slug is handled safely;
+  - static params follow authored order;
+  - single-lecture mode remains compatible.
+- Collection CTA tests:
+  - no progress -> `Start course` links to first valid lecture;
+  - partial progress -> `Resume course` links to first incomplete section anchor;
+  - progress exists but target cannot be derived -> `Continue course`;
+  - invalid first lecture and empty collection edge cases;
+  - all-complete course behavior is deterministic and not broken.
+- Lecture navigation tests:
+  - first/middle/last lecture states;
+  - back link target and label;
+  - normal anchor hrefs compatible with review-package rewriting.
+- Section navigation tests:
+  - normal anchor list renders without JavaScript-specific requirements;
+  - active anchor uses `aria-current="location"`;
+  - current state has a non-color cue;
+  - mobile summary communicates expandable contents.
+- Progress UI tests:
+  - progress bar accessible values and text remain;
+  - reset action is secondary and still keyboard reachable;
+  - section completion toggle has `aria-pressed`, clear label, and touch-friendly markup.
+- Quiz tests:
+  - selectable options;
+  - selected state;
+  - `Check answer`/reveal behavior;
+  - correct and not-quite feedback;
+  - reveal without selection;
+  - multiple quizzes independent;
+  - print/no-JS hidden feedback remains useful.
+- Visual/regression checks:
+  - no horizontal overflow at 390px, 768px, and 1280px;
+  - collection CTA visible near top at 390px;
+  - first lecture content appears without excessive progress/navigation chrome at 390px;
+  - validation/review status is present but secondary.
+
+## Risks, Assumptions, And Open Questions
+
+- The collection lecture route is missing in this checkout. Implementers should add it before treating previous/back/next navigation or review-package output as complete.
+- Existing collection progress reads localStorage on the landing only. Lecture pages in collection mode may need to use collection-scoped progress rather than single-lecture storage if the CTA must resume accurately from section toggles made inside `/lectures/{slug}`.
+- `ProgressProvider.currentSectionAnchor` currently tracks authored sections only. Overview/objectives/takeaways active state requires either expanding the observer or accepting active state only for authored sections; the spec prefers full current-location orientation.
+- CTA resume target semantics need a deterministic all-complete behavior. Recommended behavior: `Continue course` to the first lecture or last lecture review area, documented in tests.
+- Quiz answer matching should reuse the validator's existing exact answer-to-option assumption. If existing content has answer strings that do not exactly match options, feedback should reveal answer without false correctness claims.
+- Converting `SectionNavigation` to a client component must avoid hydration mismatch. Initial server markup should render no current item or a stable initial item, then enhance after mount.
+- Browser screenshot verification likely needs a dev server and Playwright or equivalent. If the repo does not already include Playwright, prefer manual browser checks or a lightweight script rather than adding a heavy dependency without approval.
+- CSS polish can easily sprawl. Keep changes tied to the spec's named surfaces and avoid decorative redesign.
+- The spec's review-mode idea is not a full new mode. Treat author/reviewer status as secondary framing unless a later spec defines a dedicated review mode.
+

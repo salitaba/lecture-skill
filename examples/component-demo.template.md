@@ -14,7 +14,7 @@ This visual gallery shows how each supported lecture component appears in the re
 
 - Identify every supported lecture component by its rendered role label.
 - Apply the exact fenced YAML syntax for supported components.
-- Preview wrapping, quiz answer reveal behavior, and internal code scrolling in the local Next.js app.
+- Preview wrapping, quiz selection and feedback behavior, and internal code scrolling in the local Next.js app.
 
 ## Section: Highlight Components
 

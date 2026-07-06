@@ -100,11 +100,15 @@ lectures/
 
 In collection mode:
 
-- The root page renders a collection landing page instead of the single lecture preview.
+- The root page renders a collection landing page with a primary start/resume/continue action near the course title.
 - Each lecture is available at `/lectures/<slug>`, where `<slug>` is the numbered subdirectory name.
-- Each lecture page includes previous/next navigation and a back-to-course link.
+- Each lecture page includes previous/back-to-course/next navigation derived from authored collection order.
+- Lecture pages in collection mode use collection-scoped progress storage.
 - `npm run validate` validates every `lectures/*/lecture.template.md` file and reports per-lecture status.
 - Optional `lectures/course.yaml` declares collection title, description, audience, level, and duration.
+- Assessment locations are grouped by lecture behind a disclosure labeled "Assessment locations for reviewers".
+- A secondary "View all lectures" anchor links to the lecture list when it is not visible near the first viewport.
+- Validation status appears as secondary badges on lecture cards; it does not dominate the learner-facing hierarchy.
 
 Collection mode takes precedence over `content/lecture.template.md` whenever `lectures/` exists. If `lectures/` is absent or empty, the app falls back to the single-lecture workflow and continues to render `content/lecture.template.md` exactly as before.
 
@@ -184,6 +188,10 @@ Rendered lecture pages automatically include local learner progress controls for
 - `Alt+R`: reset progress after confirmation.
 
 Progress is browser-only convenience state. It is not grading, analytics, account data, synced data, source evidence, or review-package content. Authors do not add progress fields or template syntax.
+
+In collection mode, lecture progress is also written to a collection-scoped localStorage key so the collection landing page can display aggregate course progress. When a lecture page is rendered within a collection, toggling a section updates both the lecture-level and collection-level storage. Resetting lecture progress also removes the lecture entry from collection storage.
+
+Collection landing pages show a primary start/resume/continue action based on aggregate progress, with the lecture list and assessment index as secondary content. Review and validation status appears as secondary badges on lecture cards without dominating the learner-facing hierarchy.
 
 Storage uses `localStorage`:
 

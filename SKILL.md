@@ -46,7 +46,7 @@ When starting new work, prefer the local scaffold commands over hand-creating pa
 - Run `npm run new:lecture` to create the next lecture in the active workflow.
 - Do not overwrite raw source files or existing templates unless the user explicitly asks.
 
-Progress tracking is automatic in the rendered site for authored `## Section:` blocks. Do not add progress fields, localStorage keys, completion checkboxes, or custom progress syntax to lecture templates. Progress is runtime browser state only; it is not grading, analytics, source evidence, synced data, or review-package content.
+Progress tracking is automatic in the rendered site for authored `## Section:` blocks. Do not add progress fields, localStorage keys, completion checkboxes, or custom progress syntax to lecture templates. Progress is runtime browser state only; it is not grading, analytics, source evidence, synced data, or review-package content. In collection mode, lecture progress is also written to collection-scoped storage so the landing page can display aggregate course progress.
 
 ## Multi-Lecture Collection Workflow
 

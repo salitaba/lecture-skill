@@ -259,15 +259,15 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("<figcaption>Lecture notes</figcaption>");
     expect(html).toContain("Quiz: Knowledge check");
     expect(html).toContain('<h3 class="quiz-question">Which command validates?</h3>');
-    expect(html).toContain('<ol class="quiz-options">');
+    expect(html).toContain('role="radiogroup"');
     expect(html).toContain('type="button"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("Show answer");
     const answerRegionId = html.match(/aria-controls="([^"]+)"/)?.[1];
-    const answerLabelId = html.match(/aria-labelledby="([^"]+)"/)?.[1];
     expect(answerRegionId).toBeTruthy();
-    expect(answerLabelId).toBeTruthy();
     expect(html).toContain(`id="${answerRegionId}"`);
+    const answerLabelId = html.match(new RegExp(`id="${answerRegionId}" class="quiz-answer"[^>]+aria-labelledby="([^"]+)"`))?.[1];
+    expect(answerLabelId).toBeTruthy();
     expect(html).toContain(`id="${answerLabelId}"`);
     expect(html).toContain(`id="${answerRegionId}" class="quiz-answer" hidden="" aria-labelledby="${answerLabelId}"`);
     expect(html).toContain(`<p id="${answerLabelId}" class="quiz-answer-label">Answer</p>`);
@@ -697,7 +697,7 @@ describe("lecture component UX contracts", () => {
       />
     );
 
-    expect(html).toContain("Assessment index");
+    expect(html).toContain("Assessment locations for reviewers");
     expect(html).toContain("Course progress");
     expect(html).toContain("0 of 7 sections completed (0%)");
     expect(html).toContain("Progress unavailable until this lecture validates.");

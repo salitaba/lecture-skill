@@ -23,9 +23,6 @@ export function LectureProgressBar() {
             {loaded && !storageAvailable ? " (not saved)" : ""}
           </p>
         </div>
-        <button type="button" className="progress-reset-button" onClick={onReset} disabled={totalSections === 0}>
-          Reset progress
-        </button>
       </div>
 
       <div
@@ -39,15 +36,25 @@ export function LectureProgressBar() {
         <span className="lecture-progress-fill" style={{ width: `${percentComplete}%` }} />
       </div>
 
-      <ol className="lecture-progress-milestones" aria-label="Progress milestones">
-        {milestones.map((milestone) => (
-          <li key={milestone} className={percentComplete >= milestone ? "milestone-complete" : undefined}>
-            <span>{milestone}%</span>
-          </li>
-        ))}
-      </ol>
+      <div className="lecture-progress-milestones-wrapper">
+        <ol className="lecture-progress-milestones" aria-label="Progress milestones">
+          {milestones.map((milestone) => (
+            <li key={milestone} className={percentComplete >= milestone ? "milestone-complete" : undefined}>
+              <span>{milestone}%</span>
+            </li>
+          ))}
+        </ol>
+        <p className="lecture-progress-milestones-summary" aria-label="Progress milestones">
+          {milestones.filter((m) => percentComplete >= m).length} of {milestones.length} milestones reached
+        </p>
+      </div>
 
-      <ResumePrompt />
+      <div className="lecture-progress-footer">
+        <ResumePrompt />
+        <button type="button" className="progress-reset-button" onClick={onReset} disabled={totalSections === 0}>
+          Reset progress
+        </button>
+      </div>
     </section>
   );
 }

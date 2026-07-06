@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-html-link-for-pages */
-
 export interface NavTarget {
   slug: string;
   title: string;
@@ -8,9 +6,11 @@ export interface NavTarget {
 export interface LectureNavigationProps {
   previous?: NavTarget;
   next?: NavTarget;
+  backHref?: string;
+  backLabel?: string;
 }
 
-export function LectureNavigation({ previous, next }: LectureNavigationProps) {
+export function LectureNavigation({ previous, next, backHref = "/", backLabel = "Back to course" }: LectureNavigationProps) {
   return (
     <nav className="lecture-nav" aria-label="Lecture navigation">
       <div className="lecture-nav-inner">
@@ -19,8 +19,8 @@ export function LectureNavigation({ previous, next }: LectureNavigationProps) {
             ← {previous.title}
           </a>
         ) : null}
-        <a className="lecture-nav-link lecture-nav-back" href="/">
-          Back to course
+        <a className="lecture-nav-link lecture-nav-back" href={backHref}>
+          {backLabel}
         </a>
         {next ? (
           <a className="lecture-nav-link lecture-nav-next" href={`/lectures/${next.slug}`}>

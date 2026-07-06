@@ -1,30 +1,56 @@
 import { AnswerKeyAppendix } from "@/components/lecture-kit/AnswerKeyAppendix";
 import { LectureHeader } from "@/components/lecture-kit/LectureHeader";
+import { LectureNavigation, type NavTarget } from "@/components/lecture-kit/LectureNavigation";
 import { PageShell } from "@/components/lecture-kit/PageShell";
 import { RenderBlocks, SectionRenderer } from "@/components/lecture-kit/SectionRenderer";
 import { SectionNavigation } from "@/components/lecture-kit/SectionNavigation";
 import { lectureNavigationTargets } from "@/lib/lecture-template/navigationTargets";
 import { progressIdFromTemplatePath, singleLectureProgressKey } from "@/lib/lecture-template/progress";
 import type { LectureTemplate } from "@/lib/lecture-template/types";
+import type { ProgressLecture } from "@/lib/lecture-template/progress";
 import { LectureProgressBar } from "./progress/LectureProgressBar";
 import { ProgressLiveRegion } from "./progress/ProgressLiveRegion";
 import { ProgressProvider } from "./progress/ProgressProvider";
 
+export interface CollectionNavigationContext {
+  previous?: NavTarget;
+  next?: NavTarget;
+  backHref: string;
+  backLabel?: string;
+}
+
 export interface LecturePageProps {
   lecture: LectureTemplate;
   templatePath: string;
+  collectionNavigation?: CollectionNavigationContext;
+  collectionContext?: {
+    collectionStorageKey: string;
+    collectionLectures: ProgressLecture[];
+  };
 }
 
-export function LecturePage({ lecture, templatePath }: LecturePageProps) {
+export function LecturePage({ lecture, templatePath, collectionNavigation, collectionContext }: LecturePageProps) {
   const lectureId = progressIdFromTemplatePath(templatePath, lecture.metadata.title);
   const storageKey = singleLectureProgressKey(lectureId);
   const progressSections = lecture.sections.map((section) => ({ anchor: section.anchor, title: section.title }));
 
   return (
     <PageShell>
-      <ProgressProvider storageKey={storageKey} sections={progressSections}>
+      <ProgressProvider
+        storageKey={storageKey}
+        sections={progressSections}
+        collectionStorageKey={collectionContext?.collectionStorageKey}
+        collectionLectures={collectionContext?.collectionLectures}
+      >
         <LectureHeader metadata={lecture.metadata} sectionCount={lecture.sections.length} />
         <LectureProgressBar />
+        {collectionNavigation ? (
+          <CollectionTopNav
+            next={collectionNavigation.next}
+            backHref={collectionNavigation.backHref}
+            backLabel={collectionNavigation.backLabel}
+          />
+        ) : null}
         <div className="lecture-layout">
           <SectionNavigation sections={lecture.sections} />
           <article className="lecture-content">
@@ -61,8 +87,41 @@ export function LecturePage({ lecture, templatePath }: LecturePageProps) {
             <AnswerKeyAppendix lecture={lecture} />
           </article>
         </div>
+        {collectionNavigation ? (
+          <LectureNavigation
+            previous={collectionNavigation.previous}
+            next={collectionNavigation.next}
+            backHref={collectionNavigation.backHref}
+            backLabel={collectionNavigation.backLabel}
+          />
+        ) : null}
         <ProgressLiveRegion />
       </ProgressProvider>
     </PageShell>
+  );
+}
+
+function CollectionTopNav({
+  next,
+  backHref,
+  backLabel = "Back to course"
+}: {
+  next?: NavTarget;
+  backHref: string;
+  backLabel?: string;
+}) {
+  return (
+    <nav className="lecture-nav lecture-nav-top" aria-label="Course navigation">
+      <div className="lecture-nav-inner">
+        <a className="lecture-nav-link lecture-nav-back" href={backHref}>
+          {backLabel}
+        </a>
+        {next ? (
+          <a className="lecture-nav-link lecture-nav-next" href={`/lectures/${next.slug}`}>
+            {next.title} →
+          </a>
+        ) : null}
+      </div>
+    </nav>
   );
 }

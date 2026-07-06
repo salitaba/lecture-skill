@@ -20,7 +20,7 @@ export function SectionCompletionToggle({ anchor, title }: { anchor: string; tit
         <span aria-hidden="true">{completed ? "✓" : ""}</span>
       </button>
       <span className="section-completion-label" aria-hidden="true">
-        {completed ? "Complete" : "Mark complete"}
+        {completed ? "Completed" : "Mark complete"}
       </span>
       <span className="section-completion-print">Progress: {completed ? "complete" : "incomplete"}</span>
     </div>
