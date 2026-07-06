@@ -1,0 +1,294 @@
+Implementation Plan: Learner Experience Primitives (spec/015-learner-experience-primitives.txt)
+
+Plan status: draft pending tech-lead review
+
+## Brief Summary
+
+`spec/015` is a sibling of `spec/014-senior-ui-ux-polish.txt`. Spec 014 already shipped the four P0 page-level primitives (CollectionPrimaryAction, LectureNavigation wiring, active section state, SelectableQuiz) and a number of supporting P1 pieces. Spec 015 is self-contained for the new work and consolidates the remaining P1 cross-cutting helpers plus a small amount of P0 polish that the spec explicitly defers:
+
+- B1. `ResumePrompt` as a real per-session helper, placed exactly where the spec wants it, not inside the progress bar.
+- B2. `ReadingTimeEstimate` derived at render time from authored section word counts.
+- B3. `GlossaryIndex` auto-generated from authored `glossary_term` components, with a per-lecture and whole-collection surface.
+- B4. `AssessmentIndexDisclosure` as a dedicated, count-aware disclosure component that can be placed under the lecture list and that wraps the existing assessment index list.
+
+The plan preserves the existing authoring schema, parser, validator, local-only progress model, static export, review package, no-account behavior, and print-friendly output. It introduces no new `lecture-component` type, no new frontmatter field, no new dependency, and no breaking change. It is a combination of a small new lib helper for reading time, a few new components, refinement of the existing 014 ResumePrompt, and focused CSS plus tests.
+
+## Relationship To Spec 014
+
+`spec/014` already produced, in this checkout:
+
+- `src/components/lecture-kit/CollectionPrimaryAction.tsx` plus `src/lib/lecture-template/resumeTarget.ts` (P0-A1).
+- `src/app/lectures/[slug]/page.tsx` plus `collectionNavigation` on `LecturePage` (P0-A2 route wiring).
+- `src/components/lecture-kit/LearningPathNavigation.tsx` with `aria-current="location"`, left rule, and bold label (P0-A3).
+- `src/components/lecture-kit/Quiz.tsx` upgraded to selectable options, `Check answer`, and feedback (P0-A4).
+- `src/components/lecture-kit/progress/ResumePrompt.tsx` plus `resumeTarget` / `dismissResumePrompt` / `jumpToResumeTarget` in `ProgressProvider` (rough P1-B1 start, but with the wrong placement and wrong dismissal model).
+
+This plan therefore does not redo 014 work. It tightens P1-B1 against the 015 spec, then adds P1-B2, P1-B3, and P1-B4 as fresh work. Anything 014 already defined for the P0 list is referenced rather than re-planned.
+
+## Relevant Existing Files
+
+- `src/lib/lecture-template/types.ts` - `LectureTemplate`, `LectureSection`, `RenderBlock`, `GlossaryTermComponent`, `LectureComponent`, and the component union. Reading time and glossary index derive from these.
+- `src/lib/lecture-template/renderMarkdown.tsx` - already exports `renderMarkdownBlocks(blocks)`. Reused for paragraph/word counting in the reading-time helper.
+- `src/lib/lecture-template/assessments.ts` - already exports `collectLectureAssessments` and `collectCollectionAssessments`. The new `AssessmentIndexDisclosure` consumes these without changing the schema.
+- `src/lib/lecture-template/collection.ts` - exposes `validateCollection()` and `scanLectureCollection()`. `CollectionLanding` already uses these; the glossary index reuses the same scan.
+- `src/lib/lecture-template/progress.ts` - `LectureProgress`, `CollectionProgress`, `validateLectureProgress`, `validateCollectionProgress`, `calculateLectureProgress`, `calculateCollectionProgress`. The new `GlossaryIndex` reuses `calculateCollectionProgress` for nothing; it is its own pure helper.
+- `src/lib/lecture-template/reviewPackage.ts` - expects deterministic, render-time data so review packages match the rendered page. The reading-time helper and glossary index must be deterministic so this continues to hold.
+- `src/components/lecture-kit/CollectionLanding.tsx` - hosts the assessment index today as an inline `<details class="assessment-index-disclosure">`. B4 refactors that into a dedicated component, keeps the same DOM class, and adds the `Show N assessments` / `Hide N assessments` toggle label.
+- `src/components/lecture-kit/LecturePage.tsx` - hosts the lecture header, progress bar, top collection nav, and learning path. B1 moves the existing `ResumePrompt` out of `LectureProgressBar` and into the lecture page header area. B2 adds reading time next to lecture metadata. B3 adds a per-lecture glossary index between key takeaways and the answer key.
+- `src/components/lecture-kit/LectureHeader.tsx` - the place to render the new `~N min read` estimate (B2).
+- `src/components/lecture-kit/LearningPathNavigation.tsx` - already has section labels; the optional per-section `~N min` reading time is appended here per spec but only when it does not crowd the label.
+- `src/components/lecture-kit/progress/ProgressProvider.tsx` - owns `resumeTarget`, `dismissResumePrompt`, `jumpToResumeTarget`, and the in-memory `resumeDismissed` boolean. B1 moves dismissal to `sessionStorage` so a page reload re-shows the prompt if the section is still incomplete.
+- `src/components/lecture-kit/progress/ResumePrompt.tsx` - existing implementation. B1 changes the markup to a divider-row banner with one primary action, drops the second `Dismiss` button, and changes the dismiss path to `sessionStorage`.
+- `src/components/lecture-kit/progress/LectureProgressBar.tsx` - today embeds `<ResumePrompt />`. B1 removes that import and renders `ResumePrompt` from `LecturePage` instead.
+- `src/components/lecture-kit/GlossaryTerm.tsx` - existing inline `glossary_term` renderer. B3 leaves it unchanged; the index is additive.
+- `src/components/lecture-kit/AnswerKeyAppendix.tsx` - end-of-lecture appendix. B3 places the per-lecture glossary index before this appendix per the spec's preferred flow.
+- `src/app/page.tsx` - chooses collection vs single-lecture mode. B3 makes the whole-collection glossary index render on `CollectionLanding`; B4 reorganizes the landing's order so the glossary index appears after the assessment index disclosure.
+- `src/app/globals.css` - visual hierarchy, focus rings, quiz feedback styles, print rules. B1-B4 add CSS hooks and print rules.
+- `tests/lecture-template/lecture-components.test.tsx`, `tests/lecture-template/assessment-index-disclosure.test.tsx`, `tests/lecture-template/collection-cta.test.tsx`, `tests/lecture-template/quiz-interaction.test.tsx`, `tests/lecture-template/visual-hierarchy.test.tsx`, `tests/lecture-template/progress-provider.test.tsx`, `tests/lecture-template/review-package.test.ts`, `tests/lecture-template/collection.test.ts` - existing coverage that the new work must keep green or update intentionally.
+- `examples/component-demo.template.md` - already includes one `glossary_term` and many `quiz`/`question_set` components. It is the right primary fixture for the new tests; the multi-lecture example is the right primary fixture for the collection-level glossary index and assessment disclosure counts.
+
+## Proposed Implementation Steps
+
+### Step 1: Add a pure `readingTime` helper
+
+- Add `src/lib/lecture-template/readingTime.ts` exporting:
+  - `countWordsInRenderBlock(block: RenderBlock): number`
+  - `countWordsInSection(section: LectureSection): number`
+  - `countWordsInLecture(lecture: LectureTemplate): number`
+  - `estimateReadingMinutes(totalWords: number, wpm = 200): number` - rounds to the nearest minute, with a 1-minute floor, mirroring the spec text.
+  - `lectureReadingMinutes(lecture: LectureTemplate): number` - composes the above.
+  - `sectionReadingMinutes(section: LectureSection): number` - same composition, for the optional per-section estimate in the learning path.
+- Counting rules:
+  - Count only authored section text, not overview, objectives, takeaways, or the answer key appendix. The spec describes "per-lecture reading time, derived from authored section word counts" and the preferred flow keeps the reading estimate next to the lesson body.
+  - For `paragraph`, `bullet_list`, `numbered_list`, and `table` markdown blocks, count whitespace-separated tokens.
+  - For `code_fence` blocks, count code tokens.
+  - For `heading` blocks, count heading text tokens.
+  - For component blocks, count words in user-visible text fields only: `body`, `definition`, `context`, `prompt`, `scenario`, `task`, `question`, `walkthrough`, `solution`, `takeaway`, `mistake`, `why_it_fails`, `correction`, `example_before`, `example_after`, `quote`, `attribution`, `content`, `items[].body`, `items[].detail`, `items[].label`, `steps[]`, `hints[]`, `items[]` (for checklist), `items[].prompt` / `items[].answer` for flashcard prompts/answers, etc. Do not include YAML keys, anchor strings, or answer keys (the answer key is already an appendix). Keep the helper simple: skip component blocks whose text is fully internal to the assessment feedback layer (`quiz.answer`, `quiz.explanation`, `practice_task.rubric.expected`, `free_response.guidance`, `question_set.questions[].answer`, `question_set.questions[].feedback`) to avoid double counting with the appendix and to keep the estimate honest.
+  - Aliases should not be counted as separate words; they belong to the term and are short.
+- Add `tests/lecture-template/reading-time.test.ts` with cases for:
+  - empty lecture, single short paragraph, mixed blocks and components;
+  - rounding at 0.5 minute boundaries;
+  - one-minute floor for non-zero lectures;
+  - the spec example: a 2000-word lecture yields `~10 min read` (200 wpm, round to nearest minute).
+- The helper must be pure and deterministic; the same lecture must yield the same value at build time and during review-package assembly.
+
+### Step 2: Render `ReadingTimeEstimate` on the lecture header and collection landing
+
+- Update `src/components/lecture-kit/LectureHeader.tsx`:
+  - Add an optional `readingMinutes?: number` prop.
+  - If provided, render an extra metadata row `<dt>Reading time</dt><dd>~{N} min read</dd>` after the existing `Duration` row. The tilde signals approximation per spec.
+  - When zero authored words, omit the row entirely.
+- Update `src/components/lecture-kit/LecturePage.tsx`:
+  - Compute `const readingMinutes = lectureReadingMinutes(lecture)` once at render.
+  - Pass it to `<LectureHeader readingMinutes={readingMinutes} />`.
+- Update `src/components/lecture-kit/LearningPathNavigation.tsx`:
+  - Accept an optional `sectionMinutes?: Record<string, number>` map of section anchor to minutes.
+  - In `NavigationList`, when an item has a `key` that matches a section anchor and a non-zero minutes value, render `<span className="nav-section-minutes">~{N} min</span>` after the label.
+  - Compute the map in `LecturePage` and pass it down; do not let the navigation recompute word counts.
+- Update `src/components/lecture-kit/CollectionLanding.tsx`:
+  - Compute the total reading minutes across all valid lectures, with a small helper `sumLectureReadingMinutes(lectures)` in the same `readingTime.ts` file.
+  - If non-zero, append a `<dt>Reading time</dt><dd>~{N} min read</dd>` row to the compact `collection-summary` metadata area, immediately after the duration. Do not insert a new card; the spec says inline metadata.
+- Update `src/app/globals.css`:
+  - Add `.lecture-header .metadata-grid` rule to keep the new row aligned with the existing four-up grid.
+  - Add `.nav-section-minutes { color: var(--muted); margin-left: 6px; font-size: 0.78rem; }`.
+  - Add print rule to keep `~N min read` visible (it is already plain text, but make the spec's print requirement explicit).
+- Update or add a test that:
+  - A lecture with no authored sections renders no `Reading time` row.
+  - A lecture with a 600-word body renders `~3 min read` (600 / 200 = 3, no rounding).
+  - The collection landing sums across all valid lectures and renders the same string.
+
+### Step 3: Add `GlossaryIndex` and a collection-level glossary surface
+
+- Add `src/lib/lecture-template/glossaryIndex.ts` exporting:
+  - `GlossaryEntry { term: string; definition: string; context?: string; aliases: string[]; lectureSlug?: string; sectionAnchor: string; }`
+  - `collectLectureGlossary(lecture: LectureTemplate, lectureSlug?: string): GlossaryEntry[]`
+  - `collectCollectionGlossary(validation: CollectionValidationResult): GlossaryEntry[]`
+  - `dedupeAndSort(entries: GlossaryEntry[]): GlossaryEntry[]` - sorts alphabetically by `term.toLowerCase()`, folds aliases into a single entry when the same term appears multiple times, prefers the first non-empty definition, and keeps all source lecture/section anchors for cross-lecture references.
+- Add `src/components/lecture-kit/GlossaryIndex.tsx` (server component):
+  - Props: `entries: GlossaryEntry[]`, `id?: string`, `title?: string` (default `Glossary`), `scope?: "lecture" | "collection"` (default `lecture`).
+  - If `entries` is empty, render `null`. The spec says authors do not maintain the index; an empty index should be invisible.
+  - Renders a `<section className="glossary-index lecture-panel" aria-labelledby={headingId}>` containing:
+    - a `<details>` (the surface) with `<summary>Glossary · N terms</summary>` on mobile (default closed) and an expanded `<ol class="glossary-index-list">` on desktop using CSS only. The `details` is the print-safe default; desktop overrides via CSS to start expanded. The same node serves both viewports.
+    - The list uses semantic markup. Each item is `<li class="glossary-index-item"><a class="glossary-index-term" href="#{anchor}">{term}</a><p class="glossary-index-definition">{definition}</p></li>` where the link target is the section anchor on the lecture page. For collection-scope entries that appear in multiple lectures, render one link per occurrence with the lecture title as supplementary text.
+    - Term is bold, definition is muted and one-line truncated in CSS with `text-overflow: ellipsis` and the full text in `title`.
+- Add `src/components/lecture-kit/CollectionGlossaryIndex.tsx` that wraps `GlossaryIndex` with `scope="collection"` and an `aria-label="Course glossary"`.
+- Add tests:
+  - `tests/lecture-template/glossary-index.test.tsx` - renders nothing for a lecture with no `glossary_term` components; renders one entry per term for a lecture with multiple; sorts alphabetically; folds aliases into the entry; renders the correct anchor.
+  - `tests/lecture-template/collection-glossary.test.tsx` - aggregates across multiple valid lectures; the same term in two lectures yields two anchors; an invalid lecture does not contribute.
+  - `tests/lecture-template/glossary-index-helper.test.ts` - pure helper tests for `collectLectureGlossary` and `collectCollectionGlossary`, including alias folding and ordering.
+- Update `src/app/globals.css`:
+  - `.glossary-index .glossary-index-list` uses a three-column grid on wide viewports and stacks on narrow.
+  - `.glossary-index summary` shows the count and chevron using the same chevron pattern as the learning-path mobile disclosure.
+  - Print rule: include the glossary index in the printed handout after the lecture body, before the answer key. On the collection landing, the collection glossary index appears below the assessment index disclosure.
+
+### Step 4: Place the per-lecture and collection glossary indices
+
+- Update `src/components/lecture-kit/LecturePage.tsx`:
+  - Compute `const glossaryEntries = collectLectureGlossary(lecture, lectureId)` using a slug derived from the template path.
+  - If non-empty, render `<GlossaryIndex entries={glossaryEntries} id="glossary-index" scope="lecture" />` between the key takeaways and `<AnswerKeyAppendix lecture={lecture} />`, matching the spec's preferred flow.
+- Update `src/components/lecture-kit/CollectionLanding.tsx`:
+  - Compute `const glossaryEntries = collectCollectionGlossary(validation)` and render `<CollectionGlossaryIndex entries={glossaryEntries} />` below the assessment disclosure, matching the spec's preferred order.
+- Update tests:
+  - Confirm the lecture glossary index does not appear when there are zero glossary terms.
+  - Confirm the collection glossary index aggregates across valid lectures and omits invalid ones.
+
+### Step 5: Refactor the assessment index into a dedicated `AssessmentIndexDisclosure`
+
+- Add `src/components/lecture-kit/AssessmentIndexDisclosure.tsx` (server component):
+  - Props: `assessments: AssessmentSummary[]`, `id?: string` (default `assessment-index`).
+  - Always renders a `<details class="assessment-index-disclosure">` (preserves the existing DOM class so 014's tests and CSS hooks stay valid).
+  - The `<summary>` reads `Show N assessments` when closed and `Hide N assessments` when open, derived from `assessments.length`. Singular form: `Show 1 assessment` / `Hide 1 assessment`.
+  - The body is the same grouped-by-lecture list that `CollectionLanding` already produces. Move the grouping helper out of `CollectionLanding.tsx` into this component file as an internal helper.
+  - On desktop, the details should default to `open`. The simplest implementation is a CSS rule that adds `open` to `.assessment-index-disclosure` at the desktop breakpoint. This stays a single source of truth (the details element), keeps keyboard and print behavior correct, and avoids hydration mismatch.
+- Update `src/components/lecture-kit/CollectionLanding.tsx`:
+  - Remove the inline `<details class="assessment-index-disclosure">` block and replace it with `<AssessmentIndexDisclosure assessments={assessments} id="assessment-index" />`.
+  - Reorder so that the assessment disclosure appears below the lecture list (already the case) and the glossary index appears below it.
+- Update tests:
+  - Update `tests/lecture-template/assessment-index-disclosure.test.tsx` to assert the new toggle label and DOM. Keep the existing DOM class so the existing CSS hooks keep working.
+  - Add a new test that the disclosure label includes the count and uses singular/plural correctly.
+  - Add a CSS regression test that confirms `details.assessment-index-disclosure` carries `open` at the desktop breakpoint (or that an open attribute is added by the CSS via a `:not([open])` rule plus a sibling rule - prefer the `details[open]` default plus a `@media (min-width: 768px) .assessment-index-disclosure { open: true; }`-style approach if supported; otherwise default to `open` in the markup and rely on the mobile override).
+
+### Step 6: Tighten `ResumePrompt` against the 015 spec
+
+- The current `src/components/lecture-kit/progress/ResumePrompt.tsx` is too wide (it includes a `Dismiss` button) and is placed inside the progress bar. The 015 spec wants:
+  - "Compact banner directly below the lecture header, above progress and the learning-path nav."
+  - "Single primary button, no card border; uses a divider row."
+  - "Dismissal is per-session (sessionStorage), not persistent. A reload re-shows the prompt if the section is still incomplete."
+  - "Hidden on print." (Already true via `.resume-progress-prompt { display: none }` in print CSS, but verify.)
+- Move the render call:
+  - Update `src/components/lecture-kit/progress/LectureProgressBar.tsx` to remove the `<ResumePrompt />` import and render call. The progress bar's footer now only contains the `Reset progress` button.
+  - Update `src/components/lecture-kit/LecturePage.tsx` to render `<ResumePrompt />` directly under the `LectureHeader` and `<LectureProgressBar />` block but above the `CollectionTopNav` and the `lecture-layout` div, so the prompt sits between progress and the learning path. The spec asks for "below the lecture header, above progress and the learning-path nav"; the closest accurate placement is between the progress bar and the `CollectionTopNav` because the progress bar is part of the header band today, but a stricter reading places the prompt above the progress bar. Implementers should consult the spec UX notes and place it immediately after the `LectureHeader` and before the `LectureProgressBar`, so the prompt appears before the progress bar. Update the test to assert this exact order: `LectureHeader > ResumePrompt > LectureProgressBar > CollectionTopNav > lecture-layout > LectureNavigation`.
+- Change the markup:
+  - Replace the card-style `<div className="resume-progress-prompt" role="status">` with a divider-row `<aside className="resume-prompt" aria-label="Resume lecture">` (or `<section>` per the spec, but `<aside>` is the better semantic role for a tangential affordance). The prompt uses a row layout with the message and a single primary link/button.
+  - Drop the `Dismiss` button entirely. The spec's "dismissible per session" is implemented by clicking anywhere on the prompt (the message and the button are part of the same `details`-like disclosure), but a simpler model is to keep one button: the button label is `Continue from <Section title>` and the action jumps to the section. The spec says "Single line: `Continue from <Section title>` plus a primary action." A secondary "Dismiss" button is not desired. Dismissing therefore happens implicitly on click (which also navigates). For accessibility, add a separate, but compact, secondary `Dismiss for this session` link button at the end of the row, styled as plain text. The 015 spec prioritizes the single primary action; the dismiss is allowed when it does not crowd the prompt. If implementation can keep just the primary, do so; the fallback is a `Dismiss` link.
+  - Use a real `<a href="#{section.anchor}">` for the primary action so the prompt works without JavaScript. The `<a>` is the primary, the dismiss is a button.
+- Change the dismiss path:
+  - Replace the `useState`-backed `resumeDismissed` flag in `ProgressProvider` with a per-session flag stored in `sessionStorage` under a stable key, e.g. `lecture-resume-dismissed:{storageKey}`. The provider still exposes `dismissResumePrompt()` and `resumeTarget`; only the backing store changes.
+  - On mount, read the session flag. On `dismissResumePrompt()`, write `1` to that key. A page reload reads the same key, so the prompt re-shows when the section is still incomplete (per spec). When the user closes the tab, the key is cleared by the browser.
+  - When `resumeTarget` becomes undefined (lecture 100% complete, or all sections complete), the dismiss flag is effectively dead - the prompt is not rendered. The next visit to the lecture should still re-show the prompt for a new section, which sessionStorage guarantees because the key is the same for the lecture.
+- Update CSS:
+  - Add `.resume-prompt` divider-row styles (border-top, border-bottom, padding, 44px min-height on touch).
+  - Hide `.resume-prompt` in `@media print` (already true for `.resume-progress-prompt`; rename the class and add a guard so the new class is also hidden).
+  - Honor `prefers-reduced-motion: reduce` (no transitions).
+- Update tests:
+  - Add a test in `tests/lecture-template/resume-prompt.test.tsx` that verifies the prompt renders between the header and the progress bar, contains exactly one primary link, and that clicking the link (or pressing Enter on it) jumps to the section and dismisses the prompt for the rest of the session.
+  - Add a test for `sessionStorage` behavior: dismissing writes to `sessionStorage`; a remount within the same session does not re-show the prompt; the prompt becomes visible again when the section is still incomplete and the page reloads (simulate by clearing React state and reloading the same storage).
+  - Update `tests/lecture-template/lecture-components.test.tsx` to reflect the new class name and the new placement, including the order assertion.
+  - Update `tests/lecture-template/visual-hierarchy.test.tsx` if it asserts specific class names.
+
+### Step 7: CSS, print, and visual polish for the new primitives
+
+- Update `src/app/globals.css`:
+  - Add `.resume-prompt` divider-row styles.
+  - Add `.glossary-index` styles: three-column grid above `900px`, stacked below; the `<details>` summary shows count and chevron; print rule keeps the list expanded and visible.
+  - Add `.assessment-index-disclosure` mobile-only `open: false` default and a desktop-only override that opens it (or set `open` in the markup and use CSS to close on mobile; pick the markup path that is hydration-safe).
+  - Add `.nav-section-minutes` muted metadata style.
+  - Add `.lecture-header .metadata-grid` rule to keep the new `Reading time` row aligned.
+  - Update print rules:
+    - `.resume-prompt` is hidden in print.
+    - `.glossary-index` is visible in print and starts expanded (the spec says "Print: included as an appendix after the lecture, before the answer key"; we are placing it before the answer key on the live page, so print already shows it).
+    - `.assessment-index-disclosure` is visible in print and starts expanded (it already is, but the new label needs to be hidden in print or rendered as a heading).
+  - Add `prefers-reduced-motion` rules where the new components add transitions.
+- Visual check items:
+  - At `390px`: the per-lecture glossary index is reachable; the assessment index disclosure starts closed.
+  - At `768px`: the collection glossary index fits below the assessment index; the assessment index starts open.
+  - At `1280px`: the optional per-section reading minutes in the learning path do not push the section label to a second line on a typical 40-character section title.
+
+### Step 8: Update examples, docs, and the review-package manifest
+
+- Update `examples/component-demo.template.md` to:
+  - Add two more `glossary_term` components so the new index test fixture is non-trivial.
+  - Confirm the example's lecture has authored sections totaling more than 200 words so the reading-time estimate is non-zero and visible in the lecture header.
+- Update `README.md` and `SKILL.md`:
+  - Document the new `ResumePrompt` placement, the `~N min read` reading estimate, the auto-generated glossary index, and the assessment index disclosure.
+  - Document the new render-time data being deterministic for review packages.
+  - Add a small agent-guidance note that these primitives compose existing data and do not require any authoring changes.
+- Update the review-package worksheet (`src/lib/lecture-template/reviewPackage.ts`) to:
+  - Include the reading-time estimate and the glossary index in the per-lecture worksheet summary, identical to the rendered page.
+  - Include the collection-level glossary index in the collection summary.
+  - Do not include the per-lecture progress prompt; the prompt is per-session and is not part of the static handout.
+- No new CLI commands are required. `npm run validate` and `npm run package:review` should still pass without changes.
+
+### Step 9: Verification and screenshot evidence
+
+- Run focused automated tests during implementation:
+  - `npm run test -- tests/lecture-template/reading-time.test.ts`
+  - `npm run test -- tests/lecture-template/glossary-index.test.tsx`
+  - `npm run test -- tests/lecture-template/collection-glossary.test.tsx`
+  - `npm run test -- tests/lecture-template/glossary-index-helper.test.ts`
+  - `npm run test -- tests/lecture-template/assessment-index-disclosure.test.tsx`
+  - `npm run test -- tests/lecture-template/resume-prompt.test.tsx`
+  - `npm run test -- tests/lecture-template/lecture-components.test.tsx`
+  - `npm run test -- tests/lecture-template/collection-cta.test.tsx`
+  - `npm run test -- tests/lecture-template/quiz-interaction.test.tsx`
+  - `npm run test -- tests/lecture-template/visual-hierarchy.test.tsx`
+  - `npm run test -- tests/lecture-template/progress-provider.test.tsx`
+  - `npm run test -- tests/lecture-template/review-package.test.ts`
+  - `npm run test -- tests/lecture-template/collection.test.ts`
+- Run broad verification:
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run validate`
+  - `npm run build`
+  - `npm run package:review`
+- Add manual/browser verification using the existing `examples/multi-lecture/` and `examples/component-demo.template.md` fixtures:
+  - collection landing at 390px, 768px, and 1280px showing the new glossary index and the assessment index disclosure;
+  - short lecture route showing the new lecture header reading-time row and the moved resume prompt;
+  - long/component-heavy lecture route showing the per-lecture glossary index and the per-section minutes in the learning path;
+  - mobile assessment interaction showing the assessment disclosure starts closed and opens on tap;
+  - quiz selection → check feedback remains identical to 014;
+  - print preview of a lecture showing the resume prompt hidden, the glossary index visible, the answer key appendix visible.
+- Use a browser check such as `document.documentElement.scrollWidth <= document.documentElement.clientWidth` at each viewport.
+
+## Data Model, API, Persistence, Event, Or Domain Changes
+
+- Template schema: no changes.
+- Parser, validator, renderMarkdown: no changes expected. The reading-time helper is a pure function over the already-parsed `RenderBlock` tree.
+- Persistence: one new `sessionStorage` key per lecture to back the resume-prompt dismiss flag, scoped as `lecture-resume-dismissed:{storageKey}`. No new `localStorage` key. The review package and `npm run package:review` static export are unaffected because sessionStorage is per browser session only and is not serialized into the static build.
+- Component API changes:
+  - `LectureHeader` adds an optional `readingMinutes` prop.
+  - `LearningPathNavigation` adds an optional `sectionMinutes` map.
+  - `CollectionLanding` no longer renders the assessment disclosure inline; it delegates to `AssessmentIndexDisclosure`.
+  - `LecturePage` renders `ResumePrompt` directly (no longer inside `LectureProgressBar`).
+  - `ProgressProvider` swaps the in-memory `resumeDismissed` state for a `sessionStorage`-backed flag with the same external contract.
+- External services: none.
+- Runtime network dependencies: none.
+- Static export and review package behavior: must remain compatible. Reading time and glossary index are derived at render time and serialized into the static HTML. The review-package worksheet must list the same values.
+
+## Test Plan
+
+- Helper tests (pure, no DOM):
+  - `readingTime` rounds, floors at 1 minute, ignores overview/objectives/takeaways, ignores assessment feedback text.
+  - `collectLectureGlossary` finds every `glossary_term` component, sorts alphabetically, and folds aliases.
+  - `collectCollectionGlossary` aggregates across valid lectures and skips invalid ones.
+  - `dedupeAndSort` produces stable output for the same input.
+- Component tests:
+  - `GlossaryIndex` renders nothing for an empty entry list, renders one row per term, shows a `<details>` with a count summary, and links to the right anchor.
+  - `CollectionGlossaryIndex` aggregates across multiple lectures, includes lecture titles for cross-lecture terms, and uses the same component.
+  - `AssessmentIndexDisclosure` renders the correct `Show N assessments` / `Hide N assessments` label, supports the existing `.assessment-index-disclosure` class, and groups by lecture.
+  - `ResumePrompt` renders a single primary action, the message names the section, the dismiss is per-session, and the prompt is hidden in print.
+- Route and integration tests:
+  - `LecturePage` in collection mode renders `ResumePrompt` after the header, before the progress bar, then the top collection nav, then the learning path. The order is asserted.
+  - `CollectionLanding` renders `CollectionPrimaryAction`, the assessment disclosure, and the collection glossary index in the spec's preferred order.
+  - `examples/multi-lecture/` fixture has authored `glossary_term` components and at least one lecture with enough text to produce a non-zero reading-time estimate.
+- Visual/regression checks:
+  - No horizontal overflow at 390px, 768px, and 1280px.
+  - Per-section minutes in the learning path do not push the section label to a second line on a typical 40-character title at 1280px.
+  - The glossary index renders as a 3-column grid above 900px, stacked below.
+  - The assessment disclosure is closed on mobile and open on desktop.
+  - The resume prompt is hidden in print.
+  - Print handout includes the reading-time estimate, the per-lecture glossary index, and the answer key appendix.
+
+## Risks, Assumptions, And Open Questions
+
+- The exact algorithm for "authored section word counts" is not specified for component blocks. The plan above proposes a conservative counting rule that ignores assessment feedback text to avoid double counting with the answer key appendix. Implementers should call this out in the PR description and update tests if a different rule is preferred.
+- The reading-time helper is render-time, not build-time. Next.js static export (`npm run build`) will bake the value into the static HTML, so the static export and the review package will match. If a future build pipeline wants to compute reading time at build time and inject it as a constant, that is a non-goal for 015 and can be deferred.
+- The new `sessionStorage` flag means the resume prompt behaves differently between a page reload (re-shows) and a tab close/reopen (re-shows, since `sessionStorage` is per tab session). This matches the spec. A subtle consequence is that the prompt is not "remembered" across tabs; the spec accepts this.
+- The "Default open on desktop" plan for the assessment disclosure uses a CSS approach. If the implementer prefers a server-rendered `open` attribute and a CSS rule that closes it on mobile, the tests must not assert the `open` attribute on the server in a way that conflicts with the responsive default. Pick one path and pin it in tests.
+- The per-section minutes in the learning path can crowd the section label on long titles. The spec says "Optional per-section estimate in the learning-path nav (e.g. `3 min`), if it does not crowd the section label." The CSS rule should ellipsize the label first and never the minutes.
+- A glossary term that appears in two different lectures with different definitions is rare but possible. The plan folds them into one row with both anchors. If the same term has two different definitions, prefer the first and note the second in `title`; this is documented in the helper test.
+- The spec lists "Above any instructor notes" in the assessment index disclosure description, but instructor notes are authored inside lectures, not on the collection landing. The collection landing therefore renders the assessment disclosure below the lecture list without an instructor notes band. The spec line about instructor notes applies if a future collection-level instructor note is added; the plan handles the current state and is forward-compatible.
+- Browser screenshot verification may need a dev server. If the repo does not already include Playwright, prefer manual browser checks or a lightweight script rather than adding a heavy dependency.
+- Existing 014 tests use the class `.resume-progress-prompt`. After B1, the new class is `.resume-prompt` (or kept as the old class for compatibility - decide and document). The CSS migration is part of Step 6.
+- The spec is a sibling of 014 and explicitly defers P0 items to 014. If a previous 014 task did not land (for example, the `CollectionPrimaryAction` may need an `aria-label` that includes the target lecture title per 015 A1 accessibility rules), the implementer should fold that small refinement into the relevant B1-B4 step rather than creating a separate task. The plan does not list 014 follow-ups as separate tasks; this is a deliberate choice to keep tasks small and the spec 015 self-contained.

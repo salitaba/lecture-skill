@@ -8,18 +8,25 @@ export function ResumePrompt() {
   if (!resumeTarget) return null;
 
   return (
-    <div className="resume-progress-prompt" role="status">
+    <aside className="resume-prompt" aria-label="Resume lecture">
       <p>
-        Resume with <strong>{resumeTarget.title ?? resumeTarget.anchor}</strong>.
+        Continue from <strong>{resumeTarget.title ?? resumeTarget.anchor}</strong>
       </p>
-      <div className="resume-progress-actions">
-        <button type="button" onClick={jumpToResumeTarget}>
-          Jump to section
-        </button>
-        <button type="button" className="resume-dismiss-button" onClick={dismissResumePrompt}>
+      <div className="resume-prompt-actions">
+        <a
+          className="resume-prompt-action"
+          href={`#${resumeTarget.anchor}`}
+          onClick={(event) => {
+            event.preventDefault();
+            jumpToResumeTarget();
+          }}
+        >
+          Continue reading
+        </a>
+        <button type="button" className="resume-prompt-dismiss" onClick={dismissResumePrompt}>
           Dismiss
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

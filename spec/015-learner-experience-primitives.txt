@@ -1,0 +1,491 @@
+Feature: Learner Experience Primitives
+
+Authors: product manager, senior UI/UX designer.
+Relationship to prior work: layered on top of `spec/014-senior-ui-ux-polish.txt`, which ships the page-level UI polish (collection CTA, lecture navigation wiring, active section state, selectable quiz). This spec is a sibling that defines the cross-cutting helpers and a small set of new page-level primitives that complete the learner journey. Where 014 already defines a primitive, 015 defers to 014 and references it; 015 is self-contained for new work and consolidates the P0/P1 list for plan generation.
+
+## Product Summary
+
+The Lecture Site Engine has a mature component vocabulary (22 `lecture-component` types) and a clean authoring model. The remaining gap is not "more component types." It is the small set of page-level primitives and cross-cutting helpers that make a rendered course feel like a designed learning product instead of a stack of equal-weight cards.
+
+This spec bundles two priority tiers:
+
+- P0: page-level primitives that are visible to every learner and either missing or under-built today.
+- P1: cross-cutting helpers that turn authored content into a navigable, paced learning surface.
+
+Every primitive in this spec either composes data the engine already has (progress, glossary terms, authored sections, assessments) or upgrades an existing component's interaction model. None of them require a new `lecture-component` type, a new authoring field, a new dependency, or a breaking change.
+
+The primary product outcome is: a learner opening a collection, a lecture, or a long section can answer three questions in under five seconds — *what is this, where am I, what do I do next* — without scrolling, hovering, or guessing.
+
+## Product Outcome
+
+Learners should experience the rendered course as a guided, paced, navigable learning path:
+
+- The collection landing answers *what is this course, how long is it, and what should I do next?* in the first viewport.
+- Long lectures stay navigable because the active section is always visible and resumable.
+- Quizzes feel like practice with feedback, not reveal cards.
+- Resuming returns the learner to the exact section they left, not just the lecture.
+- Reading time is honest, visible, and updated as sections complete.
+- Vocabulary and assessment moments are findable as indexes, not buried in prose.
+- Mobile reading is calm: actions are reachable, chrome is compact, and content arrives first.
+
+Educators and reviewers should see authoring artifacts (glossary terms, assessments, instructor notes) surface as discoverable indexes in the rendered page and the review package, with no extra authoring work.
+
+## Users And Jobs
+
+Primary users:
+
+- Learners reading a local or static lecture collection on desktop or mobile.
+- Technical educators previewing course flow and printing handouts.
+- Reviewers checking handoff readiness.
+- AI coding agents using the rendered output as a quality target.
+
+Jobs to be done:
+
+- As a learner, I want one obvious action on the collection page so I never wonder whether to start or resume.
+- As a learner, I want to resume to the exact section I left, not the top of the lecture.
+- As a learner, I want long lectures to show me which section I am reading as I scroll.
+- As a learner, I want quizzes to feel like real practice: I select, I check, I learn.
+- As a learner, I want to know how long a lecture will take before I commit.
+- As a learner, I want vocabulary I encountered earlier to be findable later.
+- As a learner, I want assessments visible without dominating the page that is supposed to start my course.
+- As an educator, I want every authored artifact to surface as an index in the rendered output, not require extra authoring.
+- As a reviewer, I want the collection page to stay scannable without losing authoring signals.
+
+## Problem
+
+The current site is functional, but the learner journey has visible friction that the component vocabulary alone cannot fix:
+
+- The collection landing has no single primary action; lecture titles are links, but there is no `Start course` / `Resume course` / `Continue course` affordance.
+- Resume targets are coarse: a learner returns to a lecture, not a section.
+- Lecture navigation is implemented as a component but is not rendered on collection-mode lecture pages.
+- The learning-path navigation is a static card; it does not show the current section as the learner scrolls.
+- The quiz is reveal-only; selecting an option before reveal does nothing.
+- Reading time is fixed at the lecture level and is not shown in a consistent place.
+- Glossary terms are rendered in place but never collected into an index, so learners cannot revisit them.
+- The assessment index on the collection landing can crowd out the lecture list and the primary action, especially on mobile.
+- Section completion controls are small and easy to miss on touch devices.
+
+Each gap is small. Together they make the course feel like a stack of boxes rather than a guided product.
+
+## Goals
+
+P0 — page-level primitives:
+
+- G1. Ship a `CollectionPrimaryAction` that derives a `Start`, `Resume`, or `Continue` label and target from local progress and renders as the dominant action on the collection landing.
+- G2. Wire the existing `LectureNavigation` into `LecturePage` in collection mode, with a compact top affordance and a full bottom affordance.
+- G3. Add active-section state to `LearningPathNavigation` for long lectures, using `aria-current="location"` and a non-color cue.
+- G4. Upgrade `Quiz` to a `SelectableQuiz` that supports option selection, a `Check answer` action, and explicit feedback (correct/expected/explanation) without implying grading.
+
+P1 — cross-cutting helpers:
+
+- G5. Add a `ResumePrompt` that appears on a lecture page when there is a known resume target deeper in the lecture.
+- G6. Add a `ReadingTimeEstimate` derived from authored section word counts, rendered next to lecture metadata and (optionally) in the learning-path nav.
+- G7. Add an auto-generated `GlossaryIndex` built from authored `glossary_term` components, with a collapsible surface and anchor links.
+- G8. Add an `AssessmentIndexDisclosure` that keeps the assessment index accessible but defers it on mobile and below the lecture list on desktop.
+
+## Non-Goals
+
+- No new `lecture-component` types. Primitives in this spec compose or upgrade existing data and components.
+- No new authoring schema, no new frontmatter fields, no new component YAML.
+- No new runtime dependency. Reading time and glossary index are derived in the build.
+- No learner accounts, authentication, sync, or server-side state.
+- No grading, scoring, mastery tracking, or assessment-linked progress rules.
+- No analytics, dashboards, or educator reporting.
+- No AI-generated feedback at runtime.
+- No remote fetching of any kind during render.
+- No breaking change to existing valid lecture templates, single-lecture mode, collection mode, or the review package.
+- No new keyboard shortcut that conflicts with browser, OS, or screen reader defaults.
+
+## Product Decisions
+
+- Resume is best-effort local. A wrong-but-reasonable resume target is better than blocking the learner. Fall back to the top of the lecture.
+- Reading time is approximate and labelled as such (`~12 min read`). It is not a contract.
+- The glossary index is auto-generated. Authors do not maintain it.
+- The assessment index is closed by default on mobile and below the lecture list on desktop, but is always reachable in one tap or one scroll.
+- Active section state uses IntersectionObserver on the client. The first authored section is rendered as active on the server so there is no flash of unstyled state.
+- Quiz selection state is local-only. It is never persisted, exported, or synced.
+- The collection CTA always links to a valid route. If progress is corrupted or empty, fall back to `Start course` → first valid lecture.
+- All primitives are independent. Any one can ship without the others.
+
+## UX Designer Notes
+
+Treat the rendered course as one calm, dense workspace. The page is not a marketing landing page and not a settings dashboard. The content is the strongest element; everything else either supports reading or orients the learner.
+
+Experience principles:
+
+- One primary action per surface. The collection page has one CTA. The lecture page has one resume target when applicable. The quiz has one check action.
+- Hierarchy first, decoration last. Use typography, spacing, and grouping before adding more borders.
+- Mobile is a first-class reading mode. Stack deliberately; do not just stack desktop cards.
+- Feedback teaches. Quiz feedback explains reasoning, not only right or wrong.
+- Indexes are for finding, not browsing. Collapse them by default on small screens.
+- Reduced motion is respected everywhere: progress transitions, active-section cues, and quiz feedback.
+- All stateful UI degrades to a readable static HTML with the same information.
+
+Visual language:
+
+- Primary CTA uses the strongest surface (filled, full-width on mobile, inline on desktop).
+- Secondary actions use a divider row, not a card.
+- Active section uses a left rule (3px), bold label, and `aria-current="location"`. Color is never the only cue.
+- Quiz selected option uses a 2px ring and a check icon. Feedback uses a calm tint, not red/green shouting.
+- Glossary index uses a compact list with anchor links and a small chevron disclosure.
+- Assessment disclosure uses a single-line button with count, e.g. `Show 7 assessments`.
+
+## Priority
+
+### P0: Page-Level Primitives
+
+#### A1. CollectionPrimaryAction
+
+A single primary action on the collection landing, derived from local progress.
+
+Behavior:
+
+- No known section progress → label `Start course`, target = first valid lecture.
+- A partially complete lecture with a known incomplete section → label `Resume course`, target = first incomplete section anchor in that lecture.
+- Progress exists but no precise target is derivable (corrupted, empty, or all-complete) → label `Continue course` when at least one lecture is incomplete, else `Restart course` → first valid lecture.
+
+Visual:
+
+- Top of `CollectionLanding`, immediately after the title and description.
+- Filled button, full-width on `< 480px`, inline on wider viewports.
+- Above the compact progress summary, above the assessment index, above the lecture list.
+- Lecture count, total duration, and validation pass count appear as compact metadata below the title, secondary to the CTA.
+
+Accessibility:
+
+- Single `<a>` styled as a primary button.
+- Visible focus ring.
+- `aria-label` mirrors the visible label and includes the target lecture title when known.
+- Reduced motion respected (no hover scale).
+
+#### A2. LectureNavigation Wiring
+
+Render the existing `LectureNavigation` in `LecturePage` when collection context is present.
+
+Behavior:
+
+- First lecture: back to course, next lecture.
+- Middle lecture: previous, back to course, next.
+- Last lecture: previous, back to course.
+- Top affordance: compact row directly below the lecture header, only when collection context exists. Contains `Back to course` and `Next lecture` (or `Previous` on the last lecture).
+- Bottom affordance: full `LectureNavigation` after key takeaways and answer key.
+
+Visual:
+
+- Top affordance uses a compact divider row, not a card.
+- Bottom affordance matches the existing `LectureNavigation` styling.
+- 44px minimum tap target height on touch.
+
+Accessibility:
+
+- `<nav>` element with descriptive `aria-label` (`Course navigation`).
+- All actions are normal anchors; no JavaScript required.
+- Visible focus.
+
+#### A3. Active Section State
+
+Make the current section visible in `LearningPathNavigation` as the learner scrolls.
+
+Behavior:
+
+- Client-side `IntersectionObserver` tracks the topmost visible authored section.
+- Server-render the first authored section as active so there is no flash on load.
+- Update active state on scroll with a small debounce; do not cause layout shift.
+- Use `aria-current="location"` on the active anchor.
+- Provide a non-color cue: a left rule plus bold label, with a screen-reader-only `Current` suffix.
+
+Visual:
+
+- Active anchor has a 3px left rule in the accent color and bold label.
+- Inactive anchors are muted but readable.
+- No animation on the rule; respect reduced motion.
+
+Accessibility:
+
+- Anchors remain real links; no scroll-jacking.
+- Active state is announced to assistive tech via `aria-current`.
+- Falls back to a static "you are at the top" state when JavaScript is unavailable.
+
+#### A4. SelectableQuiz
+
+Upgrade `Quiz` to support option selection before reveal and to teach through feedback.
+
+Behavior:
+
+- Learner can select one option by clicking or pressing Enter/Space.
+- Selected option shows a 2px ring and a check icon.
+- Primary action label changes from `Show answer` to `Check answer` when a selection exists.
+- After `Check answer`:
+  - Selected option is marked correct or incorrect.
+  - The expected option is identified with a separate, non-judgmental cue (`Expected answer`).
+  - The explanation is revealed inline.
+- If the learner reveals without selecting, the UI shows the expected option and explanation without scolding.
+- Hidden state is never treated as secure; answers remain in static HTML, source, and review packages.
+
+Visual:
+
+- Calm feedback tint, not red/green shouting.
+- Expected-answer cue uses a left rule, not a fill.
+- Mobile: full-width options, single column.
+- Print: shows the expected option and explanation with a clear label, identical to no-JS fallback.
+
+Accessibility:
+
+- Options are real `<button>` elements with `aria-pressed` or `aria-checked`.
+- Feedback region uses `aria-live="polite"`.
+- Keyboard navigation between options with arrow keys.
+- Visible focus on the active option.
+
+### P1: Cross-Cutting Helpers
+
+#### B1. ResumePrompt
+
+A small, dismissible prompt on a lecture page that points to the first incomplete section.
+
+Behavior:
+
+- Appears on a lecture page when the learner has progress in the current lecture and there is at least one incomplete authored section.
+- Single line: `Continue from <Section title>` plus a primary action.
+- Dismissal is per-session (sessionStorage), not persistent. A reload re-shows the prompt if the section is still incomplete.
+- Hidden on print.
+
+Visual:
+
+- Compact banner directly below the lecture header, above progress and the learning-path nav.
+- Single primary button, no card border; uses a divider row.
+- Reduced motion respected.
+
+Accessibility:
+
+- `<aside>` or `<section>` with `aria-label="Resume lecture"`.
+- Action is a real link with a section anchor.
+- Visible focus.
+
+#### B2. ReadingTimeEstimate
+
+Per-lecture reading time, derived from authored section word counts.
+
+Behavior:
+
+- Estimate = total authored words / 200 wpm, rounded to the nearest minute, with a 1-minute floor.
+- Rendered next to lecture metadata as `~N min read` with a tilde to signal approximation.
+- Optional per-section estimate in the learning-path nav (e.g. `3 min`), if it does not crowd the section label.
+- Updates only on rebuild; this is build-time data, not runtime.
+
+Visual:
+
+- Inline metadata, not a card.
+- Same typographic weight as duration and level.
+- No icon, no progress bar.
+
+Accessibility:
+
+- Plain text. No special ARIA needed.
+
+#### B3. GlossaryIndex
+
+An auto-generated, navigable index of all `glossary_term` components in the current lecture or collection.
+
+Behavior:
+
+- Built at render time from authored `glossary_term` components.
+- Alphabetical by term, with aliases folded in.
+- Each entry links to the term's anchor on the page.
+- Collapsed by default on mobile, expanded by default on desktop.
+- On the collection landing, the index spans the whole collection.
+
+Visual:
+
+- Compact list inside a single surface.
+- Disclosure uses a small chevron; no card border on mobile.
+- Term is bold; definition is muted and one-line truncated with full text on hover/focus.
+- Print: included as an appendix after the lecture, before the answer key.
+
+Accessibility:
+
+- Disclosure is a real `<button>` with `aria-expanded`.
+- List uses semantic `<dl>` or `<ul>` markup.
+- Visible focus on each link.
+
+#### B4. AssessmentIndexDisclosure
+
+A collapsed-by-default surface for the assessment index, designed not to block the start journey.
+
+Behavior:
+
+- Mobile: collapsed by default with a single-line button `Show N assessments` / `Hide N assessments`.
+- Desktop: appears below the lecture list, above any instructor notes; expanded by default, with a disclosure.
+- The index itself is unchanged; only its placement and default state change.
+- Assessment anchors still work directly.
+
+Visual:
+
+- Single-line disclosure button, no card border.
+- Index list uses compact metadata (component type, lecture title) and a one-line prompt.
+- No icons, no badges.
+
+Accessibility:
+
+- Real `<button>` with `aria-expanded` and `aria-controls`.
+- List uses semantic markup.
+- Visible focus.
+
+## Recommended Experience Direction
+
+### Collection Landing
+
+Preferred first-screen order:
+
+1. Eyebrow and course title.
+2. Short description.
+3. Compact metadata: lecture count, duration, reading time, level, audience.
+4. `CollectionPrimaryAction`.
+5. Compact progress summary.
+6. Compact lecture list, with a `View all lectures` anchor if the list is long.
+7. `AssessmentIndexDisclosure` (collapsed on mobile, expanded on desktop, below the list).
+8. `GlossaryIndex` (collapsed on mobile, expanded on desktop, below assessments).
+
+The page reads as a course dashboard, not a report page. Validation and pass/fail badges remain visible but are visually secondary to the primary action.
+
+### Lecture Page
+
+Preferred flow:
+
+1. Lecture title, description, and compact metadata including `~N min read`.
+2. `ResumePrompt` (when applicable, dismissible per session).
+3. `LearningPathNavigation` with active section state.
+4. Overview and objectives.
+5. Authored sections.
+6. Key takeaways.
+7. `GlossaryIndex` for the lecture (collapsed on mobile, expanded on desktop).
+8. Answer key appendix.
+9. `LectureNavigation` (top affordance plus bottom full nav).
+
+`CollectionPrimaryAction` is on the landing, not duplicated here. The lecture page's primary action is the reading itself; resume is a prompt, not a button bar.
+
+### Mobile Reading
+
+- Primary CTA is full-width and above the fold.
+- Disclosure controls use a chevron and 44px tap target.
+- Reading time is inline, not a separate card.
+- The learning-path disclosure is visibly interactive with a chevron and a count: `Learning path · 7 sections`.
+
+### Active Section
+
+Desktop learning path:
+
+- Active anchor has a 3px left rule, bold label, and `aria-current="location"`.
+- Inactive anchors are muted.
+- No color-only cues.
+
+Mobile learning path:
+
+- Same rules, applied inside the disclosure body.
+- The disclosure header is not marked active; the active cue is inside the list.
+
+### Quiz Interaction
+
+Selected:
+
+- 2px ring + check icon.
+- `aria-pressed="true"`.
+
+After check:
+
+- Selected option: tinted background, label `Your answer`.
+- Expected option: left rule, label `Expected answer`.
+- Explanation: revealed inline, polite live region.
+- Print: same content, same labels, no ring.
+
+### Glossary Index
+
+Desktop:
+
+- Three-column grid when width allows, otherwise stacked.
+- Term bold, definition one-line truncated.
+
+Mobile:
+
+- Collapsed disclosure at the top of the lecture content.
+- Expanded list uses the same compact row.
+
+## Accessibility Requirements
+
+- All CTAs, disclosures, and quiz options are keyboard reachable.
+- All interactive elements have a visible focus ring that meets 3:1 contrast.
+- Active navigation state never relies on color alone (left rule + bold + `aria-current`).
+- Disclosure controls use real `<button>` elements with `aria-expanded`.
+- Quiz feedback uses an `aria-live="polite"` region.
+- Reading time is plain text and is included in the printed handout.
+- The `ResumePrompt` is announced as a region with a clear label.
+- Reduced motion is respected for progress transitions, active-section updates, and quiz feedback.
+- Tap targets on touch devices are at least 44px high.
+- No new keyboard shortcut conflicts with browser, OS, or screen reader defaults.
+
+## Responsive Requirements
+
+- 390px: primary CTA visible near the top of the collection page; no horizontal overflow.
+- 390px: lecture page first viewport shows title, resume prompt (if applicable), and a compact progress summary; the learning-path disclosure is closed by default.
+- 768px: collection page fits the CTA, compact progress, and the start of the lecture list without scrolling past the fold.
+- 1280px: side navigation does not overpower the content column; the active section is visible in the learning path.
+- Long quiz options, lecture titles, glossary terms, and URLs wrap inside their containers.
+- Disclosure surfaces do not introduce body-level horizontal overflow at any breakpoint.
+
+## Functional Requirements
+
+- Existing valid lecture templates remain valid.
+- Existing collection routes continue to render from `lectures/`.
+- Single-lecture mode continues to render from the active template path.
+- Static export and review package behavior remain compatible.
+- Local progress storage remains local-only.
+- Resume targeting works without remote state.
+- All primitives degrade to a useful static HTML with the same information when JavaScript is unavailable.
+- No unsafe HTML rendering is introduced.
+- No new runtime network dependency is introduced.
+- The glossary index is deterministic and identical between the rendered page and the review package.
+- Reading time is computed at build time and is identical between the rendered page and the review package.
+
+## Success Metrics / Quality Gates
+
+- On a fresh collection, a learner can identify what the course is and start it in under five seconds.
+- On a partially completed course, a learner can resume to the exact section from the collection page in one click.
+- On any collection lecture, a learner can reach the previous or next lecture without returning to the collection page.
+- In a long lecture, a learner can identify the active section from the learning path at any scroll position.
+- A learner can complete a quiz option, check it, and read the explanation without leaving the lecture page.
+- Reading time is shown for every lecture and is within 20% of the actual reading time for authored material.
+- The glossary index surfaces every authored term and links to the correct anchor.
+- The assessment index is reachable in one tap on mobile and does not crowd the start action on desktop.
+- Screenshots at 390px, 768px, and 1280px show no clipping, overlap, or body-level horizontal overflow.
+- Print output remains useful for instructor review and includes reading time, glossary index, and full quiz answer guidance.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests still pass or are updated for intentional behavior.
+
+## Acceptance Criteria
+
+- The collection landing renders a `CollectionPrimaryAction` whose label is `Start course`, `Resume course`, `Continue course`, or `Restart course` based on local progress, and whose target is a valid route or section anchor.
+- The collection CTA appears above progress, the assessment index, and the lecture list.
+- `LecturePage` in collection mode renders a top compact nav and a bottom full `LectureNavigation` with previous, back, and next as appropriate for the lecture's position.
+- The learning path on long lectures shows an active-section state with a left rule, bold label, and `aria-current="location"`.
+- The first authored section is rendered as active on the server, before any client-side observer runs.
+- A learner can select a quiz option, press `Check answer`, and see their selection labeled, the expected answer labeled, and the explanation revealed.
+- A learner who reveals a quiz without selecting still sees the expected answer and explanation, with no scolding language.
+- A `ResumePrompt` appears on a lecture page when the learner has progress and at least one incomplete section, links to that section, and is dismissible per session.
+- Reading time appears next to lecture metadata and is computed from authored section word counts.
+- The glossary index lists every authored `glossary_term` in the current lecture (and the whole collection on the landing) and links to the correct anchor.
+- The assessment index is collapsed by default on mobile and below the lecture list on desktop, with a disclosure that meets 44px tap target height.
+- All primitives degrade to a useful static HTML when JavaScript is unavailable, and the same content appears in the review package.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests still pass or are updated for intentional behavior.
+- Verification includes browser screenshots for collection landing, short lecture, long/component-heavy lecture, mobile assessment interaction, and quiz selection → check feedback.
+
+## Out Of Scope For 015
+
+The following were considered and intentionally deferred; they are not part of this spec:
+
+- New `lecture-component` types (`prereq_check`, `key_takeaway_card`, `try_it`, `figure`, `poll`).
+- A `review-mode` toggle that exposes `instructor_note` and hidden content in the browser.
+- Per-section learner notes persisted to localStorage.
+- Progress export/import as JSON.
+- Diagram fullscreen, zoom/pan, and download SVG.
+- Time-based progress (estimated remaining reading time as the learner marks sections complete).
+- Multi-device progress sync.
+
+These items remain candidates for a future `spec/016` once 015 is verified and stable.

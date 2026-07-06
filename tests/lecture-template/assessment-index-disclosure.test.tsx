@@ -33,7 +33,7 @@ describe("assessment index disclosure", () => {
       />
     );
 
-    const summary = screen.getByText("Assessment locations for reviewers");
+    const summary = screen.getByText("Show 4 assessments").closest("summary")!;
     const details = summary.closest("details");
     expect(details).toBeInTheDocument();
     expect(details?.tagName).toBe("DETAILS");
@@ -55,7 +55,8 @@ describe("assessment index disclosure", () => {
       />
     );
 
-    expect(screen.getByText("Assessment locations for reviewers")).toBeInTheDocument();
+    expect(screen.getByText("Show 4 assessments")).toBeInTheDocument();
+    expect(screen.getByText("Hide 4 assessments")).toBeInTheDocument();
   });
 
   it("disclosure can be toggled by keyboard", async () => {
@@ -74,7 +75,7 @@ describe("assessment index disclosure", () => {
       />
     );
 
-    const summary = screen.getByText("Assessment locations for reviewers");
+    const summary = screen.getByText("Show 4 assessments").closest("summary")!;
     summary.focus();
     expect(summary).toHaveFocus();
 
@@ -99,7 +100,7 @@ describe("assessment index disclosure", () => {
       />
     );
 
-    const details = screen.getByText("Assessment locations for reviewers").closest("details");
+    const details = screen.getByText("Show 4 assessments").closest("details");
     expect(details).toBeTruthy();
     expect(details!.open).toBe(false);
   });

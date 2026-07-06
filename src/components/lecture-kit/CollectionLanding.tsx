@@ -1,7 +1,11 @@
 import type { CollectionValidationResult, LectureValidationResult } from "@/lib/lecture-template/types";
 import { collectCollectionAssessments } from "@/lib/lecture-template/assessments";
+import { collectCollectionGlossary } from "@/lib/lecture-template/glossaryIndex";
 import { LECTURES_DIR } from "@/lib/lecture-template/readTemplate";
 import { collectionProgressKey, progressIdFromCollectionBase, type ProgressLecture } from "@/lib/lecture-template/progress";
+import { sumLectureReadingMinutes } from "@/lib/lecture-template/readingTime";
+import { AssessmentIndexDisclosure } from "./AssessmentIndexDisclosure";
+import { CollectionGlossaryIndex } from "./CollectionGlossaryIndex";
 import { CollectionProgressBar, CollectionLectureProgress } from "./progress/CollectionProgressBar";
 import { CollectionPrimaryAction } from "./CollectionPrimaryAction";
 import { CollectionProgressProvider } from "./progress/CollectionProgressProvider";
@@ -19,6 +23,9 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
     courseMetadata?.description ??
     `${validation.lectureCount} ${validation.lectureCount === 1 ? "lecture" : "lectures"} in authored order.`;
   const assessments = collectCollectionAssessments(validation);
+  const glossaryEntries = collectCollectionGlossary(validation);
+  const validTemplates = validation.results.filter((result) => result.valid && result.template).map((result) => result.template!);
+  const readingMinutes = sumLectureReadingMinutes(validTemplates);
   const progressLectures: ProgressLecture[] = validation.results
     .filter((result) => result.valid && result.template)
     .map((result) => ({
@@ -37,7 +44,7 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
           <p className="description">{description}</p>
           <p className="collection-summary">
             {validation.lectureCount} {validation.lectureCount === 1 ? "lecture" : "lectures"} • {formatMinutes(totalMinutes)} total
-            • {passingCount} passing
+            {readingMinutes > 0 ? <> • ~{readingMinutes} min read</> : null} • {passingCount} passing
           </p>
           {courseMetadata ? (
             <dl className="lecture-list-meta" aria-label="Course metadata">
@@ -120,64 +127,11 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
           })}
         </ol>
 
-        <details className="assessment-index-disclosure">
-          <summary>Assessment locations for reviewers</summary>
-          {assessments.length > 0 ? (
-            <ol className="assessment-group-list">
-              {groupAssessmentsByLecture(assessments).map(({ lectureTitle, lectureSlug, items }) => (
-                <li key={lectureSlug ?? lectureTitle} className="assessment-group">
-                  <h3 className="assessment-group-title">{lectureTitle}</h3>
-                  <ol className="assessment-group-items">
-                    {items.map((assessment) => (
-                      <li key={`${assessment.lectureSlug}-${assessment.anchor}`}>
-                        <a href={`/lectures/${assessment.lectureSlug}#${assessment.anchor}`} title={assessment.title}>
-                          {truncateTitle(assessment.title)}
-                        </a>
-                        <span className="assessment-group-meta">
-                          {labelForAssessment(assessment.type)}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p>No assessments found in valid lectures.</p>
-          )}
-        </details>
+        <AssessmentIndexDisclosure assessments={assessments} id="assessment-index" />
+        <CollectionGlossaryIndex entries={glossaryEntries} />
       </section>
     </CollectionProgressProvider>
   );
-}
-
-function labelForAssessment(type: string): string {
-  if (type === "quiz") return "Quiz";
-  if (type === "question_set") return "Question set";
-  if (type === "free_response") return "Free response";
-  return "Practice task";
-}
-
-function truncateTitle(title: string): string {
-  return title.length > 60 ? title.slice(0, 57) + "\u2026" : title;
-}
-
-interface AssessmentGroup {
-  lectureTitle: string;
-  lectureSlug: string | undefined;
-  items: ReturnType<typeof collectCollectionAssessments>;
-}
-
-function groupAssessmentsByLecture(assessments: ReturnType<typeof collectCollectionAssessments>): AssessmentGroup[] {
-  const map = new Map<string, AssessmentGroup>();
-  for (const assessment of assessments) {
-    const key = assessment.lectureSlug ?? assessment.lectureTitle ?? "unknown";
-    if (!map.has(key)) {
-      map.set(key, { lectureTitle: assessment.lectureTitle ?? key, lectureSlug: assessment.lectureSlug, items: [] });
-    }
-    map.get(key)!.items.push(assessment);
-  }
-  return Array.from(map.values());
 }
 
 function parseDurationMinutes(result: LectureValidationResult): number {

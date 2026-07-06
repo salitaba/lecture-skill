@@ -697,7 +697,7 @@ describe("lecture component UX contracts", () => {
       />
     );
 
-    expect(html).toContain("Assessment locations for reviewers");
+    expect(html).toContain("Show 4 assessments");
     expect(html).toContain("Course progress");
     expect(html).toContain("0 of 7 sections completed (0%)");
     expect(html).toContain("Progress unavailable until this lecture validates.");

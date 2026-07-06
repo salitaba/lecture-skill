@@ -1,7 +1,6 @@
 "use client";
 
 import { useProgress } from "./ProgressProvider";
-import { ResumePrompt } from "./ResumePrompt";
 
 const milestones = [25, 50, 75, 100];
 
@@ -50,7 +49,6 @@ export function LectureProgressBar() {
       </div>
 
       <div className="lecture-progress-footer">
-        <ResumePrompt />
         <button type="button" className="progress-reset-button" onClick={onReset} disabled={totalSections === 0}>
           Reset progress
         </button>

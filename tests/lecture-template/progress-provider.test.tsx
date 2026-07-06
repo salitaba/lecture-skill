@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LectureProgressBar } from "../../src/components/lecture-kit/progress/LectureProgressBar";
 import { ProgressLiveRegion } from "../../src/components/lecture-kit/progress/ProgressLiveRegion";
 import { ProgressProvider, useProgress } from "../../src/components/lecture-kit/progress/ProgressProvider";
+import { ResumePrompt } from "../../src/components/lecture-kit/progress/ResumePrompt";
 import { SectionCompletionToggle } from "../../src/components/lecture-kit/progress/SectionCompletionToggle";
 
 const sections = [
@@ -145,15 +146,23 @@ describe("ProgressProvider", () => {
     document.body.innerHTML = '<section id="second-topic"></section>';
     vi.spyOn(document, "getElementById").mockReturnValue({ scrollIntoView } as unknown as HTMLElement);
 
-    renderProgress();
+    render(
+      <ProgressProvider storageKey={storageKey} sections={sections}>
+        <ResumePrompt />
+        <LectureProgressBar />
+        <SectionCompletionToggle anchor="first-topic" title="First Topic" />
+        <SectionCompletionToggle anchor="second-topic" title="Second Topic" />
+        <ProgressLiveRegion />
+      </ProgressProvider>
+    );
 
-    await waitFor(() => expect(screen.getByText(/Resume with/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Continue from/)).toBeInTheDocument());
     expect(screen.getByText("Second Topic")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Jump to section" }));
+    fireEvent.click(screen.getByRole("link", { name: "Continue reading" }));
 
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
-    expect(screen.queryByText(/Resume with/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Continue from/)).not.toBeInTheDocument();
   });
 });
 

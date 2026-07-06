@@ -1,6 +1,14 @@
 import type { LectureMetadata } from "@/lib/lecture-template/types";
 
-export function LectureHeader({ metadata, sectionCount }: { metadata: LectureMetadata; sectionCount: number }) {
+export function LectureHeader({
+  metadata,
+  sectionCount,
+  readingMinutes
+}: {
+  metadata: LectureMetadata;
+  sectionCount: number;
+  readingMinutes?: number;
+}) {
   return (
     <header className="lecture-header">
       <p className="eyebrow">Lecture</p>
@@ -15,6 +23,12 @@ export function LectureHeader({ metadata, sectionCount }: { metadata: LectureMet
           <dt>Duration</dt>
           <dd>{metadata.duration}</dd>
         </div>
+        {readingMinutes ? (
+          <div>
+            <dt>Reading time</dt>
+            <dd>~{readingMinutes} min read</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Level</dt>
           <dd>{metadata.level}</dd>

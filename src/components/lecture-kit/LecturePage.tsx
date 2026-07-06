@@ -1,16 +1,20 @@
 import { AnswerKeyAppendix } from "@/components/lecture-kit/AnswerKeyAppendix";
+import { GlossaryIndex } from "@/components/lecture-kit/GlossaryIndex";
 import { LectureHeader } from "@/components/lecture-kit/LectureHeader";
 import { LectureNavigation, type NavTarget } from "@/components/lecture-kit/LectureNavigation";
 import { PageShell } from "@/components/lecture-kit/PageShell";
 import { RenderBlocks, SectionRenderer } from "@/components/lecture-kit/SectionRenderer";
 import { SectionNavigation } from "@/components/lecture-kit/SectionNavigation";
+import { collectLectureGlossary } from "@/lib/lecture-template/glossaryIndex";
 import { lectureNavigationTargets } from "@/lib/lecture-template/navigationTargets";
 import { progressIdFromTemplatePath, singleLectureProgressKey } from "@/lib/lecture-template/progress";
+import { lectureReadingMinutes, sectionReadingMinutes } from "@/lib/lecture-template/readingTime";
 import type { LectureTemplate } from "@/lib/lecture-template/types";
 import type { ProgressLecture } from "@/lib/lecture-template/progress";
 import { LectureProgressBar } from "./progress/LectureProgressBar";
 import { ProgressLiveRegion } from "./progress/ProgressLiveRegion";
 import { ProgressProvider } from "./progress/ProgressProvider";
+import { ResumePrompt } from "./progress/ResumePrompt";
 
 export interface CollectionNavigationContext {
   previous?: NavTarget;
@@ -33,6 +37,9 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
   const lectureId = progressIdFromTemplatePath(templatePath, lecture.metadata.title);
   const storageKey = singleLectureProgressKey(lectureId);
   const progressSections = lecture.sections.map((section) => ({ anchor: section.anchor, title: section.title }));
+  const readingMinutes = lectureReadingMinutes(lecture);
+  const sectionMinutes = Object.fromEntries(lecture.sections.map((section) => [section.anchor, sectionReadingMinutes(section)]));
+  const glossaryEntries = collectLectureGlossary(lecture);
 
   return (
     <PageShell>
@@ -42,7 +49,8 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
         collectionStorageKey={collectionContext?.collectionStorageKey}
         collectionLectures={collectionContext?.collectionLectures}
       >
-        <LectureHeader metadata={lecture.metadata} sectionCount={lecture.sections.length} />
+        <LectureHeader metadata={lecture.metadata} sectionCount={lecture.sections.length} readingMinutes={readingMinutes} />
+        <ResumePrompt />
         <LectureProgressBar />
         {collectionNavigation ? (
           <CollectionTopNav
@@ -52,7 +60,7 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
           />
         ) : null}
         <div className="lecture-layout">
-          <SectionNavigation sections={lecture.sections} />
+          <SectionNavigation sections={lecture.sections} sectionMinutes={sectionMinutes} />
           <article className="lecture-content">
             <section className="overview-section lecture-panel" aria-labelledby={lectureNavigationTargets.overview.id}>
               <p className="section-kicker">Start Here</p>
@@ -83,6 +91,8 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
                 ))}
               </ul>
             </section>
+
+            <GlossaryIndex entries={glossaryEntries} id="lecture-glossary-index" />
 
             <AnswerKeyAppendix lecture={lecture} />
           </article>

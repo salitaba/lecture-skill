@@ -11,7 +11,13 @@ const nonAuthoredAnchors = [
   lectureNavigationTargets.takeaways.href.slice(1)
 ];
 
-export function LearningPathNavigation({ sections }: { sections: LectureSection[] }) {
+export function LearningPathNavigation({
+  sections,
+  sectionMinutes
+}: {
+  sections: LectureSection[];
+  sectionMinutes?: Record<string, number>;
+}) {
   const progressContext = useProgressOptional();
   const [activeAnchor, setActiveAnchor] = useState<string | undefined>(undefined);
 
@@ -60,7 +66,8 @@ export function LearningPathNavigation({ sections }: { sections: LectureSection[
       key: section.anchor,
       href: `#${section.anchor}`,
       prefix: `Section ${index + 1}`,
-      label: section.title
+      label: section.title,
+      minutes: sectionMinutes?.[section.anchor]
     })),
     {
       key: "takeaways",
@@ -104,6 +111,7 @@ function NavigationList({
     href: string;
     prefix: string;
     label: string;
+    minutes?: number;
   }>;
   activeAnchor?: string;
 }) {
@@ -121,6 +129,7 @@ function NavigationList({
             >
               <span className="nav-prefix">{item.prefix}</span>
               <span>{item.label}</span>
+              {item.minutes ? <span className="nav-section-minutes">~{item.minutes} min</span> : null}
               {isActive ? <span className="sr-only"> (current)</span> : null}
             </a>
           </li>

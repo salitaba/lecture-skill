@@ -1,4 +1,5 @@
 import type { LectureSection, RenderBlock } from "@/lib/lecture-template/types";
+import { glossaryAnchorsForSection } from "@/lib/lecture-template/glossaryIndex";
 import { renderMarkdownBlocks } from "@/lib/lecture-template/renderMarkdown";
 import { Accordion } from "./Accordion";
 import { Callout } from "./Callout";
@@ -26,6 +27,8 @@ import { SectionCompletionToggle } from "./progress/SectionCompletionToggle";
 import { SectionProgressFrame } from "./progress/SectionProgressFrame";
 
 export function SectionRenderer({ section, index, lectureId }: { section: LectureSection; index: number; lectureId?: string }) {
+  const glossaryAnchors = glossaryAnchorsForSection(section);
+
   return (
     <SectionProgressFrame anchor={section.anchor}>
       <p className="section-number">Section {index + 1}</p>
@@ -33,12 +36,24 @@ export function SectionRenderer({ section, index, lectureId }: { section: Lectur
         <h2 id={`${section.anchor}-heading`}>{section.title}</h2>
         <SectionCompletionToggle anchor={section.anchor} title={section.title} />
       </div>
-      <RenderBlocks blocks={section.blocks} sectionAnchor={section.anchor} lectureId={lectureId} />
+      <RenderBlocks blocks={section.blocks} sectionAnchor={section.anchor} lectureId={lectureId} glossaryAnchors={glossaryAnchors} />
     </SectionProgressFrame>
   );
 }
 
-export function RenderBlocks({ blocks, sectionAnchor, lectureId }: { blocks: RenderBlock[]; sectionAnchor?: string; lectureId?: string }) {
+export function RenderBlocks({
+  blocks,
+  sectionAnchor,
+  lectureId,
+  glossaryAnchors
+}: {
+  blocks: RenderBlock[];
+  sectionAnchor?: string;
+  lectureId?: string;
+  glossaryAnchors?: string[];
+}) {
+  const glossaryAnchorByBlockIndex = glossaryAnchorsPerBlock(blocks, glossaryAnchors);
+
   return (
     <>
       {blocks.map((block, index) => {
@@ -73,7 +88,7 @@ export function RenderBlocks({ blocks, sectionAnchor, lectureId }: { blocks: Ren
           case "diagram":
             return <Diagram key={index} component={component} />;
           case "glossary_term":
-            return <GlossaryTerm key={index} component={component} />;
+            return <GlossaryTerm key={index} component={component} id={glossaryAnchorByBlockIndex[index]} />;
           case "tabs":
             return <Tabs key={index} component={component} />;
           case "accordion":
@@ -108,4 +123,14 @@ export function RenderBlocks({ blocks, sectionAnchor, lectureId }: { blocks: Ren
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled lecture component: ${JSON.stringify(value)}`);
+}
+
+function glossaryAnchorsPerBlock(blocks: RenderBlock[], glossaryAnchors: string[] | undefined): (string | undefined)[] {
+  let occurrence = 0;
+  return blocks.map((block) => {
+    if (block.kind !== "component" || block.component.type !== "glossary_term") return undefined;
+    const anchor = glossaryAnchors?.[occurrence];
+    occurrence += 1;
+    return anchor;
+  });
 }

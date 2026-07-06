@@ -171,7 +171,7 @@ describe("assessment visual hierarchy", () => {
 
     expect(html).toContain("assessment-index-disclosure");
     expect(html).toContain("<summary");
-    expect(html).toContain("Assessment locations for reviewers");
+    expect(html).toContain("Show 0 assessments");
   });
 
   it("quiz hierarchy places prompt first, then options, then action, then answer", async () => {
