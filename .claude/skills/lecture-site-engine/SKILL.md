@@ -1,3 +1,8 @@
+---
+name: lecture-site-engine
+description: Converts a raw lecture source into content/lecture.template.md (or a lectures/ collection) using the Lecture Site Engine schema, supported components, validation, and review-package workflow.
+---
+
 # Lecture Site Engine Skill
 
 Use this skill to convert one raw lecture source into `content/lecture.template.md` using the supported Lecture Site Engine schema.

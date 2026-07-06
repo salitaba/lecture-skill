@@ -658,7 +658,7 @@ steps:
 ## Creating A New Lecture With An AI Agent
 
 1. Put one raw lecture source in `content/raw-lecture.txt`.
-2. Ask the AI agent to follow `SKILL.md`.
+2. If your agent is Claude Code, it auto-discovers the `lecture-site-engine` skill from `.claude/skills/lecture-site-engine/SKILL.md`. Otherwise, ask the agent to follow that file directly.
 3. The agent should create or update `content/lecture.template.md`.
 4. Run `npm run validate`.
 5. Fix validation errors until the command passes.
