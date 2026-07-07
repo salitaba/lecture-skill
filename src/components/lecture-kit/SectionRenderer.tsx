@@ -35,7 +35,12 @@ export function SectionRenderer({ section, index, lectureId }: { section: Lectur
     <SectionProgressFrame anchor={section.anchor}>
       <p className="section-number">Section {index + 1}</p>
       <div className="section-heading-row">
-        <h2 id={`${section.anchor}-heading`}>{section.title}</h2>
+        <h2 id={`${section.anchor}-heading`}>
+          <span className="section-heading-badge" aria-hidden="true">
+            {index + 1}
+          </span>
+          {section.title}
+        </h2>
         <div className="section-heading-actions">
           <SectionCompletionToggle anchor={section.anchor} title={section.title} />
           <SectionNote anchor={section.anchor} title={section.title} />

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
 import { ThemeToggle } from "@/components/lecture-kit/ThemeToggle";
 
@@ -7,6 +7,14 @@ const bodyFont = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-body",
+  display: "swap"
+});
+
+const displayFont = Fraunces({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  style: ["normal"],
+  variable: "--font-display",
   display: "swap"
 });
 
@@ -41,7 +49,7 @@ const themeInitScript = `(function(){try{var t=localStorage.getItem("theme");if(
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={bodyFont.variable} suppressHydrationWarning>
+    <html lang="en" className={`${bodyFont.variable} ${displayFont.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>

@@ -8,14 +8,14 @@ export function renderMarkdownBlocks(blocks: RenderBlock[]): ReactNode[] {
 
 function renderBlock(block: RenderBlock, index: number): ReactNode {
   if (block.kind === "paragraph") {
-    return <p key={key(block, index)}>{block.text}</p>;
+    return <p key={key(block, index)}>{renderInline(block.text)}</p>;
   }
 
   if (block.kind === "bullet_list") {
     return (
       <ul key={key(block, index)}>
         {block.items.map((item, itemIndex) => (
-          <li key={itemIndex}>{item}</li>
+          <li key={itemIndex}>{renderInline(item)}</li>
         ))}
       </ul>
     );
@@ -25,7 +25,7 @@ function renderBlock(block: RenderBlock, index: number): ReactNode {
     return (
       <ol key={key(block, index)}>
         {block.items.map((item, itemIndex) => (
-          <li key={itemIndex}>{item}</li>
+          <li key={itemIndex}>{renderInline(item)}</li>
         ))}
       </ol>
     );
@@ -41,10 +41,32 @@ function renderBlock(block: RenderBlock, index: number): ReactNode {
 
   if (block.kind === "heading") {
     const Heading = `h${Math.min(Math.max(block.depth, 3), 6)}` as "h3";
-    return <Heading key={key(block, index)}>{block.text}</Heading>;
+    return <Heading key={key(block, index)}>{renderInline(block.text)}</Heading>;
   }
 
   return null;
+}
+
+/** Matches the small set of inline markdown authors actually use in prose: **bold**, `code`, and *italic*.
+    Order matters — bold must be tried before italic so `**x**` doesn't get split as two `*` matches. */
+const inlineTokenPattern = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+
+export function renderInline(text: string): ReactNode {
+  const parts = text.split(inlineTokenPattern).filter((part) => part !== "");
+  if (parts.length === 1) return text;
+
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={index}>{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith("*") && part.endsWith("*")) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
 }
 
 function MarkdownTable({ rows }: { rows: string[] }) {
@@ -66,7 +88,7 @@ function MarkdownTable({ rows }: { rows: string[] }) {
         <thead>
           <tr>
             {header.map((cell, index) => (
-              <th key={index}>{cell}</th>
+              <th key={index}>{renderInline(cell)}</th>
             ))}
           </tr>
         </thead>
@@ -74,7 +96,7 @@ function MarkdownTable({ rows }: { rows: string[] }) {
           {body.map((row, rowIndex) => (
             <tr key={rowIndex}>
               {row.map((cell, cellIndex) => (
-                <td key={cellIndex}>{cell}</td>
+                <td key={cellIndex}>{renderInline(cell)}</td>
               ))}
             </tr>
           ))}
