@@ -1,0 +1,174 @@
+Feature: Product Polish and Delight — Learner-Facing Landing Hierarchy, Motion Feedback, Milestone Celebration, and Finishing Touches
+
+Authors: senior UI/UX designer.
+Relationship to prior work: layered on top of `spec/014-senior-ui-ux-polish.txt` (interaction polish), `spec/015-learner-experience-primitives.txt` and `spec/012-progress-tracking-plan.txt` (progress model), `spec/016-visual-design-system.txt` (tokens, altitude, color, iconography), and `spec/017-component-kit-primitives.txt` (shared `Button`/`Card`/`Disclosure`/`ProgressMeter` primitives). Those specs made the system correct and consistent: one card shape, one button, one color per meaning, one primitive per repeated pattern. This spec does not touch that foundation — it spends the system that foundation built. It asks: now that every card is the same `Card` and every bar is the same `ProgressMeter`, does the product built from them actually feel like a course a learner wants to return to, or does it still read like an internal validation dashboard wearing a coat of design tokens? Concretely, this spec fixes four things the prior specs did not touch: an authoring-only concept (template validation status) rendered on the learner-facing landing page, a near-total absence of motion/feedback beyond what 016/017 already wired into disclosures and progress bars, a complete absence of any acknowledgment when a learner finishes something, and a handful of finishing touches (favicon, share preview, error pages) that every one of the specs so far has left for "later."
+
+## Product Summary
+
+`CollectionLanding.tsx` — the first thing anyone sees when they open this course — renders a "✓ PASS" or "✕ FAIL" badge on every single lecture card (`CollectionLanding.tsx:84-99`), styled in the exact same green/amber tokens (`.validation-badge-pass` / `.validation-badge-fail`, `globals.css:2160-2185`) that quizzes elsewhere in the product use for "you got this right/wrong." That badge reports whether a lecture's authored template passes schema validation — a fact of interest to the person writing the course, meaningless and mildly alarming to a learner (why would a lecture "fail"?). It is the single clearest remaining example of the codebase's authoring tool and its learner-facing product sharing one screen with no boundary between them.
+
+Once that's fixed, the same page has a second, quieter problem: every one of its ten lecture cards is visually identical regardless of whether the learner already finished it, is partway through it, or hasn't started it. `CollectionLandingProps` computes exactly this state today (progress lives in `CollectionProgressProvider`) but the card markup doesn't use it for anything beyond a thin `ProgressMeter` bar per card (`CollectionLanding.tsx:123`) — there's no "next up," no "done," no visual read of "where am I in this course" faster than reading ten numbers.
+
+Layered under both of those: this is a product about learning, and it currently has almost no felt response to a learner's actions. `globals.css` is 2600+ lines, and after 016/017 built out cards, badges, buttons, and progress bars, exactly three rules in the entire file animate anything (`.learning-path-chevron`'s `transform` at `globals.css:391`, `.lecture-progress-fill`/`.collection-progress-fill`'s `width` at `globals.css:652`) plus two `@keyframes` (`reveal-fade-in`, `globals.css:891`; `progress-toast-in`, `globals.css:880`). Clicking into a lecture, checking off a section, finishing a quiz, completing the whole course — none of it produces any motion, any acknowledgment, any moment that feels different from any other. `LearningPathNavigation` literally computes "0 of 4 milestones reached" and nothing renders when that number changes to 4.
+
+Finally, the smallest and cheapest fixes: this product has no favicon, no share preview, and no styled error page, so the first and last impressions — the browser tab, a shared link's preview card, a broken URL — are all default Next.js/browser chrome, not this design system.
+
+## Product Outcome
+
+- The learner-facing collection landing page shows zero authoring/validation concepts. `CollectionLanding` reports learner-relevant state only (not started / in progress / completed); template-validation PASS/FAIL is either removed from this view or moved behind a separate, explicitly internal authoring view that never ships to a learner.
+- The lecture list visually communicates "where am I" in under a second: the next lecture to resume is visually distinct from a completed one, which is visually distinct from a not-yet-started one — without adding a fourth card variant, by reusing 016's existing altitude/token vocabulary.
+- Reaching 100% on a lecture's sections, and reaching 100% on the whole course, each produce one small, deliberate, reduced-motion-respecting moment of acknowledgment — not a modal, not a full-screen takeover, something in keeping with the existing `progress-toast-in` pattern already proven for the resume/dismiss toast.
+- Interactive surfaces that currently give zero feedback on hover/press (the lecture card itself, not just its title link) get the same `--action`/`--border` motion language 016 already defined for focus-visible, extended to hover and to the one recurring `transition: width` / `transition: transform` pattern already in the codebase.
+- The tab, the link-sharing preview, and any broken-URL/error state look like they belong to the same product as everything else — not like the developer forgot to finish the `<head>`.
+
+## Users And Jobs
+
+Primary users: learners taking a course through this product (the audience 011/012/015 built assessments, progress tracking, and resume prompts for) — this spec is about their experience of the product as a whole, not any one component in isolation. Secondary: the educator/author previewing their own course, who still needs *some* way to see validation status, just not smeared across the learner's course listing.
+
+Jobs to be done:
+
+- As a learner opening a course I haven't finished, I want to see immediately which lecture I should open next, not read ten identical cards and cross-reference a progress bar under each one.
+- As a learner who just finished the last section of the course, I want some acknowledgment that I'm done — right now finishing feels identical to being on section 3 of 10.
+- As a learner, when I hover or tap a lecture card, I want it to feel clickable before I click it — right now the card gives no indication that anything happens until the underlined title text specifically is activated.
+- As a learner glancing at the browser tab bar with six things open, I want to be able to find this course by its icon, not by "the one with no icon."
+- As anyone who mistypes a lecture URL or hits a render error, I want to land on a page that still looks like this product, not a default browser or Next.js error screen.
+- As an educator, I still want to know at a glance which of my authored lectures fail validation — just on a screen a learner never sees, so "I'm previewing my own draft" and "a learner is taking my finished course" are visually distinct situations.
+
+## Problem
+
+- **An authoring concept rendered on the learner's course listing.** `CollectionLanding.tsx:84-99` renders a "✓ PASS" / "✕ FAIL" `validation-badge` on every lecture card, using the same `--success`/`--warning` tokens (`globals.css:2160-2185`) a learner sees elsewhere attached to quiz correctness. There is no learner-facing meaning of a lecture "failing" — this is `validateCollection()`'s schema-validation result, a fact for the person authoring the course, surfaced unconditionally on the same page a learner uses to pick what to study next.
+- **Zero visual differentiation by learner progress state.** Every lecture card in `CollectionLanding.tsx:79-128` renders with identical structure and altitude regardless of whether `CollectionLectureProgress` reports 0%, 40%, or 100% for it — the only state signal is a thin `ProgressMeter` bar (`CollectionLanding.tsx:123`) a reader has to individually read and compare across ten cards to figure out "where do I resume." `ResumePrompt` (`progress/ResumePrompt.tsx`) already computes exactly the "what's next" answer for the in-lecture context but nothing analogous surfaces on the collection landing card list itself.
+- **Near-absence of motion feedback across the whole product.** Sitewide, `globals.css` contains exactly three animating rules — `.learning-path-chevron`'s `transform` (`globals.css:391`), `.lecture-progress-fill`/`.collection-progress-fill`'s `width` (`globals.css:652`) — and two `@keyframes` (`reveal-fade-in` at `globals.css:891`, used for disclosure reveals; `progress-toast-in` at `globals.css:880`, used for the resume/dismiss toast). Every other state change in the product — checking a section complete, answering a quiz, hovering a card, navigating to a new lecture — is an instant, silent DOM swap. `prefers-reduced-motion` is correctly respected where motion exists (`globals.css:2418-2432`), but there is so little motion to begin with that the respect is nearly moot.
+- **No card-level interactive feedback on the product's primary navigation surface.** `.lecture-list-item` (`globals.css:2103-2109`) — the entire clickable-adjacent card a learner scans to choose a lecture — has no `:hover`/`:focus-within` treatment at all; only the nested `.lecture-list-link` text underlines on hover/focus-visible (`globals.css:2122-2130`). The card reads as inert until the cursor happens to land on the exact title string.
+- **No acknowledgment of milestones anywhere in the progress system.** `LearningPathNavigation` computes and displays "X of Y milestones reached" (its rendered lecture-page copy) and `CollectionProgressProvider`/`ProgressProvider` (`progress/ProgressProvider.tsx`) track section- and course-level completion, but no code path in `progress/*.tsx` renders any distinct state, copy, or motion when a lecture or the course crosses 100%. Finishing the last section of the last lecture looks and feels identical to finishing the third section of the first one.
+- **No favicon, manifest, or Open Graph/Twitter metadata.** `layout.tsx:14-17`'s `metadata` object sets only `title` and `description`; there is no `icon`/`apple-icon` file, no `manifest.json`, no `openGraph`/`twitter` metadata block, and no `theme-color`. A browser tab shows a generic globe/document icon; a link shared in Slack or iMessage shows no preview card at all.
+- **No styled error surfaces.** There is no `src/app/not-found.tsx` and no `src/app/error.tsx` (`find src/app` turns up only `globals.css`, `layout.tsx`, `page.tsx`). A mistyped `/lectures/xx-slug` URL or an unexpected render error falls through to Next.js's unstyled default, which shares no typography, color, or spacing with the rest of the product — the one moment a learner is already mildly frustrated is also the one moment the product looks least finished.
+
+## Goals
+
+- G1. Remove template-validation PASS/FAIL status from the learner-facing `CollectionLanding` card list; replace the per-card status signal with learner-relevant state (not started / in progress / completed), computed from the same progress data `CollectionLectureProgress` already has.
+- G2. Give the collection landing page a clear, scannable "resume here" read: the next lecture the learner should open is visually distinguishable from completed and not-started lectures, using 016's existing altitude/token vocabulary rather than a new visual language.
+- G3. Introduce a small, named motion vocabulary (2-3 durations/easings, consistent with the 150-200ms/160-180ms values already in use) and apply it to the interactive surfaces that currently have none: card-level hover/focus-within on `.lecture-list-item`, and any newly introduced state transition from G2.
+- G4. Introduce one lecture-level and one course-level completion acknowledgment, each a small, dismissable, `prefers-reduced-motion`-respecting moment built on the existing `progress-toast-in` pattern — not a new modal system.
+- G5. Add a real favicon/app icon set, a web app manifest, and Open Graph/Twitter/theme-color metadata to `layout.tsx`'s `metadata` export, matching the product's existing color tokens and an existing `Icon` glyph.
+- G6. Add `not-found.tsx` and `error.tsx` at the app root, styled with existing `Card`/`Button`/typography primitives so a bad URL or a render error still looks like this product.
+- G7. If validation status remains useful to an author previewing their own course, give it an explicit, clearly-labeled home that is never shown in the same view a learner uses (e.g., gated behind a query flag or a separate authoring-only route) rather than deleting the information outright.
+
+## Non-Goals
+
+- No new visual token, color, altitude, card shape, or typography decision — this spec spends 016's system, it doesn't extend it. Any new color needed for a state (e.g., "next up") must be one of the four semantic tokens 016 already defined, not a fifth.
+- No new component-kit primitive beyond what's strictly required for G4's completion acknowledgment (which should compose the existing toast/`Disclosure` pattern, not invent a new one) — this is a product/experience pass, not another componentization pass like 017.
+- No search, filter, or jump-navigation for large collections — real for a 30+ lecture course, out of scope for the present 10-lecture course; a candidate for a future spec if a collection actually grows past what a scannable list handles.
+- No animation library, spring-physics engine, or page-transition framework — CSS transitions/keyframes only, consistent with everything already in `globals.css`.
+- No change to the underlying progress-tracking data model (`ProgressProvider.tsx`, `CollectionProgressProvider.tsx`) beyond reading the state it already exposes; if a genuinely new piece of state is required for G4 (e.g., "has this celebration already been shown this session/ever"), it is additive and small, not a model rewrite.
+- No redesign of quiz/assessment components, `Diagram`, `Comparison`, or any other lecture-content type — none of this spec's problems are about content components; it's about the shell (landing page, navigation chrome, motion, metadata, error pages) around them.
+- No analytics, telemetry, or tracking of celebration views — reduced-motion and dismissal state may be remembered locally (e.g., `localStorage`, consistent with existing progress persistence), never sent anywhere.
+
+## Product Decisions
+
+- Learner-facing and author-facing are different views, not different props on the same badge. If validation status survives this spec (G7), it lives somewhere a learner's course listing never renders it — not behind a CSS class a learner's build simply happens not to trigger.
+- State beats decoration. G2's "next up" treatment must be derived from real progress data already computed today, not a cosmetic reshuffle; a card that looks emphasized but isn't actually next is worse than no emphasis at all.
+- Motion is proportional to significance. Hover/focus feedback (G3) is fast and subtle (100-200ms, matching existing values); a milestone acknowledgment (G4) can be slightly more noticeable but still brief and dismissable — nothing in this spec introduces a motion longer or more disruptive than the existing `progress-toast-in` (160ms).
+- One celebration moment, not a badge collection. G4 is a single acknowledgment per milestone (lecture complete, course complete) — not a streak counter, not a points system, not gamification beyond acknowledging a real, already-tracked milestone.
+- Finishing touches are still first-class. A missing favicon or a default 404 page is exactly the kind of thing that makes a product feel unfinished even when every component inside it is well designed — G5/G6 are not busywork, they're the same discipline 016 applied to buttons, applied to the browser chrome around the product.
+
+## UX Designer Notes
+
+Every prior spec in this series made a part of the system more correct. None of them asked whether the assembled result feels like a product a learner wants to use. That's what "10x better" means here — not a new visual language, but closing the gap between "the components are individually well-designed" and "the product built from them communicates state, responds to input, and acknowledges effort."
+
+The validation-badge problem is the sharpest example of a general failure mode worth naming: a screen built for one audience (an author checking their draft) got reused for a different audience (a learner picking a lecture) because it was easier to add a badge than to ask who's actually looking at this. Any time this codebase adds a new signal to a shared screen going forward, the question from G1/G7 — "would a learner understand this, and do they need to?" — should be asked before the signal ships, not retrofitted later.
+
+The motion vocabulary should stay genuinely small. The temptation after auditing "only three animating rules exist" is to animate everything; resist it. A hover state on a card, a fill transition on a bar, and one milestone moment cover every real gap identified here. If a future change wants a fourth kind of motion, that's a signal to look at whether it's solving a real feedback gap or just adding movement for its own sake.
+
+## Priority
+
+### P0: Learner/Author Boundary on the Collection Landing Page
+
+Highest-impact, lowest-effort, and the clearest case of a wrong thing being shown to the wrong audience on the product's most-viewed screen.
+
+Requirements:
+
+- Remove the `validation-badge` PASS/FAIL element from the default `CollectionLanding` render (`CollectionLanding.tsx:84-99`).
+- Replace the per-card status signal with a learner-relevant state derived from existing progress data: not started / in progress / completed (exact copy and treatment decided in P1, since it's the same data G2 needs).
+- Decide, explicitly, where validation status goes instead: either an authoring-only route/query-flag-gated view, or removed from any learner-reachable render path entirely if no author-facing need is confirmed. Document the decision in the implementation plan rather than leaving the badge's replacement ambiguous.
+- No change to the underlying `validateCollection()`/`CollectionValidationResult` data model — this is a presentation-layer fix.
+
+### P1: Progress-Aware Card Hierarchy and Hover Feedback
+
+Requirements:
+
+- Compute, per lecture card in `CollectionLanding`, one of three learner-facing states (not started / in progress / completed) from `CollectionProgressProvider`'s existing per-lecture progress data.
+- Apply a visually distinct treatment to the single "resume here" card (the next incomplete lecture in authored order) using an existing 016 altitude/token — not a new color.
+- Apply a visually distinct, quieter treatment to completed cards (e.g., a checkmark state consistent with `LearningPathNavigation`'s existing `nav-item-complete` pattern) so a learner can tell at a glance which lectures are already done.
+- Add `:hover`/`:focus-within` treatment to `.lecture-list-item` itself (`globals.css:2103-2109`), not just its nested title link, using the new small motion vocabulary from P2 (a border/background shift and/or subtle transform, 100-200ms).
+
+### P2: Motion Vocabulary and Milestone Celebration
+
+Requirements:
+
+- Define 2-3 named CSS custom properties for duration/easing (e.g., extending the existing 150-200ms/160-180ms values already used ad hoc into reusable tokens) and apply them consistently to P1's new hover treatment and to any transition touched in this spec.
+- Build one lecture-completion acknowledgment (triggered when `ProgressProvider` reports 100% of a lecture's sections complete) and one course-completion acknowledgment (triggered when `CollectionProgressProvider` reports 100% across all lectures), each composing the existing `progress-toast-in` keyframe pattern rather than a new modal or overlay system.
+- Both acknowledgments respect `prefers-reduced-motion: reduce` (fall back to an instant, static appearance, consistent with `globals.css:2418-2432`'s existing pattern) and are dismissable/non-blocking, consistent with `ResumePrompt`'s existing dismiss affordance.
+- Each acknowledgment fires once per milestone (not on every re-render/navigation back to a completed lecture) — persist "already shown" state the same way existing progress state is persisted.
+
+### P3: Finishing Touches
+
+Requirements:
+
+- Add a favicon/app icon set (standard sizes plus `apple-icon`) using the existing `Icon` glyph set and color tokens, and a `manifest.json` with the product's name/theme color.
+- Add `openGraph` and `twitter` metadata blocks plus `theme-color` to `layout.tsx`'s `metadata` export (or Next.js `viewport` export, per current Next.js metadata API), reflecting the actual course/product name rather than placeholder copy.
+- Add `src/app/not-found.tsx` and `src/app/error.tsx`, composing existing `Card`/`Button`/typography primitives (and `ValidationScreen`'s established tone, if applicable) so both look native to the rest of the product rather than falling through to framework defaults.
+
+## Accessibility Requirements
+
+- All new hover/focus treatment on `.lecture-list-item` (P1) has an equivalent `:focus-within`/`:focus-visible` state — a keyboard user tabbing to the card's link sees the same affordance a mouse user sees on hover.
+- The learner-facing progress-state replacement for the validation badge (P0/P1) carries an accessible name (not conveyed by color alone) — e.g., "Completed," "In progress," "Not started" as visible or `aria-label`-exposed text, not just a colored dot or icon.
+- Milestone acknowledgments (P2) are announced to assistive technology in a manner consistent with the existing `ProgressLiveRegion` pattern (`progress/ProgressLiveRegion.tsx`) — reuse it rather than introducing a second live region.
+- All new motion (P1 hover, P2 celebration) is fully suppressed or reduced to an instant state change under `prefers-reduced-motion: reduce`, consistent with the existing pattern at `globals.css:2418-2432`.
+- `not-found.tsx`/`error.tsx` (P3) meet the same heading-structure and focus-management baseline as `ValidationScreen.tsx` (the existing precedent for a full-page non-happy-path screen in this codebase).
+
+## Responsive Requirements
+
+- No regression at the 390px/768px/1280px breakpoints already established by 014/015/016/017 for any element modified in this spec.
+- The new card-state treatment (P1) must remain legible and non-overlapping at 390px, where `.lecture-list-item` already reflows per `globals.css:2377` (existing mobile rule for this selector).
+- Milestone acknowledgments (P2) must not obscure primary content or require horizontal scrolling at 390px; treat them as a bottom/inline toast consistent with existing toast placement, not a full-viewport takeover.
+
+## Functional Requirements
+
+- Every existing lecture template and collection continues to render identically in content terms; no authoring-schema changes.
+- `validateCollection()`'s underlying pass/fail data is not deleted — it is either relocated to an explicitly authoring-only surface (P0) or removed from the render tree, but the validation logic itself is untouched (out of scope: `src/lib/lecture-template` validator internals).
+- Milestone "already shown" state persists using the existing progress-persistence mechanism/storage keys pattern already established in `progress/ProgressProvider.tsx`/`CollectionProgressProvider.tsx`, not a new, separate storage scheme.
+- Static export and review-package output (`spec/004-static-review-package.txt`'s domain) remain functional; new metadata (favicon, OG tags) is present in both the dev preview and the static export output.
+- The full existing test suite (`tests/lecture-template/*`) passes; any test asserting on the removed `validation-badge` class name in `CollectionLanding` is updated deliberately, not left broken.
+- No new runtime dependency introduced for any goal in this spec — favicon generation, OG metadata, and motion are all achievable with Next.js's built-in metadata APIs and CSS.
+
+## Success Metrics / Quality Gates
+
+- Zero occurrences of "PASS"/"FAIL" validation-badge markup in any learner-reachable render path of `CollectionLanding`.
+- A learner can identify the single lecture they should resume next by visual scan alone (no need to read/compare per-card percentages) in a usability pass at 1280px and 390px.
+- `.lecture-list-item` has a defined, tested `:hover` and `:focus-within` state distinct from its resting state.
+- At least one lecture-completion and one course-completion acknowledgment exist, are triggered by real progress data, respect `prefers-reduced-motion`, and are announced via the existing live-region pattern.
+- `layout.tsx`'s metadata export includes `icons`, `openGraph`, `twitter`, and `theme-color` (or `viewport` themeColor) fields, verified by inspecting rendered `<head>` output.
+- `not-found.tsx` and `error.tsx` exist at the app root and render using existing design-system primitives, verified visually at 390px/768px/1280px in light and dark theme.
+- No visual diff versus 014/015/016/017's established baseline outside the specific elements this spec deliberately changes.
+
+## Acceptance Criteria
+
+- `CollectionLanding.tsx` no longer renders a validation PASS/FAIL badge to a learner; a decision on where (or whether) that information survives for authors is implemented and documented.
+- The lecture card list visually distinguishes not-started, in-progress (specifically the single "resume here" card), and completed lectures using existing design tokens.
+- Card-level hover/focus feedback exists on `.lecture-list-item`, verified in both mouse-hover and keyboard-focus states.
+- A lecture-completion and a course-completion acknowledgment are implemented, fire exactly once per milestone, are dismissable, and degrade to a static instant state under `prefers-reduced-motion: reduce`.
+- The site has a favicon/app icon visible in a browser tab, a `manifest.json`, and Open Graph/Twitter preview metadata verified by inspecting a shared-link preview (or equivalent header/meta-tag inspection).
+- Navigating to a non-existent lecture URL and triggering a render error both show a styled page consistent with the rest of the product's typography, color, and component vocabulary.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests pass, with any necessary, intentional updates (e.g., to tests asserting on the removed validation badge) documented.
+- Verification includes a visual check of the collection landing page and a lecture page, before and after, at 390px/768px/1280px in light and dark themes.
+
+## Out Of Scope For 018
+
+- Search, filter, or jump navigation for large collections (noted in Non-Goals; candidate for a future spec if a real collection grows past ~15-20 lectures).
+- Any redesign of quiz, assessment, diagram, or other lecture-content component internals — this spec is shell/chrome/product-level only.
+- A points system, streaks, badges-as-gamification, or any progress mechanic beyond acknowledging the milestones the product already tracks.
+- Analytics or telemetry of any kind, including of celebration views or dismissals.
+- An authoring-mode UI beyond the minimum needed to relocate validation status per G7/P0 (e.g., no full "author dashboard" — that's a candidate for its own future spec if the relocated validation view proves to need more than a single flagged route).
+- Any new `component-kit` primitive beyond what P2's celebration moment strictly requires by composing existing patterns.
+- `015-A3` active-section state or any other still-unimplemented item already deferred by 014/015/016/017, unless directly required to compute this spec's "resume here" card state.

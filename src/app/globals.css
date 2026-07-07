@@ -44,6 +44,13 @@
 
   --shadow-sm: 0 1px 2px rgba(15, 23, 22, 0.06), 0 1px 3px rgba(15, 23, 22, 0.08);
   --shadow-md: 0 4px 10px rgba(15, 23, 22, 0.08), 0 2px 4px rgba(15, 23, 22, 0.06);
+
+  /* Motion vocabulary: every transition/animation in this file should reference
+     these, not a hardcoded duration/easing. */
+  --motion-duration-fast: 160ms;
+  --motion-duration-standard: 180ms;
+  --motion-ease: ease;
+  --motion-ease-out: ease-out;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -388,7 +395,7 @@ summary .nav-summary-count {
 .learning-path-chevron {
   display: inline-block;
   font-size: 0.9rem;
-  transition: transform 160ms ease;
+  transition: transform var(--motion-duration-fast) var(--motion-ease);
 }
 
 details[open] > summary .learning-path-chevron {
@@ -649,7 +656,7 @@ details[open] > summary .learning-path-chevron {
   height: 100%;
   background: var(--accent);
   border-radius: inherit;
-  transition: width 180ms ease;
+  transition: width var(--motion-duration-standard) var(--motion-ease);
 }
 
 .lecture-progress-milestones-wrapper {
@@ -860,7 +867,14 @@ details[open] > summary .learning-path-chevron {
   border-radius: 8px;
   box-shadow: 0 12px 30px rgba(19, 78, 74, 0.22);
   font-weight: 800;
-  animation: progress-toast-in 160ms ease-out;
+  animation: progress-toast-in var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.progress-toast-milestone {
+  padding: 14px 18px;
+  font-size: 1rem;
+  background: var(--success-border);
+  box-shadow: var(--shadow-md), 0 12px 30px rgba(19, 78, 74, 0.22);
 }
 
 .collection-progress {
@@ -906,7 +920,7 @@ details[open] > summary .learning-path-chevron {
 .assessment-hidden-region:not([hidden]),
 .flashcard-answer:not([hidden]),
 .accordion-item[open] > .accordion-body {
-  animation: reveal-fade-in 180ms ease-out;
+  animation: reveal-fade-in var(--motion-duration-standard) var(--motion-ease-out);
 }
 
 .lecture-section > :last-child,
@@ -2106,6 +2120,26 @@ td {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
+  transition: border-color var(--motion-duration-fast) var(--motion-ease), box-shadow var(--motion-duration-fast) var(--motion-ease),
+    transform var(--motion-duration-fast) var(--motion-ease);
+}
+
+.lecture-list-item:hover,
+.lecture-list-item:focus-within {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+
+.lecture-list-item-resume {
+  border-left-width: 7px;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.lecture-list-item-complete {
+  border-left-width: 3px;
+  border-left-color: var(--success-border);
 }
 
 .lecture-list-item article {
@@ -2157,7 +2191,7 @@ td {
   content: ":";
 }
 
-.validation-badge {
+.lecture-state {
   display: inline-flex;
   width: fit-content;
   min-height: 28px;
@@ -2172,16 +2206,28 @@ td {
   text-transform: uppercase;
 }
 
-.validation-badge-pass {
+.lecture-state-completed {
   background: var(--success-bg);
   border-color: var(--success-border);
   color: var(--success-text);
 }
 
-.validation-badge-fail {
-  background: var(--warning-bg);
-  border-color: var(--warning-border);
-  color: var(--warning-text);
+.lecture-state-in-progress {
+  background: var(--surface-accent);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.lecture-state-not-started {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.lecture-state-resume {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
 }
 
 .lecture-nav {
@@ -2416,16 +2462,22 @@ td {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lecture-progress-fill,
-  .collection-progress-fill,
+  .progress-meter-fill,
   .progress-toast,
   .tabs-panel,
   .flashcard-answer,
   .accordion-body,
   .quiz-answer,
-  .assessment-hidden-region {
+  .assessment-hidden-region,
+  .learning-path-chevron,
+  .lecture-list-item {
     transition: none;
     animation: none;
+  }
+
+  .lecture-list-item:hover,
+  .lecture-list-item:focus-within {
+    transform: none;
   }
 }
 
@@ -2514,8 +2566,7 @@ td {
     border-color: #666666;
   }
 
-  .lecture-progress-fill,
-  .collection-progress-fill {
+  .progress-meter-fill {
     background: #000000;
   }
 

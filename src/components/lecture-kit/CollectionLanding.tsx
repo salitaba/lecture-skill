@@ -6,9 +6,10 @@ import { collectionProgressKey, progressIdFromCollectionBase, type ProgressLectu
 import { sumLectureReadingMinutes } from "@/lib/lecture-template/readingTime";
 import { AssessmentIndexDisclosure } from "./AssessmentIndexDisclosure";
 import { CollectionGlossaryIndex } from "./CollectionGlossaryIndex";
-import { CollectionProgressBar, CollectionLectureProgress } from "./progress/CollectionProgressBar";
+import { CollectionProgressBar } from "./progress/CollectionProgressBar";
 import { CollectionPrimaryAction } from "./CollectionPrimaryAction";
 import { CollectionProgressProvider } from "./progress/CollectionProgressProvider";
+import { LectureList } from "./LectureList";
 
 export interface CollectionLandingProps {
   validation: CollectionValidationResult;
@@ -76,56 +77,7 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
 
         <CollectionProgressBar />
 
-        <ol className="lecture-list" id="lecture-list">
-          {validation.results.map((result, index) => {
-            const template = result.template ?? fallbackTemplate(result);
-            const lectureNumber = lectureNumberFromSlug(result.slug, index);
-            const lectureTitle = template.metadata.title.trim() || humanizeSlug(result.slug);
-            const statusClass = result.valid ? "validation-badge-pass" : "validation-badge-fail";
-            const statusLabel = result.valid ? "PASS" : "FAIL";
-            const statusIcon = result.valid ? "✓" : "✕";
-
-            return (
-              <li key={result.slug} className="lecture-list-item">
-                <article aria-labelledby={`lecture-${result.slug}-title`}>
-                  <div className="lecture-list-header">
-                    <h2 id={`lecture-${result.slug}-title`}>
-                      <a className="lecture-list-link" href={`/lectures/${result.slug}`}>
-                        {lectureNumber}. {lectureTitle}
-                      </a>
-                    </h2>
-                    <span className={`validation-badge ${statusClass}`}>
-                      {statusIcon} {statusLabel}
-                    </span>
-                    <p className="lecture-list-description">{template.metadata.description}</p>
-                  </div>
-
-                  <dl className="lecture-list-meta" aria-label="Lecture metadata">
-                    <div>
-                      <dt>Audience</dt>
-                      <dd>{template.metadata.audience}</dd>
-                    </div>
-                    <div>
-                      <dt>Level</dt>
-                      <dd>{template.metadata.level}</dd>
-                    </div>
-                    <div>
-                      <dt>Duration</dt>
-                      <dd>{template.metadata.duration}</dd>
-                    </div>
-                    <div>
-                      <dt>Sections</dt>
-                      <dd>
-                        {template.sections.length} {template.sections.length === 1 ? "section" : "sections"}
-                      </dd>
-                    </div>
-                  </dl>
-                  {result.valid ? <CollectionLectureProgress slug={result.slug} /> : <p className="collection-progress-unavailable">Progress unavailable until this lecture validates.</p>}
-                </article>
-              </li>
-            );
-          })}
-        </ol>
+        <LectureList results={validation.results} progressLectures={progressLectures} />
 
         <AssessmentIndexDisclosure assessments={assessments} id="assessment-index" />
         <CollectionGlossaryIndex entries={glossaryEntries} />
@@ -142,31 +94,4 @@ function parseDurationMinutes(result: LectureValidationResult): number {
 
 function formatMinutes(totalMinutes: number): string {
   return `${totalMinutes} ${totalMinutes === 1 ? "minute" : "minutes"}`;
-}
-
-function lectureNumberFromSlug(slug: string, index: number): string {
-  const match = slug.match(/^(\d{2})-/);
-  return match?.[1] ?? String(index + 1).padStart(2, "0");
-}
-
-function humanizeSlug(slug: string): string {
-  const base = slug.replace(/^\d{2}-/, "").replace(/[-_]+/g, " ").trim();
-  if (base === "") return slug;
-  return base.replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function fallbackTemplate(result: LectureValidationResult) {
-  return {
-    metadata: {
-      title: humanizeSlug(result.slug),
-      description: "",
-      audience: "",
-      duration: "",
-      level: "beginner"
-    },
-    overview: [],
-    objectives: [],
-    sections: [],
-    takeaways: []
-  };
 }

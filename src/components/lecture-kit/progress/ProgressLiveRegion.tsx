@@ -3,7 +3,7 @@
 import { useProgress } from "./ProgressProvider";
 
 export function ProgressLiveRegion() {
-  const { announcement, toast } = useProgress();
+  const { announcement, toast, toastVariant } = useProgress();
 
   return (
     <>
@@ -11,7 +11,7 @@ export function ProgressLiveRegion() {
         {announcement}
       </div>
       {toast ? (
-        <div className="progress-toast" role="status">
+        <div className={`progress-toast${toastVariant === "milestone" ? " progress-toast-milestone" : ""}`} role="status">
           {toast}
         </div>
       ) : null}

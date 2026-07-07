@@ -50,12 +50,13 @@ describe("quiz feedback CSS classes", () => {
 
   it("includes print rules that neutralize feedback backgrounds", () => {
     const css = readFileSync(path.join(process.cwd(), "src/app/globals.css"), "utf8");
-    const printSection = css.match(/@media print\s*\{[\s\S]*?\n\}/);
+    const printBlocks = css.match(/@media print\s*\{[\s\S]*?\n\}/g) ?? [];
+    const printSection = printBlocks.find((block) => block.includes(".quiz-option-selected"));
 
     expect(printSection).toBeTruthy();
-    expect(printSection![0]).toContain(".quiz-option-selected");
-    expect(printSection![0]).toContain(".quiz-correct");
-    expect(printSection![0]).toContain(".quiz-not-quite");
-    expect(printSection![0]).toContain("background: transparent");
+    expect(printSection).toContain(".quiz-option-selected");
+    expect(printSection).toContain(".quiz-correct");
+    expect(printSection).toContain(".quiz-not-quite");
+    expect(printSection).toContain("background: transparent");
   });
 });

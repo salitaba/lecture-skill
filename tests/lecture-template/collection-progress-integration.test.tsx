@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProgressProvider } from "../../src/components/lecture-kit/progress/ProgressProvider";
 import { LectureProgressBar } from "../../src/components/lecture-kit/progress/LectureProgressBar";
+import { ProgressLiveRegion } from "../../src/components/lecture-kit/progress/ProgressLiveRegion";
 import { SectionCompletionToggle } from "../../src/components/lecture-kit/progress/SectionCompletionToggle";
 
 const sections = [
@@ -103,5 +104,58 @@ describe("ProgressProvider collection integration", () => {
 
     expect(JSON.parse(window.localStorage.getItem(lectureStorageKey) ?? "{}")).toEqual({ "first-topic": true });
     expect(window.localStorage.getItem(collectionStorageKey)).toBeNull();
+  });
+
+  it("announces a course-complete milestone only when the last incomplete lecture in the collection finishes", async () => {
+    window.localStorage.setItem(lectureStorageKey, JSON.stringify({ "first-topic": true }));
+    window.localStorage.setItem(collectionStorageKey, JSON.stringify({ "01-intro": { "first-topic": true }, "02-core": { model: true } }));
+
+    render(
+      <ProgressProvider
+        storageKey={lectureStorageKey}
+        sections={sections}
+        collectionStorageKey={collectionStorageKey}
+        collectionLectures={collectionLectures}
+      >
+        <SectionCompletionToggle anchor="first-topic" title="First Topic" />
+        <SectionCompletionToggle anchor="second-topic" title="Second Topic" />
+        <ProgressLiveRegion />
+      </ProgressProvider>
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Mark Second Topic complete" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Mark Second Topic complete" }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("You've completed the whole course. Nice work!").length).toBeGreaterThan(0);
+    });
+    expect(document.querySelector(".progress-toast-milestone")).toBeInTheDocument();
+  });
+
+  it("does not announce course-complete when other lectures in the collection are still incomplete", async () => {
+    window.localStorage.setItem(lectureStorageKey, JSON.stringify({ "first-topic": true }));
+    window.localStorage.setItem(collectionStorageKey, JSON.stringify({ "01-intro": { "first-topic": true } }));
+
+    render(
+      <ProgressProvider
+        storageKey={lectureStorageKey}
+        sections={sections}
+        collectionStorageKey={collectionStorageKey}
+        collectionLectures={collectionLectures}
+      >
+        <SectionCompletionToggle anchor="first-topic" title="First Topic" />
+        <SectionCompletionToggle anchor="second-topic" title="Second Topic" />
+        <ProgressLiveRegion />
+      </ProgressProvider>
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Mark Second Topic complete" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Mark Second Topic complete" }));
+
+    await waitFor(() => {
+      const collection = JSON.parse(window.localStorage.getItem(collectionStorageKey) ?? "{}");
+      expect(collection["01-intro"]).toEqual({ "first-topic": true, "second-topic": true });
+    });
+    expect(screen.queryAllByText("You've completed the whole course. Nice work!").length).toBe(0);
   });
 });

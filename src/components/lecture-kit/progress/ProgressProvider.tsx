@@ -2,12 +2,15 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  calculateCollectionProgress,
   calculateLectureProgress,
   type LectureProgress,
   type ProgressLecture,
   type ProgressSection,
   validateLectureProgress
 } from "@/lib/lecture-template/progress";
+
+export type ProgressToastVariant = "default" | "milestone";
 
 export interface ProgressContextValue {
   progress: LectureProgress;
@@ -21,6 +24,7 @@ export interface ProgressContextValue {
   loaded: boolean;
   announcement: string;
   toast: string;
+  toastVariant: ProgressToastVariant;
   currentSectionAnchor?: string;
   resumeTarget?: ProgressSection;
   dismissResumePrompt: () => void;
@@ -38,6 +42,7 @@ export interface ProgressProviderProps {
 const ProgressContext = createContext<ProgressContextValue | undefined>(undefined);
 const writeDelayMs = 300;
 const toastDelayMs = 1500;
+const milestoneToastDelayMs = 3200;
 
 export function ProgressProvider({ storageKey, sections, children, collectionStorageKey, collectionLectures }: ProgressProviderProps) {
   const [progress, setProgress] = useState<LectureProgress>({});
@@ -45,6 +50,7 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
   const [storageAvailable, setStorageAvailable] = useState(true);
   const [announcement, setAnnouncement] = useState("");
   const [toast, setToast] = useState("");
+  const [toastVariant, setToastVariant] = useState<ProgressToastVariant>("default");
   const [currentSectionAnchor, setCurrentSectionAnchor] = useState<string | undefined>(sections[0]?.anchor);
   const [resumeDismissed, setResumeDismissed] = useState(false);
   const storageAvailableRef = useRef(true);
@@ -56,6 +62,12 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
   const sectionAnchors = useMemo(() => sections.map((section) => section.anchor), [sections]);
   const sectionAnchorKey = sectionAnchors.join("\u001f");
   const summary = useMemo(() => calculateLectureProgress(progress, sections), [progress, sections]);
+
+  const announce = useCallback((message: string, variant: ProgressToastVariant = "default") => {
+    setAnnouncement(message);
+    setToast(message);
+    setToastVariant(variant);
+  }, []);
 
   useEffect(() => {
     storageAvailableRef.current = storageAvailable;
@@ -119,11 +131,12 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
   useEffect(() => {
     if (!toast) return undefined;
 
-    toastTimerRef.current = window.setTimeout(() => setToast(""), toastDelayMs);
+    const delay = toastVariant === "milestone" ? milestoneToastDelayMs : toastDelayMs;
+    toastTimerRef.current = window.setTimeout(() => setToast(""), delay);
     return () => {
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
     };
-  }, [toast]);
+  }, [toast, toastVariant]);
 
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return undefined;
@@ -174,8 +187,15 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
             collection = {};
           }
         }
+
+        const beforePercent = calculateCollectionProgress(collection, lectures).percentComplete;
         collection[lectureSlug] = progress;
+        const afterPercent = calculateCollectionProgress(collection, lectures).percentComplete;
         window.localStorage.setItem(collectionKey, JSON.stringify(collection));
+
+        if (beforePercent < 100 && afterPercent === 100) {
+          announce("You've completed the whole course. Nice work!", "milestone");
+        }
       } catch {
         /* collection write is best-effort */
       }
@@ -184,12 +204,7 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
     return () => {
       window.clearTimeout(timer);
     };
-  }, [loaded, progress, sections]);
-
-  const announce = useCallback((message: string) => {
-    setAnnouncement(message);
-    setToast(message);
-  }, []);
+  }, [announce, loaded, progress, sections]);
 
   const toggleSection = useCallback(
     (sectionAnchor: string) => {
@@ -197,13 +212,19 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
       if (!section) return;
 
       setProgress((current) => {
+        const previousPercent = calculateLectureProgress(current, sections).percentComplete;
         const nextComplete = current[sectionAnchor] !== true;
         const next = { ...current, [sectionAnchor]: nextComplete };
         const nextSummary = calculateLectureProgress(next, sections);
+        const justCompletedLecture = nextComplete && previousPercent < 100 && nextSummary.percentComplete === 100;
+
         announce(
-          nextComplete
-            ? `Section marked complete. ${nextSummary.completedSections} of ${nextSummary.totalSections} sections finished.`
-            : `Section marked incomplete. ${nextSummary.completedSections} of ${nextSummary.totalSections} sections finished.`
+          justCompletedLecture
+            ? `Lecture complete! All ${nextSummary.totalSections} sections finished.`
+            : nextComplete
+              ? `Section marked complete. ${nextSummary.completedSections} of ${nextSummary.totalSections} sections finished.`
+              : `Section marked incomplete. ${nextSummary.completedSections} of ${nextSummary.totalSections} sections finished.`,
+          justCompletedLecture ? "milestone" : "default"
         );
         return next;
       });
@@ -299,6 +320,7 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
       loaded,
       announcement,
       toast,
+      toastVariant,
       currentSectionAnchor,
       resumeTarget,
       dismissResumePrompt,
@@ -319,6 +341,7 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
       summary.percentComplete,
       summary.totalSections,
       toast,
+      toastVariant,
       toggleSection
     ]
   );

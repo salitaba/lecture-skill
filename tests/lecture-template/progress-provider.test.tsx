@@ -119,6 +119,21 @@ describe("ProgressProvider", () => {
     expect(screen.queryByRole("status", { name: "" })).not.toBeInTheDocument();
   });
 
+  it("announces a distinct lecture-complete milestone toast only when the last section finishes", async () => {
+    renderProgress();
+
+    await waitFor(() => expect(screen.getByText("0 of 2 sections completed")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Mark First Topic complete" }));
+
+    expect(screen.getAllByText("Section marked complete. 1 of 2 sections finished.").length).toBeGreaterThan(0);
+    expect(document.querySelector(".progress-toast-milestone")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark Second Topic complete" }));
+
+    expect(screen.getAllByText("Lecture complete! All 2 sections finished.").length).toBeGreaterThan(0);
+    expect(document.querySelector(".progress-toast-milestone")).toBeInTheDocument();
+  });
+
   it("does not run progress shortcuts from editable controls", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     render(

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeToggle } from "@/components/lecture-kit/ThemeToggle";
@@ -10,9 +10,29 @@ const bodyFont = Inter({
   display: "swap"
 });
 
+const title = "Lecture Site Engine";
+const description = "Local lecture preview generated from a structured template.";
+
 export const metadata: Metadata = {
-  title: "Lecture Site Engine",
-  description: "Local lecture preview generated from a structured template."
+  title,
+  description,
+  openGraph: {
+    title,
+    description,
+    type: "website"
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description
+  }
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c2124" }
+  ]
 };
 
 // Runs before paint so a stored theme choice applies immediately, avoiding a

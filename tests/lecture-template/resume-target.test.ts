@@ -11,12 +11,12 @@ const lectures: ProgressLecture[] = [
 describe("calculateResumeTarget", () => {
   it("returns Start course for empty progress", () => {
     const target = calculateResumeTarget({}, lectures);
-    expect(target).toEqual({ label: "Start course", href: "/lectures/01-intro" });
+    expect(target).toEqual({ label: "Start course", href: "/lectures/01-intro", slug: "01-intro" });
   });
 
   it("returns Start course when lectures are empty", () => {
     const target = calculateResumeTarget({}, []);
-    expect(target).toEqual({ label: "Start course", href: "/" });
+    expect(target).toEqual({ label: "Start course", href: "/", slug: undefined });
   });
 
   it("returns Resume course targeting first incomplete section", () => {
@@ -24,7 +24,7 @@ describe("calculateResumeTarget", () => {
       "01-intro": { s1: true }
     };
     const target = calculateResumeTarget(progress, lectures);
-    expect(target).toEqual({ label: "Resume course", href: "/lectures/01-intro#s2" });
+    expect(target).toEqual({ label: "Resume course", href: "/lectures/01-intro#s2", slug: "01-intro" });
   });
 
   it("returns Resume course targeting first lecture with no progress when previous lectures are complete", () => {
@@ -32,7 +32,7 @@ describe("calculateResumeTarget", () => {
       "01-intro": { s1: true, s2: true }
     };
     const target = calculateResumeTarget(progress, lectures);
-    expect(target).toEqual({ label: "Resume course", href: "/lectures/02-core" });
+    expect(target).toEqual({ label: "Resume course", href: "/lectures/02-core", slug: "02-core" });
   });
 
   it("returns Resume course targeting first incomplete section in second lecture", () => {
@@ -41,7 +41,7 @@ describe("calculateResumeTarget", () => {
       "02-core": { s3: true }
     };
     const target = calculateResumeTarget(progress, lectures);
-    expect(target).toEqual({ label: "Resume course", href: "/lectures/02-core#s4" });
+    expect(target).toEqual({ label: "Resume course", href: "/lectures/02-core#s4", slug: "02-core" });
   });
 
   it("returns Continue course when all sections are complete", () => {
@@ -51,7 +51,7 @@ describe("calculateResumeTarget", () => {
       "03-wrap": { s5: true }
     };
     const target = calculateResumeTarget(progress, lectures);
-    expect(target).toEqual({ label: "Continue course", href: "/lectures/01-intro" });
+    expect(target).toEqual({ label: "Continue course", href: "/lectures/01-intro", slug: "01-intro" });
   });
 
   it("returns Resume course for malformed progress with unknown slug", () => {
@@ -59,6 +59,14 @@ describe("calculateResumeTarget", () => {
       "unknown-slug": { s1: true }
     };
     const target = calculateResumeTarget(progress, lectures);
-    expect(target).toEqual({ label: "Resume course", href: "/lectures/01-intro" });
+    expect(target).toEqual({ label: "Resume course", href: "/lectures/01-intro", slug: "01-intro" });
+  });
+
+  it("exposes the target lecture's slug so callers can match it against a rendered card", () => {
+    const progress: CollectionProgress = {
+      "01-intro": { s1: true, s2: true }
+    };
+    const target = calculateResumeTarget(progress, lectures);
+    expect(target.slug).toBe("02-core");
   });
 });
