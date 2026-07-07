@@ -1,0 +1,229 @@
+Feature: Component-Kit — Shared UI Primitives and De-Duplication of the Lecture-Kit Component Library
+
+Authors: senior UI/UX designer.
+Relationship to prior work: layered on top of `spec/016-visual-design-system.txt` (typography, semantic color tokens, card altitudes, action-color unification, iconography) and the interaction work in `spec/014-senior-ui-ux-polish.txt` / `spec/015-learner-experience-primitives.txt`. Those specs decided *what a card looks like*, *what a button's color means*, and *what an icon is*. This spec does not add or change any visual token, color, altitude, or type decision — it fixes the fact that those decisions are each re-implemented by hand in 15-20 separate files instead of living in one shared, reusable component. Where 016 said "every color traces to a token," this spec says "every recurring shape traces to a component." It is a componentization/architecture pass, not a redesign.
+
+## Product Summary
+
+`src/components/lecture-kit/` holds 40+ files. A superficial read suggests a rich, varied component library. A closer read shows the opposite: underneath ~20 different lecture-content types sits the *same* card shell, the *same* eyebrow label, and underneath 8 differently-named buttons sits, in at least one proven case, the *exact same CSS rule copy-pasted under a second class name*. There is no `component-kit`, no directory boundary, and no shared primitive between "generic, reusable UI element" and "lecture-domain component" — every author of a new lecture component re-derives the card wrapper and the button from scratch by copying whichever existing file looks closest.
+
+The fix is not new UI, it's ownership: pull the handful of primitives that already exist informally (a card/surface shell, a labeled eyebrow, a button, a disclosure toggle, a progress meter, a radio-option group, a labeled subsection, the icon set) out of dozens of call sites and into one `component-kit`, so the next new lecture component composes primitives instead of hand-copying markup and CSS from whichever file was open last.
+
+Three of these — the progress meter, the radio-option group, and the labeled subsection — surfaced on a second pass after the first draft of this spec covered only the card, button, icon, and disclosure duplication. They follow the exact same evidence pattern already established below: CSS that has, in at least one case, already been merged into one shared rule across two or three call sites, with the React component layer never following suit.
+
+## Product Outcome
+
+- A new `src/components/component-kit/` directory holds every primitive that is domain-agnostic — could render in any app, not just this one's lecture content.
+- `Callout`, `ConceptCard`, `Quiz`, `Flashcard`, and the ~16 other lecture-kit components that today hand-roll `<aside className="lecture-component surface-*">` + a `component-label` `<p>` + an `<h3>` title compose a single `Card` primitive instead.
+- The 8 separately-named button classes in `globals.css` collapse onto one `Button` primitive with a small, named variant set, eliminating the proven duplicate rule (`.quiz-reveal-button` / `.assessment-reveal-button`).
+- `Icon.tsx`, the one primitive that already behaves correctly today, moves into `component-kit` and becomes the template for what qualifies as a primitive.
+- The reveal/hide behavior duplicated across five components (state + `aria-expanded` + `aria-controls` wiring) shares one `Disclosure` primitive.
+- The three hand-rolled progress-bar implementations (`LectureProgressBar`, and `CollectionProgressBar`'s two exports) share one `ProgressMeter` primitive.
+- `Quiz`'s and `QuestionSet`'s two separately-written `role="radiogroup"` option lists share one `RadioOptionGroup` primitive.
+- The fifteen hand-rolled `<h4>` + bordered-region subsections inside `PracticeTask`, `QuestionSet`, `WorkedExample`, and `MistakeCorrection`'s "why it fails" section share one `LabeledSection` primitive.
+- None of this is visible to a learner as a change — the product looks and behaves identically. What changes is who is responsible for a card looking like a card, and a button behaving like a button: one file, not twenty.
+
+## Users And Jobs
+
+Primary users: the engineers and AI agents who add or modify lecture-kit components (not end learners, who see no behavior change here) — plus reviewers checking that new component types stay consistent with the system 014/015/016 already established.
+
+Jobs to be done:
+
+- As an engineer adding a new lecture component type, I want a `Card` primitive to compose instead of copying `WorkedExample.tsx`'s wrapper markup and hoping I picked the right altitude class.
+- As an engineer fixing a bug in the reveal/hide button (e.g., a focus-visible regression), I want to fix it in one `Button`/`Disclosure` primitive, not hunt down and separately patch `quiz-reveal-button`, `assessment-reveal-button`, `flashcard-reveal`, and `checklist-reset`.
+- As a reviewer verifying 016's visual-system rules are being followed, I want a small `component-kit` surface to check against, instead of auditing 40 files for a rogue hex value or an uncoordinated new button style.
+- As an engineer, I want a clear rule for "does this belong in component-kit or lecture-kit" so the codebase doesn't regress back into copy-paste the next time someone adds a component.
+
+## Problem
+
+Concrete, file-grounded duplication found in the current codebase:
+
+- **Card/surface wrapper, copied 20 times.** `Callout.tsx:7-9`, `ConceptCard.tsx:5-7`, and `WorkedExample.tsx:6-8` (plus `Accordion`, `Checklist`, `Comparison`, `Diagram`, `FreeResponse`, `GlossaryTerm`, `InstructorNote`, `MistakeCorrection`, `PracticeTask`, `QuestionSet`, `Quiz`, `Quote`, `ResourceLinks`, `StepList`, `Summary`, `Tabs`, `Timeline` — 20 files total) each hand-write `<aside className="lecture-component surface-{quiet|card|emphasis} {component}">`, a `<p className="component-label">{text}</p>` eyebrow, and an `<h3>{component.title}</h3>`. There is no shared component; every file re-derives the same three-line shell verbatim.
+- **Byte-identical CSS under two class names.** `.quiz-reveal-button` (`globals.css:1200-1216`) and `.assessment-reveal-button` (`globals.css:1369-1385`) are the same declaration block, introduced independently by `Quiz.tsx` and by `PracticeTask.tsx`/`FreeResponse.tsx`/`QuestionSet.tsx`, because there is no shared `Button` component for either file to reach for.
+- **The codebase already half-recognizes this.** `.checklist-reset`, `.flashcard-reveal`, and `.tabs-list button` are already merged onto one shared selector (`globals.css:1515-1516, 1533-1534`) — proof that these are already understood to be "the same button" at the CSS layer, just never lifted into one React primitive at the component layer.
+- **Two more near-duplicate "primary action" buttons.** `.resume-prompt-action` (`globals.css:811-826`) and `.collection-primary-action` (`globals.css:1961-1979`) both render an `<a>` styled as a filled `--action` button with matching padding/radius/weight, hand-copied rather than parameterized from one primitive (016's G7 unified their *color*; this spec unifies their *markup*).
+- **No domain boundary.** `Icon.tsx` — the one already-correct, genuinely reusable primitive in the codebase (added for 016's icon set) — sits inside `lecture-kit/` next to 40 lecture-domain components, with nothing marking it as safe to reuse outside a lecture context.
+- **Disclosure behavior duplicated, not just its markup.** `Flashcard.tsx:17-24`, `PracticeTask.tsx:60-67` (hints) and `:83-90` (solution), `FreeResponse.tsx:32-39`, and `QuestionSet.tsx:56-63` each independently write a `useState` boolean plus `aria-expanded`/`aria-controls` wiring against a differently-named button class, instead of sharing one disclosure hook/primitive.
+- **Progress bar, hand-rolled three times, with the CSS already unified.** `progress/LectureProgressBar.tsx:27-36` and `progress/CollectionProgressBar.tsx`'s two exports (`CollectionProgressBar`, lines 8-20, and `CollectionLectureProgress`, lines 24-39) each independently render a `role="progressbar"` track-and-fill pair with matching `aria-valuemin`/`aria-valuemax`/`aria-valuenow`. The CSS layer already recognizes these as one shape — `.lecture-progress-bar, .collection-progress-bar, .collection-progress-mini-bar` share one selector (`globals.css:637-639`) and `.lecture-progress-fill, .collection-progress-fill` share another (`globals.css:649-650`) — but the React layer never followed the CSS layer's lead, so the same track/fill/aria-value JSX is written three times across two files.
+- **Two option lists, one accidentally-diverged.** `Quiz.tsx`'s `.quiz-options` (`role="radiogroup"`, lines 21-37) and `QuestionSet.tsx`'s `.assessment-options` (`role="radiogroup"`, lines 37-50) both render a labeled radio per option, but `.quiz-option` and `.assessment-option` (`globals.css`) are two separately-declared rules with identical padding/background/border/radius and one likely-accidental difference (`align-items: center` vs. `align-items: flex-start`) — the kind of drift that happens when the same shape is written twice instead of shared once.
+- **Fifteen labeled subsections, no shared component.** `PracticeTask.tsx`'s `.assessment-region` blocks (scenario/task/steps/rubric, up to 4 per instance), `QuestionSet.tsx`'s per-question `.assessment-region` (1 per question), `WorkedExample.tsx`'s `.worked-example-region` blocks (problem/starter-code/walkthrough/solution/takeaway, up to 5 per instance), and `MistakeCorrection.tsx`'s standalone `.mistake-why` section ("Why it fails") all hand-write the same `<section><h4>Label</h4>...</section>` shape — 15 occurrences found across 4 files, more than any other duplicated shape in this audit. The CSS already anticipates this: `.assessment-region` and `.worked-example-region`/`.mistake-why` (`globals.css:1701-1717`) share nearly identical padding/border-top rules and a merged `h4` margin rule, but no component wraps the pattern. (`MistakeCorrection.tsx`'s other two regions — `.mistake-region`/`.correction-region` — are a genuinely different shape: boxed two-column grid cells with their own background/border/left-accent, not a plain labeled section, and are not part of this consolidation.)
+- **Existing tests already couple to today's class names.** `tests/lecture-template/assessment-hierarchy.test.tsx`, `collection-cta.test.tsx`, `lecture-components.test.tsx`, `parseTemplate.test.ts`, `validateTemplate.test.ts`, and `visual-hierarchy.test.tsx` assert against `lecture-component`, `surface-*`, `component-label`, and several of the button class names above. Any consolidation has to either preserve these class names on rendered output or update these tests deliberately — not as an accidental side effect.
+
+## Goals
+
+- G1. Create `src/components/component-kit/` as the home for generic, domain-agnostic UI primitives, distinct from `src/components/lecture-kit/`, which holds lecture-domain components that *compose* those primitives.
+- G2. Introduce one `Button` primitive covering the three variants already observed in production — `primary` (filled `--action`: quiz reveal, assessment reveal, resume CTA, collection CTA), `ghost` (bordered/quiet: reset buttons, tab buttons), and an anchor-rendering mode for CTA links (resume prompt, collection primary action) — and repoint every existing call site at it.
+- G3. Introduce one `Card` primitive owning the `lecture-component surface-*` wrapper plus an optional labeled eyebrow and title slot, and repoint all ~20 lecture-kit components that hand-roll this wrapper at it.
+- G4. Move `Icon.tsx` into `component-kit/` with zero behavior change, establishing it as the reference example of what belongs there.
+- G5. Introduce one `Disclosure` primitive (hook and/or component) for the reveal/hide `useState` + `aria-expanded`/`aria-controls` pattern duplicated across `Flashcard`, `PracticeTask` (hints and solution), `FreeResponse`, `QuestionSet`, and `Quiz`.
+- G6. Introduce one `ProgressMeter` primitive covering the track/fill/`aria-valuenow` shape duplicated across `LectureProgressBar` and `CollectionProgressBar`'s two exports, and repoint all three at it.
+- G7. Introduce one `RadioOptionGroup` primitive covering the `role="radiogroup"` + labeled-radio-per-option shape duplicated across `Quiz` and `QuestionSet`, supporting both with and without inline correct/incorrect option coloring.
+- G8. Introduce one `LabeledSection` primitive covering the `<h4>` + bordered-region shape duplicated 15 times across `PracticeTask`, `QuestionSet`, `WorkedExample`, and `MistakeCorrection`'s "why it fails" section.
+- G9. Zero visual or behavioral regression: every consolidated primitive renders the same computed styles and accessible semantics as today's hand-rolled version, or a deliberately reviewed and documented change where consolidation forces a small adjustment.
+
+## Non-Goals
+
+- No new visual design language — this spec consumes the tokens, altitudes, and action colors 015/016 already defined; it invents no new color, spacing, or type value.
+- No authoring-schema or `lecture-component` frontmatter changes.
+- No behavior change to reveal/disclosure semantics beyond what sharing code requires (same `aria-*` attributes, same keyboard behavior, same visual result).
+- Not a publishable design-system package — no Storybook, no versioning, no external consumers; `component-kit` is an internal directory boundary, not a distributable library.
+- No renaming of CSS classes that tests currently assert on, unless the corresponding test is updated in the same change and the rename is called out explicitly.
+- No consolidating components that only superficially resemble each other — verify real behavioral/visual equivalence before merging two call sites onto one primitive; a shared CSS selector today is a hint, not proof.
+- No refactor of `src/lib/lecture-template` (parser, validator, render pipeline) — this spec is component-layer only.
+
+## Product Decisions
+
+- Primitives are dumb. `component-kit` components accept props and render markup/classes; none of them know what a "quiz" or "flashcard" is.
+- Consolidate by proven duplication, not speculative reuse. Every primitive this spec introduces must replace at least two existing hand-rolled call sites found during this audit — no primitive is added "in case something needs it later."
+- Preserve rendered class names by default. Where tests or CSS selectors depend on a specific class name, the primitive accepts and forwards that class rather than forcing a rename; a rename only happens where explicitly called for here, with the corresponding test updated in the same change.
+- One migration at a time. Land `Button`, verify, then `Card`, verify, then `Disclosure`, verify — not one sweeping rewrite touching all three simultaneously.
+- CSS follows components, not the reverse. Once a primitive owns a variant, its `globals.css` rules merge into one shared declaration (extending the existing `.tabs-list button, .checklist-reset, .flashcard-reveal` precedent) rather than leaving one rule per legacy class name that all point at the same primitive.
+
+## UX Designer Notes
+
+This is a "one shape, N callers" pass — the same discipline 016 already applied to color and card altitude ("collapse twenty ad hoc treatments into a system of three or four"), applied one layer down, to the components that emit those treatments.
+
+A design system that lives only in CSS tokens and hand-copied JSX is half a system. 016 fixed *what* a color or altitude means; this spec fixes *who is responsible* for applying it consistently — the primitive component, not each of twenty component authors independently getting it right by eye.
+
+The test for whether something belongs in `component-kit` versus `lecture-kit`: could this exact component render, unmodified, inside a completely different app — a marketing site, an admin panel — with no lecture-domain knowledge baked in? `Icon` and `Button` pass. `SectionCompletionToggle` does not — it is shaped around `ProgressProvider`'s per-section completion state — and it stays in `lecture-kit` even though it renders a `<button>` under the hood; it should *compose* the `Button`/`Disclosure` primitives, not become one.
+
+Don't manufacture a fourth `Button` variant to avoid a hard call. If something doesn't cleanly fit `primary`/`ghost`/anchor-CTA, that's a signal to look again at whether it's really a button at all (versus a mis-modeled toggle or link), not a reason to grow the variant list.
+
+## Priority
+
+### P0: Component-Kit Scaffold and the Button Primitive
+
+Highest-duplication, best-evidenced case: a proven byte-identical CSS rule under two names, 11 hand-rolled call sites, and existing partial consolidation at the CSS layer to build on.
+
+Requirements:
+
+- Create `src/components/component-kit/` with its own `index.ts` (or per-file exports) and colocated types; no lecture-domain imports inside this directory.
+- Build `Button` with `primary` and `ghost` variants (and an `as="a"` or equivalent anchor-rendering mode for CTA links), matching current computed styles for every consolidated call site.
+- Repoint `Quiz.tsx`, `PracticeTask.tsx` (hints and solution), `FreeResponse.tsx`, `QuestionSet.tsx`, `Flashcard.tsx`, `Checklist.tsx`, `Tabs.tsx`, `progress/LectureProgressBar.tsx`, `progress/ResumePrompt.tsx`, and `CollectionPrimaryAction.tsx` at the shared `Button` primitive.
+- Merge `.quiz-reveal-button` and `.assessment-reveal-button` into one `globals.css` rule; merge `.resume-prompt-action`/`.collection-primary-action` into one anchor-CTA rule (parameterized for the one legitimate size difference between the two, if it is intentional rather than accidental drift).
+- Update or confirm every test in `tests/lecture-template/*` that asserts on the consolidated class names still passes, documenting any intentional class-name change.
+
+### P1: Card Primitive and Icon Relocation
+
+Requirements:
+
+- Build a `Card` primitive owning the `lecture-component surface-{quiet|card|emphasis}` wrapper, an optional eyebrow (`component-label`) slot, and an optional title slot rendering the appropriate heading level.
+- Repoint all ~20 lecture-kit components identified in Problem (`Callout`, `Accordion`, `Checklist`, `Comparison`, `ConceptCard`, `Diagram`, `Flashcard`, `FreeResponse`, `GlossaryTerm`, `InstructorNote`, `MistakeCorrection`, `PracticeTask`, `QuestionSet`, `Quiz`, `Quote`, `ResourceLinks`, `StepList`, `Summary`, `Tabs`, `Timeline`, `WorkedExample`) at `Card`, passing each component's existing altitude, label text, and title through as props rather than hand-writing the wrapper.
+- Move `Icon.tsx` into `component-kit/` unchanged (same `IconName` union, same accessible defaults); update its ~2 import sites.
+- Verify no visual diff at the same altitude/label/title output as today for every migrated component.
+
+### P2: Disclosure Primitive
+
+Requirements:
+
+- Build a `Disclosure` primitive (hook plus a thin presentational wrapper around `Button`) that owns the `useState` boolean, `aria-expanded`, and `aria-controls` wiring for reveal/hide interactions.
+- Repoint `Flashcard.tsx`, `PracticeTask.tsx` (hints and solution — two independent disclosures on one component), `FreeResponse.tsx`, and `QuestionSet.tsx` at it; leave `Quiz.tsx`'s reveal wired through the same primitive if its feedback-state logic (correct/incorrect) fits without distorting the primitive — otherwise document why it stays bespoke.
+- Confirm the 150-200ms transition behavior and `prefers-reduced-motion` handling introduced in 016 continue to apply per call site through the shared primitive.
+
+### P3: Progress, Choice, and Structural Primitives
+
+Found on a second pass over the same codebase; same duplication standard as P0-P2 (at least two proven call sites per primitive), lower interaction risk since none of these touch reveal/disclosure state.
+
+Requirements:
+
+- Build a `ProgressMeter` primitive (track + fill + `aria-valuemin`/`aria-valuemax`/`aria-valuenow`, with a `size` variant covering the existing default and "mini" scales) and repoint `LectureProgressBar.tsx`, `CollectionProgressBar.tsx`'s `CollectionProgressBar` export, and its `CollectionLectureProgress` export at it.
+- Build a `RadioOptionGroup` primitive (`role="radiogroup"` + labeled radio per option) supporting an optional inline correct/incorrect coloring mode, and repoint `Quiz.tsx`'s option list and `QuestionSet.tsx`'s per-question option list at it. Resolve the `align-items: center` vs. `align-items: flex-start` divergence between `.quiz-option`/`.assessment-option` as part of this migration — decide by screenshot whether it's an intentional difference (make it a prop) or drift (unify).
+- Build a `LabeledSection` primitive (`<h4>` label + bordered/divided region, with an already-established "no border on the first one" rule) and repoint the 15 occurrences across `PracticeTask.tsx`, `QuestionSet.tsx`, `WorkedExample.tsx`, and `MistakeCorrection.tsx`'s "why it fails" section at it. Do not force `MistakeCorrection`'s other two regions (`.mistake-region`/`.correction-region`, a boxed two-column grid) into this primitive — they're a different shape.
+
+## Recommended Component Architecture
+
+### Directory Shape
+
+- `src/components/component-kit/`: `Button`, `Card`, `Icon`, `Disclosure` (and their types) — no imports from `lecture-kit` or `@/lib/lecture-template`.
+- `src/components/lecture-kit/`: unchanged domain components, now composing `component-kit` primitives instead of hand-rolling markup.
+- Import direction is one-way: `lecture-kit` imports from `component-kit`; `component-kit` never imports from `lecture-kit`.
+
+### Button
+
+- Variants: `primary` (filled `--action`, used for every forward-moving CTA per 016's G7), `ghost` (bordered/quiet, used for resets and tab buttons), and an anchor-rendering mode for the two CTA-link call sites.
+- Props carry through `className` so existing/required test-facing class names are preserved without every call site re-deriving them.
+- Owns the 44px minimum tap target already established as a pattern (`progress-reset-button`, `resume-prompt-dismiss`) so it's guaranteed once, not per call site.
+
+### Card
+
+- Props: `altitude` (`quiet | card | emphasis`, defaulting to `card`), optional `label` (renders the eyebrow), optional `title` (renders the heading), `className` for the component-specific modifier class (e.g. `callout-${variant}`), and `children`.
+- Heading level stays configurable per call site (most use `h3`; verify none require `h4` at the wrapper level before hardcoding).
+
+### Disclosure
+
+- Owns open/closed state, `aria-expanded`/`aria-controls`, and id generation for the controlled region; the calling component supplies the trigger label and the revealed content.
+- Composes `Button` for its trigger rather than rendering a raw `<button>`.
+
+### ProgressMeter
+
+- Props: `value` (0-100), `label` (accessible name), `size?: "default" | "mini"`.
+- Owns the `role="progressbar"` element and its `aria-valuemin`/`aria-valuemax`/`aria-valuenow`; the calling component supplies the surrounding heading/summary text (e.g. "X of Y sections completed"), which stays outside the primitive since its wording differs per caller.
+
+### RadioOptionGroup
+
+- Props: `name`, `options`, `selected`, `onSelect`, and an optional `revealState` (e.g. `"hidden" | "correct" | "incorrect"` per option) that switches on the inline coloring `Quiz` needs but `QuestionSet` does not.
+- Owns the `role="radiogroup"` wrapper and per-option `<label><input type="radio">...</label>` markup; does not own the reveal button or the revealed-answer region, which stay with `Disclosure`/the calling component.
+
+### LabeledSection
+
+- Props: `label` (renders `<h4>`), `children`, and an implicit "no top border on the first section in a group" rule matching today's `:first-of-type` CSS behavior.
+- Purely structural — no state, no behavior — the simplest primitive in this spec and the highest-occurrence one (15 call sites).
+
+## Accessibility Requirements
+
+- Every `aria-expanded`, `aria-controls`, `aria-pressed`, and `aria-label` currently present on a consolidated element is preserved exactly after migration to a shared primitive.
+- The 44px minimum tap target already required on buttons in this codebase holds for every variant of the shared `Button` primitive, not just the call sites that happened to have it before.
+- No change to any existing focus-visible treatment; shared primitives must not regress keyboard focus styling established in 016.
+- Icon relocation does not change `aria-hidden`/accessible-name behavior for any existing `Icon` consumer.
+- `ProgressMeter`'s `role="progressbar"` and `aria-valuemin`/`aria-valuemax`/`aria-valuenow` are preserved exactly for all three consolidated call sites.
+- `RadioOptionGroup`'s `role="radiogroup"` and per-option accessible labeling are preserved exactly for `Quiz` and `QuestionSet`.
+
+## Responsive Requirements
+
+- No regression at the 390px/768px/1280px breakpoints already verified by 014/015/016 for any component migrated to a shared primitive.
+- Card and Button primitives must not introduce new horizontal overflow or wrapping regressions at 390px for any of their ~20+31 call sites.
+
+## Functional Requirements
+
+- Every existing lecture template (`examples/`, `lectures/`) continues to render identically; no authoring-schema changes.
+- Static export and review-package output remain visually consistent with the live site, aside from intentionally documented class-name consolidations.
+- No new runtime dependency introduced for `component-kit`.
+- `component-kit` primitives are fully typed (no `any`), consistent with the rest of the codebase's TypeScript strictness.
+- The full existing test suite (`tests/lecture-template/*`) passes; any test assertion that must change because a class name was intentionally consolidated is updated in the same change and called out in the PR description, not left as an incidental diff.
+- Migration proceeds one primitive at a time (per Priority order) so each stage can be verified independently before the next begins.
+
+## Success Metrics / Quality Gates
+
+- The count of independent hand-rolled `<aside className="lecture-component ...">` wrapper blocks in `lecture-kit/*.tsx` drops from ~20 to 0 — all route through `Card`.
+- `.quiz-reveal-button` and `.assessment-reveal-button` no longer exist as two separately-declared identical rule blocks in `globals.css`; one rule serves both call sites via the shared `Button` primitive.
+- `Icon.tsx` resolves from `component-kit`, not `lecture-kit`, with all existing consumers updated and passing.
+- The five reveal/hide call sites (`Flashcard`, `PracticeTask` x2, `FreeResponse`, `QuestionSet`) share one `Disclosure` primitive instead of five independent `useState`/`aria-*` implementations.
+- `LectureProgressBar` and both `CollectionProgressBar` exports share one `ProgressMeter` primitive instead of three hand-rolled progress bars.
+- `Quiz` and `QuestionSet` share one `RadioOptionGroup` primitive instead of two separately-declared option-list implementations, and their CSS divergence (`align-items`) is resolved deliberately, not left as drift.
+- The 15 `<h4>` + bordered-region occurrences in `PracticeTask`, `QuestionSet`, `WorkedExample`, and `MistakeCorrection` share one `LabeledSection` primitive.
+- Full existing test suite passes with all class-name-related changes intentional and documented.
+- No visual diff at 390px/768px/1280px in light and dark theme beyond the deliberate class-name consolidations described in this spec.
+
+## Acceptance Criteria
+
+- `src/components/component-kit/` exists, contains `Button`, `Card`, `Icon`, and `Disclosure`, and contains no import from `lecture-kit` or the lecture-domain type layer.
+- Every lecture-kit component identified in Problem as hand-rolling the card wrapper now composes `Card` instead.
+- Every lecture-kit component identified in Problem as hand-rolling a button now composes `Button` (directly or via `Disclosure`).
+- `globals.css` no longer contains two separately-named, identically-declared button rules; consolidated primitives correspond to consolidated CSS.
+- `Icon.tsx` lives in `component-kit/` with unchanged public behavior.
+- `LectureProgressBar` and both `CollectionProgressBar` exports compose `ProgressMeter` instead of hand-rolling their own progress track/fill.
+- `Quiz` and `QuestionSet` compose `RadioOptionGroup` instead of hand-rolling their own `role="radiogroup"` option list.
+- `PracticeTask`, `QuestionSet`, and `WorkedExample` compose `LabeledSection` instead of hand-rolling their own `<h4>` + bordered-region markup.
+- All accessibility attributes (`aria-expanded`, `aria-controls`, `aria-pressed`, `aria-label`) present before migration are present and correct after migration.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests pass, with any necessary, intentional updates documented.
+- Verification includes a visual check (screenshots or equivalent) of a component-heavy lecture page before and after migration at 390px/768px/1280px in light and dark themes, showing no unintended difference.
+
+## Out Of Scope For 017
+
+- A `NoScriptNotice` primitive. Seven `<noscript>` blocks (`Flashcard`, `Diagram`, `FreeResponse`, `PracticeTask`, `QuestionSet`, `Quiz`, `Tabs`) share a similar shape, but two of them (`Quiz`, `Diagram`) embed a literal `<style>` override tied to a specific class name rather than pure text content — lower duplication value and higher risk than the primitives in this spec's priority list. Candidate for a future pass once `Button`'s class-name approach (Step 2 of the implementation plan) is settled, since `NoScriptNotice`'s style-override variant depends on that decision.
+- A Storybook, docs site, or published package for `component-kit`.
+- Any new visual token, color, altitude, or typography decision (that's 016's domain; this spec only consumes it).
+- Any new `lecture-component` type or authoring/schema change.
+- Speculative extraction of any component that is not already duplicated at least twice, found during this audit.
+- Refactoring `src/lib/lecture-template` (parser/validator/render pipeline).
+- `015-A3` active-section state or any other still-unimplemented item already deferred by 014/015/016.

@@ -1,10 +1,9 @@
 import type { ResourceLinksComponent } from "@/lib/lecture-template/types";
+import { Card } from "@/components/component-kit";
 
 export function ResourceLinks({ component }: { component: ResourceLinksComponent }) {
   return (
-    <aside className="lecture-component surface-quiet resource-links">
-      <p className="component-label">Resources</p>
-      <h3>{component.title}</h3>
+    <Card altitude="quiet" label="Resources" title={component.title} className="resource-links">
       <ul>
         {component.links.map((link, index) => {
           const external = isExternalUrl(link.url);
@@ -21,7 +20,7 @@ export function ResourceLinks({ component }: { component: ResourceLinksComponent
           );
         })}
       </ul>
-    </aside>
+    </Card>
   );
 }
 

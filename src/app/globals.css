@@ -634,9 +634,7 @@ details[open] > summary .learning-path-chevron {
   font-weight: 700;
 }
 
-.lecture-progress-bar,
-.collection-progress-bar,
-.collection-progress-mini-bar {
+.progress-meter-track {
   position: relative;
   width: 100%;
   height: 12px;
@@ -646,8 +644,7 @@ details[open] > summary .learning-path-chevron {
   border-radius: 999px;
 }
 
-.lecture-progress-fill,
-.collection-progress-fill {
+.progress-meter-fill {
   display: block;
   height: 100%;
   background: var(--accent);
@@ -701,7 +698,7 @@ details[open] > summary .learning-path-chevron {
   min-width: 0;
 }
 
-.progress-reset-button {
+.btn-ghost-muted {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
@@ -717,11 +714,11 @@ details[open] > summary .learning-path-chevron {
   cursor: pointer;
 }
 
-.progress-reset-button:hover {
+.btn-ghost-muted:hover {
   background: var(--surface-accent);
 }
 
-.progress-reset-button:disabled {
+.btn-ghost-muted:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -808,7 +805,7 @@ details[open] > summary .learning-path-chevron {
   gap: 14px;
 }
 
-.resume-prompt-action {
+.btn-primary-compact {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
@@ -819,14 +816,17 @@ details[open] > summary .learning-path-chevron {
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.resume-prompt-action:hover {
+.btn-primary-compact:hover {
   background: var(--action-hover);
 }
 
-.resume-prompt-dismiss {
+.btn-ghost-text {
+  display: inline-flex;
   min-height: 44px;
+  align-items: center;
   padding: 0;
   color: var(--muted);
   background: none;
@@ -873,7 +873,7 @@ details[open] > summary .learning-path-chevron {
   margin-top: 14px;
 }
 
-.collection-progress-mini-bar {
+.progress-meter-track-mini {
   height: 9px;
 }
 
@@ -1197,14 +1197,14 @@ details[open] > summary .learning-path-chevron {
   color: var(--warning);
 }
 
-.quiz-reveal-button {
+.btn-primary {
   display: inline-flex;
   width: fit-content;
   max-width: 100%;
   min-height: 44px;
   align-items: center;
   justify-content: center;
-  margin: 2px 0 12px;
+  margin: 4px 0 12px;
   padding: 9px 14px;
   color: #ffffff;
   background: var(--action);
@@ -1212,11 +1212,12 @@ details[open] > summary .learning-path-chevron {
   border-radius: 8px;
   font: inherit;
   font-weight: 800;
+  text-decoration: none;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 
-.quiz-reveal-button:hover {
+.btn-primary:hover {
   background: var(--action-hover);
 }
 
@@ -1318,18 +1319,17 @@ details[open] > summary .learning-path-chevron {
   color: var(--muted);
 }
 
-.assessment-region {
+.labeled-section {
   min-width: 0;
   padding: 14px 0;
   border-top: 1px solid var(--border);
 }
 
-.assessment-region:first-of-type {
+.labeled-section:first-of-type {
   border-top: 0;
 }
 
-.assessment-region h4,
-.practice-starter-code h4 {
+.labeled-section h4 {
   margin: 0 0 8px;
   font-size: 1rem;
 }
@@ -1364,29 +1364,6 @@ details[open] > summary .learning-path-chevron {
 .assessment-option span {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.assessment-reveal-button {
-  display: inline-flex;
-  width: fit-content;
-  max-width: 100%;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  margin: 4px 0 12px;
-  padding: 9px 14px;
-  color: #ffffff;
-  background: var(--action);
-  border: 1px solid var(--action);
-  border-radius: 8px;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-
-.assessment-reveal-button:hover {
-  background: var(--action-hover);
 }
 
 .assessment-hidden-region {
@@ -1454,12 +1431,6 @@ details[open] > summary .learning-path-chevron {
   padding-left: 22px;
 }
 
-.practice-starter-code {
-  min-width: 0;
-  padding: 14px 0;
-  border-top: 1px solid var(--border);
-}
-
 .practice-starter-code .code-block {
   margin: 10px 0 0;
 }
@@ -1511,9 +1482,7 @@ details[open] > summary .learning-path-chevron {
   margin: 12px 0;
 }
 
-.tabs-list button,
-.checklist-reset,
-.flashcard-reveal {
+.btn-ghost {
   display: inline-flex;
   min-height: 44px;
   align-items: center;
@@ -1528,10 +1497,8 @@ details[open] > summary .learning-path-chevron {
   cursor: pointer;
 }
 
-.tabs-list button[aria-selected="true"],
-.tabs-list button:hover,
-.checklist-reset:hover,
-.flashcard-reveal:hover {
+.tabs-list .btn-ghost[aria-selected="true"],
+.btn-ghost:hover {
   color: #ffffff;
   background: var(--accent-strong);
 }
@@ -1698,21 +1665,8 @@ details[open] > summary .learning-path-chevron {
   border-left-color: var(--info-border);
 }
 
-.worked-example-region,
-.mistake-why {
-  min-width: 0;
-  padding: 12px 0;
-  border-top: 1px solid var(--border);
-}
-
-.worked-example-region:first-of-type {
-  border-top: 0;
-}
-
-.worked-example-region h4,
 .mistake-region h4,
-.correction-region h4,
-.mistake-why h4 {
+.correction-region h4 {
   margin: 0 0 8px;
 }
 
@@ -1958,7 +1912,7 @@ td {
   gap: 24px;
 }
 
-.collection-primary-action {
+.btn-primary-lg {
   display: inline-flex;
   min-height: 48px;
   align-items: center;
@@ -1972,9 +1926,10 @@ td {
   font-weight: 800;
   font-size: 1.05rem;
   text-decoration: none;
+  cursor: pointer;
 }
 
-.collection-primary-action:hover {
+.btn-primary-lg:hover {
   background: var(--action-hover);
 }
 

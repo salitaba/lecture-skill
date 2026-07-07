@@ -1,10 +1,9 @@
 import type { TimelineComponent } from "@/lib/lecture-template/types";
+import { Card } from "@/components/component-kit";
 
 export function Timeline({ component }: { component: TimelineComponent }) {
   return (
-    <aside className={`lecture-component surface-card timeline timeline-${component.orientation}`}>
-      <p className="component-label">Timeline</p>
-      <h3>{component.title}</h3>
+    <Card altitude="card" label="Timeline" title={component.title} className={`timeline timeline-${component.orientation}`}>
       <ol className="timeline-items">
         {component.items.map((item, index) => (
           <li className="timeline-item" key={`${item.label}-${index}`}>
@@ -19,6 +18,6 @@ export function Timeline({ component }: { component: TimelineComponent }) {
           </li>
         ))}
       </ol>
-    </aside>
+    </Card>
   );
 }

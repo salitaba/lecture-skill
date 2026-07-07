@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import type { ChecklistComponent } from "@/lib/lecture-template/types";
+import { Button, Card } from "@/components/component-kit";
 
 export function Checklist({ component, instanceId }: { component: ChecklistComponent; instanceId?: string }) {
   const fallbackId = useId();
@@ -33,9 +34,7 @@ export function Checklist({ component, instanceId }: { component: ChecklistCompo
   }
 
   return (
-    <aside className="lecture-component surface-card checklist">
-      <p className="component-label">Checklist</p>
-      <h3>{component.title}</h3>
+    <Card altitude="card" label="Checklist" title={component.title} className="checklist">
       <ul className="checklist-items">
         {component.items.map((item, index) => {
           const inputId = `${storageKey}-${index}`.replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -48,12 +47,12 @@ export function Checklist({ component, instanceId }: { component: ChecklistCompo
         })}
       </ul>
       {component.reset_label ? (
-        <button type="button" className="checklist-reset" onClick={reset}>
+        <Button variant="ghost" className="checklist-reset" onClick={reset}>
           {component.reset_label}
-        </button>
+        </Button>
       ) : null}
       <p className="checklist-storage-note">Saved only in this browser when local storage is enabled for this checklist.</p>
-    </aside>
+    </Card>
   );
 }
 

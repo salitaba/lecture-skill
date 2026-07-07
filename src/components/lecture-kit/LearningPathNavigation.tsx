@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LectureSection } from "@/lib/lecture-template/types";
 import { lectureNavigationTargets } from "@/lib/lecture-template/navigationTargets";
 import { useProgressOptional } from "./progress/ProgressProvider";
-import { Icon } from "./Icon";
+import { Icon } from "@/components/component-kit";
 
 const nonAuthoredAnchors = [
   lectureNavigationTargets.overview.href.slice(1),

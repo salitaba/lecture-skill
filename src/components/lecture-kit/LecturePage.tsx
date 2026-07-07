@@ -1,6 +1,6 @@
 import { AnswerKeyAppendix } from "@/components/lecture-kit/AnswerKeyAppendix";
 import { GlossaryIndex } from "@/components/lecture-kit/GlossaryIndex";
-import { Icon } from "@/components/lecture-kit/Icon";
+import { Icon } from "@/components/component-kit";
 import { LectureHeader } from "@/components/lecture-kit/LectureHeader";
 import { LectureNavigation, type NavTarget } from "@/components/lecture-kit/LectureNavigation";
 import { PageShell } from "@/components/lecture-kit/PageShell";

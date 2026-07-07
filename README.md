@@ -242,7 +242,20 @@ All styling lives in `src/app/globals.css`. There is no Tailwind, CSS Modules, o
 - **Elevation**: `--shadow-sm`/`--shadow-md` are reserved for page-level surfaces (`.lecture-panel`, `.lecture-section`, `.validation-panel`, and `.surface-emphasis`). Nested component cards stay flat so elevation communicates page structure, not per-component competition.
 - **Dark mode**: driven entirely by `prefers-color-scheme: dark` token overrides in `:root`; there is no separate dark-mode design pass per component. Print output (`@media print`) is unaffected and always forces light, high-contrast colors regardless of screen theme.
 - **Motion**: reveal/expand interactions (`Tabs`, `Quiz`, assessment reveal regions, `Flashcard`, `Accordion`) use the `reveal-fade-in` keyframe animation, which fires correctly the moment `[hidden]`/`[open]` flips `display` away from `none` (a CSS transition cannot do this; a CSS animation can). All of it is disabled under `prefers-reduced-motion: reduce`.
-- **Icons**: `src/components/lecture-kit/Icon.tsx` is the only source of inline SVG icons (chevron, check, warning, arrow-prev, arrow-next). Icons are decorative (`aria-hidden`) — the adjacent text always carries the accessible name.
+- **Icons**: `src/components/component-kit/Icon.tsx` is the only source of inline SVG icons (chevron, check, warning, arrow-prev, arrow-next). Icons are decorative (`aria-hidden`) — the adjacent text always carries the accessible name.
+
+## Component Architecture
+
+`src/components/component-kit/` holds generic, domain-agnostic UI primitives: `Button`, `Card`, `Icon`, `Disclosure`/`useDisclosure`, `ProgressMeter`, `RadioOptionGroup`, `LabeledSection`. These components take no dependency on lecture-domain types or on `@/lib/lecture-template`, and could render unmodified in an unrelated app.
+
+`src/components/lecture-kit/` holds every lecture-domain component (`Quiz`, `Callout`, `ConceptCard`, and the rest) and *composes* `component-kit` primitives rather than hand-rolling markup:
+
+- A new component that needs the standard card shell (border, altitude, an eyebrow label, an optional title) composes `Card`, passing `altitude`, `label`, and `title` as props — it does not write its own `<aside className="lecture-component surface-...">` wrapper.
+- A new interactive button composes `Button` (`variant="primary"` for forward-moving actions, `variant="ghost"` for resets/toggles) rather than a bare `<button>` with its own class.
+- A reveal/hide interaction composes `useDisclosure()` (state + id generation) and, where the trigger is a plain toggle, `DisclosureTrigger` — rather than a fresh `useState` boolean and hand-wired `aria-expanded`/`aria-controls` pair.
+- A progress bar composes `ProgressMeter`; a radio-button option list composes `RadioOptionGroup`; a `<h4>`-labeled subsection within a larger component composes `LabeledSection`.
+
+Import direction is one-way: `lecture-kit` imports from `component-kit`; `component-kit` never imports from `lecture-kit`. Before adding a new visual or interactive pattern, check whether an existing `component-kit` primitive already covers it — the goal is that the next new lecture component is assembled from primitives, not copied from whichever existing file looks closest.
 
 ## Template Schema
 

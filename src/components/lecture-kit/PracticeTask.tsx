@@ -1,51 +1,41 @@
 "use client";
 
-import { useId, useState } from "react";
 import type { PracticeTaskComponent } from "@/lib/lecture-template/types";
 import { CodeBlock } from "./CodeBlock";
+import { Card, DisclosureTrigger, LabeledSection, useDisclosure } from "@/components/component-kit";
 
 export function PracticeTask({ component }: { component: PracticeTaskComponent }) {
-  const [hintsRevealed, setHintsRevealed] = useState(false);
-  const [solutionRevealed, setSolutionRevealed] = useState(false);
-  const baseId = useId();
-  const hintsRegionId = `${baseId}-hints`;
-  const hintsLabelId = `${baseId}-hints-label`;
-  const solutionRegionId = `${baseId}-solution`;
-  const solutionLabelId = `${baseId}-solution-label`;
+  const { open: hintsRevealed, toggle: toggleHints, regionId: hintsRegionId } = useDisclosure("hints");
+  const { open: solutionRevealed, toggle: toggleSolution, regionId: solutionRegionId } = useDisclosure("solution");
+  const hintsLabelId = `${hintsRegionId}-label`;
+  const solutionLabelId = `${solutionRegionId}-label`;
 
   return (
-    <aside id={component.anchor} className="lecture-component surface-emphasis assessment-card practice-task-card">
-      <p className="component-label">Practice task</p>
-      <h3>{component.title}</h3>
+    <Card id={component.anchor} altitude="emphasis" label="Practice task" title={component.title} className="assessment-card practice-task-card">
       {component.scenario ? (
-        <section className="assessment-region">
-          <h4>Scenario</h4>
+        <LabeledSection label="Scenario">
           <p>{component.scenario}</p>
-        </section>
+        </LabeledSection>
       ) : null}
-      <section className="assessment-region">
-        <h4>Task</h4>
+      <LabeledSection label="Task">
         <p>{component.task}</p>
-      </section>
+      </LabeledSection>
       {component.steps ? (
-        <section className="assessment-region">
-          <h4>Steps</h4>
+        <LabeledSection label="Steps">
           <ol>
             {component.steps.map((step, index) => (
               <li key={`${step}-${index}`}>{step}</li>
             ))}
           </ol>
-        </section>
+        </LabeledSection>
       ) : null}
       {component.starter_code ? (
-        <section className="practice-starter-code">
-          <h4>Starter code</h4>
+        <LabeledSection label="Starter code" className="practice-starter-code">
           <CodeBlock component={{ type: "code_block", language: component.starter_code.language, code: component.starter_code.code }} />
-        </section>
+        </LabeledSection>
       ) : null}
       {component.rubric ? (
-        <section className="assessment-region practice-rubric">
-          <h4>Rubric</h4>
+        <LabeledSection label="Rubric" className="practice-rubric">
           <ul>
             {component.rubric.map((item, index) => (
               <li key={`${item.criterion}-${index}`}>
@@ -53,19 +43,13 @@ export function PracticeTask({ component }: { component: PracticeTaskComponent }
               </li>
             ))}
           </ul>
-        </section>
+        </LabeledSection>
       ) : null}
       {component.hints ? (
         <>
-          <button
-            type="button"
-            className="assessment-reveal-button"
-            aria-expanded={hintsRevealed}
-            aria-controls={hintsRegionId}
-            onClick={() => setHintsRevealed((current) => !current)}
-          >
+          <DisclosureTrigger className="assessment-reveal-button" open={hintsRevealed} regionId={hintsRegionId} onToggle={toggleHints}>
             {hintsRevealed ? "Hide hints" : "Show hints"}
-          </button>
+          </DisclosureTrigger>
           <div id={hintsRegionId} className="assessment-hidden-region" hidden={!hintsRevealed} aria-labelledby={hintsLabelId}>
             <p id={hintsLabelId} className="assessment-region-label">
               Hints
@@ -80,15 +64,9 @@ export function PracticeTask({ component }: { component: PracticeTaskComponent }
       ) : null}
       {component.solution ? (
         <>
-          <button
-            type="button"
-            className="assessment-reveal-button"
-            aria-expanded={solutionRevealed}
-            aria-controls={solutionRegionId}
-            onClick={() => setSolutionRevealed((current) => !current)}
-          >
+          <DisclosureTrigger className="assessment-reveal-button" open={solutionRevealed} regionId={solutionRegionId} onToggle={toggleSolution}>
             {solutionRevealed ? "Hide solution" : "Show solution"}
-          </button>
+          </DisclosureTrigger>
           <div id={solutionRegionId} className="assessment-hidden-region" hidden={!solutionRevealed} aria-labelledby={solutionLabelId}>
             <p id={solutionLabelId} className="assessment-region-label">
               Solution
@@ -98,6 +76,6 @@ export function PracticeTask({ component }: { component: PracticeTaskComponent }
         </>
       ) : null}
       <noscript className="assessment-noscript">Interactive hint and solution reveal requires JavaScript. Printed output includes hidden guidance.</noscript>
-    </aside>
+    </Card>
   );
 }

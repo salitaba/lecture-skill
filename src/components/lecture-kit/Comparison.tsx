@@ -1,5 +1,6 @@
 import { useId } from "react";
 import type { ComparisonComponent } from "@/lib/lecture-template/types";
+import { Card } from "@/components/component-kit";
 
 export function Comparison({ component }: { component: ComparisonComponent }) {
   const idPrefix = useId().replaceAll(":", "");
@@ -8,9 +9,7 @@ export function Comparison({ component }: { component: ComparisonComponent }) {
   const rightLabelId = `${idPrefix}-comparison-right-label`;
 
   return (
-    <aside className="lecture-component surface-card comparison">
-      <p className="component-label">Comparison</p>
-      <h3>{component.title}</h3>
+    <Card altitude="card" label="Comparison" title={component.title} className="comparison">
       <div className="comparison-list">
         <div className="comparison-header">
           <span id={topicLabelId}>Topic</span>
@@ -41,6 +40,6 @@ export function Comparison({ component }: { component: ComparisonComponent }) {
           );
         })}
       </div>
-    </aside>
+    </Card>
   );
 }

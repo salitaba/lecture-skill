@@ -1,6 +1,7 @@
 "use client";
 
 import { useProgress } from "./ProgressProvider";
+import { Button, ProgressMeter } from "@/components/component-kit";
 
 const milestones = [25, 50, 75, 100];
 
@@ -24,16 +25,7 @@ export function LectureProgressBar() {
         </div>
       </div>
 
-      <div
-        className="lecture-progress-bar"
-        role="progressbar"
-        aria-label="Lecture progress"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percentComplete}
-      >
-        <span className="lecture-progress-fill" style={{ width: `${percentComplete}%` }} />
-      </div>
+      <ProgressMeter value={percentComplete} label="Lecture progress" />
 
       <div className="lecture-progress-milestones-wrapper">
         <ol className="lecture-progress-milestones" aria-label="Progress milestones">
@@ -49,9 +41,9 @@ export function LectureProgressBar() {
       </div>
 
       <div className="lecture-progress-footer">
-        <button type="button" className="progress-reset-button" onClick={onReset} disabled={totalSections === 0}>
+        <Button variant="ghost" tone="muted" className="progress-reset-button" onClick={onReset} disabled={totalSections === 0}>
           Reset progress
-        </button>
+        </Button>
       </div>
     </section>
   );

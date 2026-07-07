@@ -1,10 +1,9 @@
 import type { InstructorNoteComponent } from "@/lib/lecture-template/types";
+import { Card } from "@/components/component-kit";
 
 export function InstructorNote({ component }: { component: InstructorNoteComponent }) {
   return (
-    <aside className="lecture-component surface-quiet instructor-note">
-      <p className="component-label">Instructor note</p>
-      <h3>{component.title}</h3>
+    <Card altitude="quiet" label="Instructor note" title={component.title} className="instructor-note">
       <dl className="instructor-note-meta">
         <div>
           <dt>Audience</dt>
@@ -18,6 +17,6 @@ export function InstructorNote({ component }: { component: InstructorNoteCompone
         ) : null}
       </dl>
       <p>{component.body}</p>
-    </aside>
+    </Card>
   );
 }

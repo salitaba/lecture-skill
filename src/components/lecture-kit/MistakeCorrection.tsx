@@ -1,10 +1,9 @@
 import type { MistakeCorrectionComponent } from "@/lib/lecture-template/types";
+import { Card, LabeledSection } from "@/components/component-kit";
 
 export function MistakeCorrection({ component }: { component: MistakeCorrectionComponent }) {
   return (
-    <aside className="lecture-component surface-card mistake-correction">
-      <p className="component-label">Common mistake</p>
-      <h3>{component.title}</h3>
+    <Card altitude="card" label="Common mistake" title={component.title} className="mistake-correction">
       <div className="mistake-correction-grid">
         <section className="mistake-region">
           <h4>Mistake</h4>
@@ -17,10 +16,9 @@ export function MistakeCorrection({ component }: { component: MistakeCorrectionC
           {component.example_after ? <pre className="mistake-example">{component.example_after}</pre> : null}
         </section>
       </div>
-      <section className="mistake-why">
-        <h4>Why it fails</h4>
+      <LabeledSection label="Why it fails" className="mistake-why">
         <p>{component.why_it_fails}</p>
-      </section>
-    </aside>
+      </LabeledSection>
+    </Card>
   );
 }

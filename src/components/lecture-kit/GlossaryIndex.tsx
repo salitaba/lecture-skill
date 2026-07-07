@@ -1,5 +1,5 @@
 import type { GlossaryEntry } from "@/lib/lecture-template/glossaryIndex";
-import { Icon } from "./Icon";
+import { Icon } from "@/components/component-kit";
 
 export interface GlossaryIndexProps {
   entries: GlossaryEntry[];

@@ -2,6 +2,7 @@
 
 import { KeyboardEvent, useId, useMemo, useState, useSyncExternalStore } from "react";
 import type { TabsComponent } from "@/lib/lecture-template/types";
+import { Button, Card } from "@/components/component-kit";
 
 export function Tabs({ component }: { component: TabsComponent }) {
   const idPrefix = useId().replaceAll(":", "");
@@ -41,15 +42,19 @@ export function Tabs({ component }: { component: TabsComponent }) {
   }
 
   return (
-    <aside className="lecture-component surface-card tabs" data-enhanced={enhanced ? "true" : "false"}>
-      <p className="component-label">Tabs</p>
-      <h3>{component.title}</h3>
+    <Card
+      altitude="card"
+      label="Tabs"
+      title={component.title}
+      className="tabs"
+      attributes={{ "data-enhanced": enhanced ? "true" : "false" }}
+    >
       <div className="tabs-list" role="tablist" aria-label={component.title}>
         {component.tabs.map((panel, index) => (
-          <button
+          <Button
+            variant="ghost"
             id={ids[index].tab}
             key={`${panel.label}-${index}`}
-            type="button"
             role="tab"
             aria-selected={activeIndex === index}
             aria-controls={ids[index].panel}
@@ -58,7 +63,7 @@ export function Tabs({ component }: { component: TabsComponent }) {
             onKeyDown={(event) => onKeyDown(event, index)}
           >
             {panel.label}
-          </button>
+          </Button>
         ))}
       </div>
       <div className="tabs-panels">
@@ -77,7 +82,7 @@ export function Tabs({ component }: { component: TabsComponent }) {
         ))}
       </div>
       <noscript className="tabs-noscript">All tab panels are shown in the authored order when JavaScript is unavailable.</noscript>
-    </aside>
+    </Card>
   );
 }
 

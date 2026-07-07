@@ -1,9 +1,9 @@
 import type { GlossaryTermComponent } from "@/lib/lecture-template/types";
+import { Card } from "@/components/component-kit";
 
 export function GlossaryTerm({ component, id }: { component: GlossaryTermComponent; id?: string }) {
   return (
-    <aside id={id} className="lecture-component surface-quiet glossary-term">
-      <p className="component-label">Glossary</p>
+    <Card altitude="quiet" id={id} label="Glossary" className="glossary-term">
       <dl>
         <div>
           <dt>{component.term}</dt>
@@ -16,6 +16,6 @@ export function GlossaryTerm({ component, id }: { component: GlossaryTermCompone
           <span>Also called:</span> {component.aliases.join(", ")}
         </p>
       ) : null}
-    </aside>
+    </Card>
   );
 }

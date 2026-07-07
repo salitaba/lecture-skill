@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { QuestionSetComponent } from "@/lib/lecture-template/types";
+import { Card, DisclosureTrigger, LabeledSection, RadioOptionGroup, useDisclosure } from "@/components/component-kit";
 
 export function QuestionSet({ component, enableShuffle = true }: { component: QuestionSetComponent; enableShuffle?: boolean }) {
-  const baseId = useId();
   const [previewShuffleEnabled, setPreviewShuffleEnabled] = useState(false);
-  const [revealed, setRevealed] = useState<Record<number, boolean>>({});
-  const [selected, setSelected] = useState<Record<number, string>>({});
   const shuffledOptions = useMemo(
     () => component.questions.map((question) => shuffleOptions(question.options)),
     [component.questions]
@@ -20,63 +18,53 @@ export function QuestionSet({ component, enableShuffle = true }: { component: Qu
   }, [enableShuffle]);
 
   return (
-    <aside id={component.anchor} className="lecture-component surface-emphasis assessment-card question-set-card">
-      <p className="component-label">Assessment: Question set</p>
-      <h3>{component.title}</h3>
+    <Card id={component.anchor} altitude="emphasis" label="Assessment: Question set" title={component.title} className="assessment-card question-set-card">
       {component.instructions ? <p className="assessment-instructions">{component.instructions}</p> : null}
       <div className="question-set-list">
-        {component.questions.map((question, questionIndex) => {
-          const answerRegionId = `${baseId}-question-${questionIndex}-answer`;
-          const answerLabelId = `${baseId}-question-${questionIndex}-answer-label`;
-          const name = `${baseId}-question-${questionIndex}`;
-          const isRevealed = Boolean(revealed[questionIndex]);
-
-          return (
-            <section key={`${question.question}-${questionIndex}`} className="assessment-region" aria-labelledby={`${baseId}-question-${questionIndex}`}>
-              <h4 id={`${baseId}-question-${questionIndex}`}>{question.question}</h4>
-              <div className="assessment-options" role="radiogroup" aria-labelledby={`${baseId}-question-${questionIndex}`}>
-                {optionsByQuestion[questionIndex].map((option, optionIndex) => (
-                  <label key={`${questionIndex}-${optionIndex}-${option}`} className="assessment-option">
-                    <input
-                      type="radio"
-                      name={name}
-                      value={option}
-                      checked={selected[questionIndex] === option}
-                      onChange={() => setSelected((current) => ({ ...current, [questionIndex]: option }))}
-                    />
-                    <span>{option}</span>
-                  </label>
-                ))}
-              </div>
-              {selected[questionIndex] ? (
-                <p className="assessment-selection">Selected: {selected[questionIndex]}</p>
-              ) : (
-                <p className="assessment-selection">Select an option before revealing the answer.</p>
-              )}
-              <button
-                type="button"
-                className="assessment-reveal-button"
-                aria-expanded={isRevealed}
-                aria-controls={answerRegionId}
-                onClick={() => setRevealed((current) => ({ ...current, [questionIndex]: !current[questionIndex] }))}
-              >
-                {isRevealed ? "Hide feedback" : "Reveal answer"}
-              </button>
-              <div id={answerRegionId} className="assessment-hidden-region" hidden={!isRevealed} aria-labelledby={answerLabelId}>
-                <p id={answerLabelId} className="assessment-region-label">
-                  Answer
-                </p>
-                <p>{question.answer}</p>
-                {question.feedback ? <p>{question.feedback}</p> : null}
-              </div>
-            </section>
-          );
-        })}
+        {component.questions.map((question, questionIndex) => (
+          <QuestionSetItem key={`${question.question}-${questionIndex}`} question={question} options={optionsByQuestion[questionIndex]} />
+        ))}
       </div>
       <noscript className="assessment-noscript">
         Interactive answer reveal requires JavaScript. Printed output includes all answers and feedback.
       </noscript>
-    </aside>
+    </Card>
+  );
+}
+
+function QuestionSetItem({ question, options }: { question: QuestionSetComponent["questions"][number]; options: string[] }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const { open: isRevealed, toggle, regionId: answerRegionId } = useDisclosure("answer");
+  const answerLabelId = `${answerRegionId}-label`;
+  const questionHeadingId = `${answerRegionId}-heading`;
+
+  return (
+    <LabeledSection label={question.question} headingId={questionHeadingId} className="assessment-region">
+      <RadioOptionGroup
+        name={answerRegionId}
+        options={options}
+        selected={selected}
+        onSelect={setSelected}
+        optionClassName="assessment-option"
+        groupClassName="assessment-options"
+        groupLabelledBy={questionHeadingId}
+      />
+      {selected ? (
+        <p className="assessment-selection">Selected: {selected}</p>
+      ) : (
+        <p className="assessment-selection">Select an option before revealing the answer.</p>
+      )}
+      <DisclosureTrigger className="assessment-reveal-button" open={isRevealed} regionId={answerRegionId} onToggle={toggle}>
+        {isRevealed ? "Hide feedback" : "Reveal answer"}
+      </DisclosureTrigger>
+      <div id={answerRegionId} className="assessment-hidden-region" hidden={!isRevealed} aria-labelledby={answerLabelId}>
+        <p id={answerLabelId} className="assessment-region-label">
+          Answer
+        </p>
+        <p>{question.answer}</p>
+        {question.feedback ? <p>{question.feedback}</p> : null}
+      </div>
+    </LabeledSection>
   );
 }
 

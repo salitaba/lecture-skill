@@ -1,39 +1,33 @@
 import type { WorkedExampleComponent } from "@/lib/lecture-template/types";
 import { CodeBlock } from "./CodeBlock";
+import { Card, LabeledSection } from "@/components/component-kit";
 
 export function WorkedExample({ component }: { component: WorkedExampleComponent }) {
   return (
-    <aside className="lecture-component surface-card worked-example">
-      <p className="component-label">Worked example</p>
-      <h3>{component.title}</h3>
-      <section className="worked-example-region">
-        <h4>Problem</h4>
+    <Card altitude="card" label="Worked example" title={component.title} className="worked-example">
+      <LabeledSection label="Problem">
         <p>{component.problem}</p>
-      </section>
+      </LabeledSection>
       {component.starter_code ? (
-        <section className="worked-example-region">
-          <h4>Starter code</h4>
+        <LabeledSection label="Starter code">
           <CodeBlock component={{ type: "code_block", language: component.language ?? "text", code: component.starter_code }} />
-        </section>
+        </LabeledSection>
       ) : null}
-      <section className="worked-example-region">
-        <h4>Walkthrough</h4>
+      <LabeledSection label="Walkthrough">
         <ol>
           {component.walkthrough.map((step, index) => (
             <li key={`${step}-${index}`}>{step}</li>
           ))}
         </ol>
-      </section>
-      <section className="worked-example-region worked-example-solution">
-        <h4>Solution</h4>
+      </LabeledSection>
+      <LabeledSection label="Solution" className="worked-example-solution">
         <p>{component.solution}</p>
-      </section>
+      </LabeledSection>
       {component.takeaway ? (
-        <section className="worked-example-region">
-          <h4>Takeaway</h4>
+        <LabeledSection label="Takeaway">
           <p>{component.takeaway}</p>
-        </section>
+        </LabeledSection>
       ) : null}
-    </aside>
+    </Card>
   );
 }

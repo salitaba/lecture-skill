@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useCollectionProgress } from "./progress/CollectionProgressProvider";
 import { calculateResumeTarget } from "@/lib/lecture-template/resumeTarget";
 import type { ProgressLecture } from "@/lib/lecture-template/progress";
+import { Button } from "@/components/component-kit";
 
 export function CollectionPrimaryAction({ lectures }: { lectures: ProgressLecture[] }) {
   const { progress, loaded } = useCollectionProgress();
@@ -11,15 +12,15 @@ export function CollectionPrimaryAction({ lectures }: { lectures: ProgressLectur
 
   if (!loaded) {
     return (
-      <a className="collection-primary-action" href={lectures.length > 0 ? `/lectures/${lectures[0].slug}` : "/"}>
+      <Button as="a" size="lg" className="collection-primary-action" href={lectures.length > 0 ? `/lectures/${lectures[0].slug}` : "/"}>
         Start course
-      </a>
+      </Button>
     );
   }
 
   return (
-    <a className="collection-primary-action" href={target.href}>
+    <Button as="a" size="lg" className="collection-primary-action" href={target.href}>
       {target.label}
-    </a>
+    </Button>
   );
 }

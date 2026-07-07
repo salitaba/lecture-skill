@@ -1,6 +1,7 @@
 "use client";
 
 import { useProgress } from "./ProgressProvider";
+import { Button } from "@/components/component-kit";
 
 export function ResumePrompt() {
   const { resumeTarget, jumpToResumeTarget, dismissResumePrompt } = useProgress();
@@ -13,7 +14,9 @@ export function ResumePrompt() {
         Continue from <strong>{resumeTarget.title ?? resumeTarget.anchor}</strong>
       </p>
       <div className="resume-prompt-actions">
-        <a
+        <Button
+          as="a"
+          size="compact"
           className="resume-prompt-action"
           href={`#${resumeTarget.anchor}`}
           onClick={(event) => {
@@ -22,10 +25,10 @@ export function ResumePrompt() {
           }}
         >
           Continue reading
-        </a>
-        <button type="button" className="resume-prompt-dismiss" onClick={dismissResumePrompt}>
+        </Button>
+        <Button variant="ghost" tone="text" className="resume-prompt-dismiss" onClick={dismissResumePrompt}>
           Dismiss
-        </button>
+        </Button>
       </div>
     </aside>
   );

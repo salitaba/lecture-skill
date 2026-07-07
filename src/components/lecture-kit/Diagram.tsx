@@ -2,6 +2,7 @@
 
 import type { DiagramComponent } from "@/lib/lecture-template/types";
 import { useId, useEffect, useRef, useState } from "react";
+import { Card } from "@/components/component-kit";
 
 let mermaidReady: Promise<typeof import("mermaid").default> | null = null;
 
@@ -53,8 +54,7 @@ export function Diagram({ component }: { component: DiagramComponent }) {
   }, [diagramId, component.code, component.theme]);
 
   return (
-    <figure role="img" aria-label={component.title} className="lecture-component diagram-card">
-      <p className="component-label">Diagram</p>
+    <Card as="figure" label="Diagram" className="diagram-card" attributes={{ role: "img", "aria-label": component.title }}>
       <noscript>
         <style>{`.diagram-card .diagram-svg-container pre { display: block !important; }`}</style>
         Diagrams require JavaScript for interactive rendering. Raw source code is shown below.
@@ -75,6 +75,6 @@ export function Diagram({ component }: { component: DiagramComponent }) {
         {loadError && <p className="diagram-error">Diagram library failed to load. Showing source code.</p>}
         {renderError && <p className="diagram-error">Diagram could not be rendered. Showing source code.</p>}
       </div>
-    </figure>
+    </Card>
   );
 }
