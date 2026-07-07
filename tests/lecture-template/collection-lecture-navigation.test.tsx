@@ -24,7 +24,8 @@ describe("collection lecture navigation", () => {
     const nextLink = screen.getByRole("link", { name: /Core Concepts/ });
     expect(nextLink).toHaveAttribute("href", "/lectures/02-core-concepts");
 
-    expect(screen.queryByRole("link", { name: /←/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Introduction/ })).not.toBeInTheDocument();
+    expect(document.querySelector(".lecture-nav-prev")).not.toBeInTheDocument();
   });
 
   it("middle lecture shows previous, back, and next", () => {
@@ -37,14 +38,16 @@ describe("collection lecture navigation", () => {
       />
     );
 
-    const prevLink = screen.getByRole("link", { name: /← Introduction/ });
+    const prevLink = screen.getByRole("link", { name: /Introduction/ });
     expect(prevLink).toHaveAttribute("href", "/lectures/01-intro");
+    expect(prevLink.querySelector("svg")).toBeInTheDocument();
 
     const backLink = screen.getByRole("link", { name: "Back to course" });
     expect(backLink).toHaveAttribute("href", "/");
 
-    const nextLink = screen.getByRole("link", { name: /Wrap Up →/ });
+    const nextLink = screen.getByRole("link", { name: /Wrap Up/ });
     expect(nextLink).toHaveAttribute("href", "/lectures/03-wrap");
+    expect(nextLink.querySelector("svg")).toBeInTheDocument();
   });
 
   it("last lecture shows previous and back to course only", () => {
@@ -56,13 +59,14 @@ describe("collection lecture navigation", () => {
       />
     );
 
-    const prevLink = screen.getByRole("link", { name: /← Core Concepts/ });
+    const prevLink = screen.getByRole("link", { name: /Core Concepts/ });
     expect(prevLink).toHaveAttribute("href", "/lectures/02-core");
+    expect(prevLink.querySelector("svg")).toBeInTheDocument();
 
     const backLink = screen.getByRole("link", { name: "Back to course" });
     expect(backLink).toHaveAttribute("href", "/");
 
-    expect(screen.queryByRole("link", { name: /→/ })).not.toBeInTheDocument();
+    expect(document.querySelector(".lecture-nav-next")).not.toBeInTheDocument();
   });
 
   it("uses custom backHref and backLabel when provided", () => {
@@ -103,5 +107,14 @@ describe("collection lecture navigation", () => {
     );
 
     expect(screen.getByRole("navigation", { name: "Lecture navigation" })).toBeInTheDocument();
+  });
+
+  it("keeps 'Back to course' pinned to a fixed grid slot regardless of which sibling links exist", () => {
+    const { unmount } = render(<LectureNavigation next={{ slug: "02-core", title: "Core" }} />);
+    expect(screen.getByRole("link", { name: "Back to course" }).closest("a")).toHaveClass("lecture-nav-back");
+    unmount();
+
+    render(<LectureNavigation previous={{ slug: "01-intro", title: "Introduction" }} />);
+    expect(screen.getByRole("link", { name: "Back to course" }).closest("a")).toHaveClass("lecture-nav-back");
   });
 });

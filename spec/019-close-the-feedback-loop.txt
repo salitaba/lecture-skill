@@ -1,0 +1,274 @@
+Feature: Close the Feedback Loop — Answer Review, Diagram Inspection, Accessible Shortcuts, and Passage Highlights & Notes
+
+Authors: senior product manager, senior UI/UX designer.
+
+Relationship to prior work: layered on top of `spec/015-learner-experience-primitives.txt` (`SelectableQuiz`, `ResumePrompt`, `GlossaryIndex`), `spec/017-component-kit-primitives.txt` (shared `Card`/`Button`/`Disclosure`/`RadioOptionGroup` primitives), and `spec/018-product-polish-and-delight.txt` (motion vocabulary, milestone celebration, the authoring/learner boundary on the collection page). Those specs made the product respond in the instant an interaction happens — select an option, check it, mark a section complete, watch a bar fill. This spec is about the moment after: what happens to that interaction once the page reloads, the learner scrolls past it, or comes back tomorrow. Three real, frequently-hit surfaces — quiz/assessment answers, Mermaid diagrams, and the two keyboard shortcuts `ProgressProvider` already wires up — each do real work and then either forget it happened or never told the learner it was possible. This spec closes those three loops, and adds one genuinely new capability that `spec/015` named and deferred twice over: a way for a learner to mark up and annotate what they're reading. It does not add a grading system, an animation library, a search engine, a shared/synced annotation system, or a new visual language; every fix and addition composes primitives and patterns 015-018 already established.
+
+## Product Summary
+
+`lectures/` is not a hypothetical ten-card demo; it is a real nine-lecture Life Cycle Assessment course, and a scan of its authored content shows quizzes and diagrams are not edge-case decoration — they are the bulk of what a learner does on a lecture page beyond reading prose: 16 `diagram` components and 12 single-answer assessments (7 `quiz`, 5 `question_set`) across nine lectures, versus, for comparison, only 4 authored `glossary_term` entries in the whole course. Three gaps sit directly in that heavily-trafficked path.
+
+First, every quiz and question-set selection lives in a plain `useState` (`Quiz.tsx:8`; `QuestionSetItem` in `QuestionSet.tsx:36`) that is discarded the instant the component unmounts. A learner who works through seven quizzes in a lecture, closes the tab, and returns the next day has no record of which ones they got right. `AnswerKeyAppendix.tsx:1-89` prints the same master answer key to every learner regardless of what they selected — it is authoring/review content (`collectLectureAnswerKey`), not attempt history, and was never meant to answer "what did *I* get wrong." The product tracks section-level progress meticulously (`ProgressProvider.tsx`) but drops the one signal — *did I get this right* — most useful to a learner deciding what to revisit.
+
+Second, `Diagram.tsx:56-67` renders every Mermaid figure — architecture diagrams, process flows, comparison matrices, 16 of them in this course — into the same fixed-width `Card` as every other content block. The only escape hatch is a `<details>` disclosure showing raw Mermaid source (`Diagram.tsx:68-73`), useful to an author debugging syntax, useless to a learner trying to read a wide flowchart on a 390px phone or a laptop window. There is no way to see a diagram larger than the column it was authored into, and no way to save one for offline reference.
+
+Third, `ProgressProvider.tsx:290-308` wires up two real, global keyboard shortcuts — Alt+M marks the current section complete, Alt+R resets progress (behind a `window.confirm`) — and nothing in the rendered page, in an `aria-keyshortcuts` attribute, or in visible copy tells a learner either one exists (`grep -rn "Alt+" src/components` returns nothing). They work, silently, for whoever happens to guess them or read the source. The same page has no skip-to-content link (`layout.tsx:48-51` renders `<ThemeToggle />` then `children` directly into `<body>`), so a keyboard or screen-reader user must tab through the theme toggle and the full learning-path navigation before reaching lecture content on every single page load.
+
+Fourth, and different in kind from the other three: nothing in this product lets a learner mark up what they're reading. `SectionRenderer.tsx:29-42` renders each authored section with a completion toggle and nothing else — no way to highlight a passage worth remembering, no way to jot a note next to it. `spec/015` named "per-section learner notes persisted to localStorage" as a candidate for `spec/016` and no spec since has picked it up (`grep -rn "highlight\|learner note" src` returns nothing). This is the one gap in this spec that isn't a loop the product already started and dropped — it's a capability a learner would reasonably expect from any long-form reading product and the course simply doesn't have.
+
+## Product Outcome
+
+- A learner who answers a quiz or question-set item, leaves, and comes back sees their own last answer preserved — not a blank slate — and can jump straight to a short list of just the items they got wrong or never attempted, without re-reading everything they already got right.
+- A learner on any viewport can open a diagram larger than its authored column, read it without horizontal scrolling inside a cramped card, and save it as an SVG if they want it outside the browser.
+- A learner who tabs into the page can skip past repeated navigation chrome straight to lecture content, and can discover — from visible text, not source-reading — that Alt+M and Alt+R exist and what they do.
+- A learner can highlight a passage of authored text and jot a short note on any section, both saved locally and visible again next time they open that lecture.
+- None of this introduces a score, a streak, a pass/fail state, a new dependency, or a new interaction pattern the product doesn't already use elsewhere.
+
+## Users And Jobs
+
+Primary users: learners working through this course's assessments and diagrams (the same audience 011/013/015 built `SelectableQuiz`, `QuestionSet`, and `Diagram` for), keyboard/screen-reader users navigating the product (the audience 016/017/018's accessibility requirements were written for but this spec is the first to test end-to-end with real keyboard-only navigation of a lecture page), and learners re-reading dense material who want to mark it up — an audience no prior spec addressed.
+
+Jobs to be done:
+
+- As a learner reviewing before I move on, I want to see only the items I got wrong or skipped, not re-scan every quiz on the page to remember which ones those were.
+- As a learner returning to a lecture I partly answered, I want my previous selections still shown, not a page that's forgotten everything I did.
+- As a learner trying to read a dense flowchart on my phone, I want to open it larger than the card it's authored into.
+- As a learner who wants a diagram for my own notes, I want to save it without a screenshot.
+- As a keyboard user, I want to skip repeated navigation on every page instead of tabbing through it every time.
+- As a keyboard or screen-reader user, I want to discover that shortcuts exist and what they do, without reading the source code.
+- As a learner, I want to mark a passage worth remembering without leaving the page or losing it on reload.
+- As a learner, I want to jot a short note next to a section, even if I don't want to highlight specific text.
+- As an author, I want none of this to require a new authoring field, a new component type, or rewriting how quizzes, diagrams, and sections are authored today.
+
+## Problem
+
+- **Quiz and question-set selections are never persisted.** `Quiz.tsx:8` and `QuestionSet.tsx:36` hold `selected` in local component state only; `ProgressProvider.tsx` persists section completion to `localStorage` but has no concept of an individual assessment answer. Reloading the page, navigating away and back, or returning the next day resets every quiz to unanswered, even ones the learner already checked.
+- **The only answer-review surface is the master answer key, not the learner's own attempt.** `AnswerKeyAppendix.tsx:9-82` renders every quiz/question-set/free-response/practice-task answer, explanation, and rubric identically for every visitor — correct by design for print/review use, but it cannot answer "which of these did I personally get wrong," because it has no access to (and today, no source for) what the learner selected.
+- **Diagrams have no way to be viewed larger than their authored card.** `Diagram.tsx:56-67` renders the Mermaid SVG directly into `.diagram-svg-container` inside a standard-width `Card`; the only alternate view is `<details>` raw source (`Diagram.tsx:68-73`), which shows Mermaid syntax, not a bigger picture. There is no fullscreen view, no zoom, and no way to export the rendered SVG.
+- **No skip-to-content affordance.** `layout.tsx:42-53`'s `<body>` renders `<ThemeToggle />` immediately followed by `{children}`, and `PageShell.tsx:3-5`'s `<main>` has no `id`. A keyboard user or screen-reader user lands at the theme toggle on every page and must tab through the full `LearningPathNavigation` list before reaching lecture content — the exact WCAG 2.4.1 bypass-blocks gap.
+- **Two real keyboard shortcuts are entirely undiscoverable.** `ProgressProvider.tsx:290-308` binds `Alt+M` (toggle current section complete) and `Alt+R` (reset progress, gated by `window.confirm`) at the `window` level. No button carries `aria-keyshortcuts`, no visible copy anywhere mentions either binding — `SectionCompletionToggle.tsx:13-21` (the visible "Mark complete" button that Alt+M duplicates) and `LectureProgressBar.tsx:44-46` (the visible "Reset progress" button that Alt+R duplicates) both omit it.
+
+- **No way to mark up or annotate what's being read.** `SectionRenderer.tsx:29-42` renders a completion toggle per section and nothing else; there is no highlight affordance and no note field anywhere in the product (`grep -rn "highlight\|learner note" src` returns nothing). `spec/015`'s Out-Of-Scope section named "per-section learner notes persisted to localStorage" as a candidate for a future spec, and no spec since 016 has picked it up — still true today.
+
+## Goals
+
+P0 — Accessible Navigation and Shortcuts:
+
+- G1. Add a "Skip to main content" link as the first focusable element in the page, visually hidden until focused, jumping to the lecture/collection `<main>` landmark.
+- G2. Make `Alt+M` and `Alt+R` discoverable: add `aria-keyshortcuts` to the two buttons that perform the same actions (`SectionCompletionToggle`, the reset button in `LectureProgressBar`) and add small, visible, muted inline copy next to each stating the shortcut.
+
+P1 — Answer Review:
+
+- G3. Persist the learner's most recent selection and correctness for every `quiz` and `question_set` item, using the existing per-lecture progress storage key as an additive field — not a new storage scheme.
+- G4. When a learner returns to an already-attempted `quiz` or `question_set` item, restore the previous selection and revealed/checked state instead of resetting to blank.
+- G5. Add a per-lecture "Review your answers" surface, populated only once the learner has at least one attempt, listing just the items they got wrong or left unattempted, each linking to that item's anchor.
+
+P2 — Diagram Inspection:
+
+- G6. Add an "Expand diagram" control on every successfully-rendered `Diagram` that opens the same SVG in a larger, scrollable native `<dialog>`.
+- G7. Add a "Download SVG" action inside that dialog.
+
+P3 — Highlighting and Notes:
+
+- G8. Let a learner select text within an authored section and mark it as a persistent highlight, rendered consistently across reloads.
+- G9. Let a learner attach a short free-text note to any authored section, independent of highlighting, reachable without a text selection.
+- G10. Add a per-lecture "Your highlights & notes" surface that lists everything a learner has marked or noted in that lecture, collapsed by default until they've created at least one.
+
+## Non-Goals
+
+- No grading, scoring, mastery tracking, streaks, or percentage-correct display anywhere — G3-G5 store and surface "your last selection, right or wrong" for review, the same no-grading posture `spec/011` and `spec/015` already committed to. This is not a test result, a gradebook, or a completion requirement.
+- Correctness tracking applies only to `quiz` and `question_set` (components with a single defined correct answer). `free_response` and `practice_task` remain self-assessed and excluded from any right/wrong signal, unchanged from 011/015.
+- No attempt history or timestamps — only the most recent selection per item is kept, overwritten on re-answer, consistent with how section-completion state already works.
+- No new `lecture-component` type and no new authoring frontmatter/YAML field for quiz, question-set, or diagram components.
+- No new runtime dependency: shortcut hints are plain markup, answer persistence reuses the existing `localStorage` progress mechanism, and diagram inspection uses the native `<dialog>` element and `Blob`/`URL.createObjectURL`, all already available without a package addition.
+- No pan/zoom gesture engine for diagrams — the expanded view relies on native scrolling and the browser's own pinch-zoom, not a JS zoom/pan library. Consistent with `spec/018`'s "no animation library, spring-physics engine" non-goal.
+- No full-text search across lecture content, the glossary, or the collection list. The collection's 4 authored glossary terms and 9-lecture size do not justify a search surface today; `spec/018`'s existing non-goal on collection-list search stands and is not revisited here.
+- No redesign of `SelectableQuiz`'s visual language — the 2px selection ring, calm feedback tint, and "Expected answer" left-rule cue from `spec/015` are reused for the "previously answered" state, not replaced.
+- No keyboard-shortcut preferences panel, remapping UI, or command palette — G2 documents the two shortcuts that already exist; it does not add a settings surface.
+- No change to `AnswerKeyAppendix`'s master content, audience, or placement — it remains the complete, learner-independent reference; G5 adds a second, personal view alongside it.
+- No accessibility rework of components this spec doesn't touch (e.g., `Diagram`'s existing `role="img"`/`aria-label` on the un-expanded card, `Quiz`'s existing `RadioOptionGroup` keyboard model) — those already meet 015/017's bar.
+- No multi-device sync, accounts, or server-side storage for highlights or notes — local-only, exactly like existing progress data, per `spec/015`'s original non-goal on learner accounts/sync.
+- No rich text, markdown rendering, images, or attachments in notes — plain text only.
+- No collaborative or shared annotations — every learner's highlights and notes are visible only in their own browser.
+- No highlight color picker or multiple highlight colors — one highlight treatment, drawn from the existing accent token, not a new semantic color.
+- No export of highlights or notes as a file — mirrors `spec/015`'s existing "no progress export/import" non-goal; a candidate for a future spec.
+- No annotating diagrams, code blocks, quiz options, or any other interactive component's internals — highlighting and notes apply to authored prose within a section's rendered markdown, not to component-kit interaction surfaces that already have their own model.
+
+## Product Decisions
+
+- Attempt memory is best-effort local, like everything else in this system. It persists via the existing per-lecture `localStorage` progress key (`ProgressProvider`'s `storageKey`) as an additive field alongside section completion, not a second storage scheme — the same posture `spec/018` took for "milestone already shown" state.
+- "Review your answers" shows only the current state of the learner's own last attempt, never a log. Re-answering an item overwrites its stored state, exactly like toggling section completion overwrites the previous value.
+- The review surface is silent (renders nothing) until the learner has attempted at least one `quiz`/`question_set` item in that lecture — an empty "you haven't answered anything yet" state is noise, not help, on a page a learner may be visiting for the first time.
+- Diagram fullscreen uses the native `<dialog>` element, not a custom overlay component. The codebase has zero prior modal/dialog pattern (`grep -rn "dialog|modal" src` returns nothing) — a native element is the smallest possible new interaction primitive, and gets focus-trapping, `Escape`-to-close, and backdrop semantics for free.
+- Download uses a same-origin `Blob` URL generated from the already-rendered SVG markup; no server round-trip, no new file format, no change to how Mermaid source is authored or stored.
+- Shortcut discoverability is solved with visible inline text and `aria-keyshortcuts`, not a help modal, tooltip system, or onboarding tour — matching the "small, composed from what exists" posture every spec since 015 has held to.
+- The skip link is a single anchor, styled with the existing focus-ring token, positioned off-screen until `:focus` — no new component-kit primitive required.
+- Notes are the guaranteed path; highlighting is the enhanced one. Every learner has at least one fully keyboard- and screen-reader-accessible way to annotate a section (a note) regardless of input device; text-range highlighting is additional richness for pointer/touch users, not the only way to mark something up.
+- A highlight that no longer matches its saved text (because the author edited the lecture since the learner saved it) is dropped silently on render, never shown against the wrong text — the same "fail closed on stale local data" posture already used for corrupted progress JSON (`ProgressProvider.tsx:84-90`).
+- Highlight and note data is additive to the same per-lecture `localStorage` key used by progress and quiz-attempt state (R1), not a third storage scheme.
+
+## UX Designer Notes
+
+All three problems in this spec share one shape: the product already does the interesting work — it computes whether an answer is correct, it renders a diagram, it listens for a keystroke — and then either discards the result or hides that it happened. That is a cheaper, more honest class of fix than anything in 014-018: nothing here is a new capability, it's finishing capabilities that already exist quietly.
+
+Resist over-building the review surface. The temptation, once "what did I get wrong" is possible, is to build toward a quiz dashboard, a per-lecture score, a streak. Don't. The job here is narrower and more useful: let a learner find the three things they missed in a twelve-item lecture without re-reading all twelve. If a future spec wants scoring or mastery tracking, that is a deliberate, larger decision this spec is not making by accretion.
+
+The diagram dialog should feel like "the same figure, bigger," not a new surface with its own chrome. No caption redesign, no toolbar beyond expand/download/close. If a diagram was legible and well-labeled at authored size, the dialog is a convenience for the exceptions — the wide flowchart, the dense comparison matrix — not a redesign of how every diagram is presented.
+
+Shortcut discoverability should read as a footnote, not a feature. A single muted `(Alt+M)` next to "Mark complete" is enough; do not add a keyboard-shortcuts legend, a help panel, or a `?`-key overlay. The bar here is "a curious or screen-reader-dependent learner can find out this exists," not "every learner is taught keyboard shortcuts."
+
+Highlighting and notes are the one part of this spec that could sprawl into something much bigger — a rich-text editor, a synced notebook, a shareable annotation layer. Don't build toward any of that. The bar is a highlighter and a margin, the two oldest, lowest-tech ways to mark up something you're reading. If a highlight's saved position and the authored text it points to ever disagree, drop the highlight rather than render it wrong — a missing highlight is a shrug, a highlight on the wrong sentence is actively confusing.
+
+## Priority
+
+### P0: Accessible Navigation and Shortcuts
+
+Highest-impact, lowest-effort, and the clearest case of accessibility work already invested elsewhere (015/016/017/018's focus rings, `aria-current`, `aria-live` regions) being undermined by two small, cheap-to-fix omissions on the page's own entry point.
+
+#### S1. Skip to main content
+
+- Render a "Skip to main content" link as the very first element inside `<body>` in `layout.tsx`, ahead of `ThemeToggle`.
+- Visually hidden by default (same technique as the existing `.sr-only` utility), becomes visible with the product's existing focus-ring treatment on `:focus`.
+- Targets the `<main>` rendered by `PageShell.tsx` (`id="main-content"` added there); works identically on collection and lecture pages, and in the static export/review package.
+- No JavaScript required; a plain anchor.
+
+#### S2. Discoverable shortcuts
+
+- Add `aria-keyshortcuts="Alt+M"` to the button in `SectionCompletionToggle.tsx:13-21` and `aria-keyshortcuts="Alt+R"` to the reset button in `LectureProgressBar.tsx:44-46`.
+- Add small, muted, non-`sr-only` inline text next to each button's existing label stating the shortcut (e.g. "Mark complete · Alt+M"), styled at the same visual weight as other secondary metadata in the product (`nav-section-minutes`, `lecture-progress-summary`), not as a new badge or callout.
+- No change to the shortcuts' behavior, guard (`window.confirm` on reset), or the `isEditableShortcutTarget` exclusion already in `ProgressProvider.tsx:362-366`.
+
+### P1: Answer Review
+
+The highest-value tier: this course has three times as many quiz/question-set items as glossary terms, and currently loses the result of every single one on reload.
+
+#### R1. Persist last attempt
+
+- Extend the data already read/written by `ProgressProvider` (or a directly adjacent, additive structure keyed the same way) to store, per `quiz`/`question_set` item anchor, the learner's most recent selected option and whether it matched the authored answer.
+- Written with the same debounce and best-effort `localStorage` semantics already used for section progress (`ProgressProvider.tsx:110-129`); no new storage key namespace.
+- `question_set` items (which share one component anchor across multiple sub-questions) are keyed per sub-question using their authored order, not a client-generated id — deterministic across reloads.
+
+#### R2. Restore attempt state on return
+
+- `Quiz` and `QuestionSet` read any stored attempt for their anchor(s) on mount and initialize `selected`/revealed state from it instead of blank, reusing 015's existing selected-ring and revealed-answer visual treatment unchanged.
+- A learner can always re-select and re-check; doing so overwrites the stored attempt (R1).
+- Falls back to today's blank-state behavior when no stored attempt exists or storage is unavailable, identical to how section progress already degrades (`storageAvailable` in `ProgressProvider.tsx`).
+
+#### R3. "Review your answers"
+
+- New per-lecture surface rendered in `LecturePage.tsx` between `GlossaryIndex` (line 96) and `AnswerKeyAppendix` (line 98), composing the existing `lecture-panel`/`Card` surface — not a new visual container type.
+- Lists only `quiz`/`question_set` items the learner has attempted-and-missed or never attempted (per R1's stored state), each as a one-line entry with the question text and a link to its anchor.
+- Renders nothing (not an empty state) when the learner has zero attempts in the lecture, per the Product Decisions above.
+- Distinct heading and copy from `AnswerKeyAppendix` so the two are never confused: this is "your answers," the appendix is "the answer key."
+
+### P2: Diagram Inspection
+
+#### D1. Expand diagram
+
+- Add an "Expand diagram" `Button` (existing `component-kit` primitive) to `Diagram.tsx`, shown only when the SVG rendered successfully (i.e., neither `loadError` nor `renderError` is set).
+- Opens a native `<dialog>` containing the same rendered SVG markup at a larger, scrollable size, with a visible "Close" control, `Escape`-to-close, and backdrop-click-to-close (all native `<dialog>` behavior).
+- Motion on open/close uses the existing `--motion-duration-fast`/`--motion-ease` tokens (`globals.css:50-53`) for a simple fade, respecting `prefers-reduced-motion` per the existing pattern at `globals.css:2418-2432`.
+
+#### D2. Download SVG
+
+- Inside the expanded dialog, a "Download SVG" action creates a `Blob` from the rendered SVG's markup and triggers a download via `URL.createObjectURL`, named from the diagram's `component.title` (slugified).
+- No dependency added; no server involvement; disabled/absent if the diagram failed to render.
+
+### P3: Highlighting and Notes
+
+The one addition in this spec that isn't finishing a loop the product already started — `spec/015` named it and deferred it twice; this is where it lands.
+
+#### H1. Text highlighting
+
+- Selecting a run of text (mouse or touch) within an authored section's rendered content surfaces a small floating action (a `Button`-styled control, dismissed on selection change) offering "Highlight."
+- Highlighted text renders wrapped in a real `<mark>` element with the existing accent token at reduced opacity as its background — no new semantic color.
+- Selecting or activating an existing highlight offers "Remove highlight"; removal is immediate, no confirmation (low-stakes, easily redone, unlike Alt+R's progress reset).
+- Persisted per lecture, keyed by section anchor, block index, and start/end text offsets, plus a short snippet used to re-validate the match still points at the same text on each render; a highlight whose snippet no longer matches the authored content at that position is dropped rather than rendered.
+- Purely a client-side render-time overlay: never written back into the authored `.template.md`, has zero effect on `validateCollection()`, the review package, or any other learner's view of the same lecture.
+
+#### H2. Section notes
+
+- Every authored section gets one optional per-learner note, entered via an "Add a note" control rendered next to `SectionCompletionToggle` (`SectionRenderer.tsx:37`) — a real `<button>` toggling an inline text area via the existing `useDisclosure` primitive, reachable and usable with no text selection and no pointer.
+- Autosaves on blur/debounce using the same ~300ms write pattern already used for section-progress writes (`ProgressProvider.tsx:117-124`).
+- A section with a saved note shows a small, non-color-only indicator (icon plus `sr-only` "(has your note)" suffix) next to its entry in `LearningPathNavigation`, mirroring the existing `nav-item-complete` treatment (`LearningPathNavigation.tsx:139-147`).
+
+#### H3. "Your highlights & notes"
+
+- A per-lecture, collapsed-by-default surface composing the same disclosure pattern as `AssessmentIndexDisclosure`, listing every highlight (with its surrounding snippet) and every section note in that lecture, each linking to its section anchor.
+- Renders nothing until the learner has created at least one highlight or note in that lecture, matching R3's empty-state posture.
+- Positioned in `LecturePage.tsx` alongside R3's "Review your answers," between `GlossaryIndex` (line 96) and `AnswerKeyAppendix` (line 98).
+
+## Accessibility Requirements
+
+- The skip link (S1) is keyboard-reachable as the very first Tab stop on every page and visibly focused per the product's existing focus-ring treatment.
+- `aria-keyshortcuts` (S2) is present on both buttons; the accompanying visible shortcut text is real text, not `aria-label`-only, so it benefits sighted keyboard users too.
+- Restored quiz/question-set state (R2) is announced consistently with existing quiz feedback patterns — no new live region; reuse the `aria-live="polite"` region pattern already present in `QuestionSet`/`Quiz`.
+- "Review your answers" (R3) links are real anchors to real in-page ids; the section itself is a labelled landmark (`aria-labelledby`), consistent with `GlossaryIndex`'s and `AnswerKeyAppendix`'s existing markup.
+- The diagram dialog (D1) uses native `<dialog>` semantics for focus trapping and restores focus to the triggering "Expand diagram" button on close.
+- "Download SVG" (D2) is a real `<button>` or `<a>` with a clear accessible name, not an icon-only control.
+- All new motion (D1's dialog open/close) is fully suppressed under `prefers-reduced-motion: reduce`, consistent with `globals.css:2418-2432`.
+- H1's floating highlight action appears for both mouse-drawn and keyboard-extended (Shift+Arrow) text selections where the browser supports it; H2's section notes require no text selection at all and are the guaranteed accessible annotation path for any learner who cannot produce one.
+- Highlighted text stays real, selectable text inside a semantic `<mark>` element — never an image, canvas overlay, or non-text markup.
+- The "Add a note" control (H2) is a real `<button>` with `aria-expanded`, keyboard reachable, with the product's existing visible focus ring.
+- The section-note-present indicator (H2) is not color-only: icon plus `sr-only` text, consistent with `nav-item-complete`'s existing pattern.
+
+## Responsive Requirements
+
+- No regression at the 390px/768px/1280px breakpoints already established by 014-018 for any element modified in this spec.
+- The diagram dialog (D1) fills the viewport responsibly at 390px (near-fullscreen) and remains comfortably scrollable, not letterboxed, at 1280px.
+- "Review your answers" (R3) entries wrap long question text without overflow at 390px, consistent with existing `lecture-panel` behavior.
+- The skip link (S1), when focused, does not cause horizontal overflow at any breakpoint.
+- The inline shortcut hints (S2) do not cause `SectionCompletionToggle` or the reset button's row to wrap awkwardly at 390px; abbreviate or stack if needed, but never truncate silently.
+- The floating highlight action (H1) and the note text area (H2) stay within the viewport and never cause horizontal overflow at 390px; the highlight action repositions rather than clipping off-screen near a section's edge.
+- "Your highlights & notes" (H3) entries wrap long snippets and note text without overflow at 390px, consistent with existing `lecture-panel` behavior.
+
+## Functional Requirements
+
+- Every existing lecture template and collection continues to render identically in content terms; no authoring-schema changes.
+- `AnswerKeyAppendix` and `collectLectureAnswerKey`/`collectCollectionAssessments` are unchanged in content and placement; this spec only adds a second, learner-specific surface (R3) alongside them.
+- Stored attempt state (R1) is local-only, never sent anywhere, and degrades gracefully (falls back to blank/unattempted state) when `localStorage` is unavailable, matching `ProgressProvider`'s existing `storageAvailable` handling.
+- Diagram expand/download (D1/D2) work only for diagrams that rendered successfully; failed diagrams keep today's error-message behavior (`Diagram.tsx:74-77`) unchanged.
+- Static export and review-package output remain functional; the skip link and shortcut hints render identically in both dev preview and static export. The expand-diagram dialog and download action are client-side only and degrade to the existing `<details>`-source fallback under `noscript`, consistent with `Diagram.tsx:58-61`.
+- The full existing test suite (`tests/lecture-template/*`) passes; any test asserting on today's blank quiz/question-set initial state or on `Diagram.tsx`'s current markup is updated deliberately, not left broken.
+- No new runtime dependency is introduced for any goal in this spec.
+- Highlight and note data is local-only, never sent anywhere, and degrades gracefully (the affordance is simply unavailable, not broken) when `localStorage` is unavailable, matching existing `storageAvailable` handling.
+- Highlights and notes are never written back into an authored `.template.md` and have no effect on `validateCollection()`, static export content, or the review package's authored output — they are a learner-local rendering overlay only.
+
+## Success Metrics / Quality Gates
+
+- A learner can answer a quiz, reload the page, and see their selection and check state preserved, not reset.
+- A learner can open "Review your answers" on a lecture with mixed attempts and see only the missed/unattempted items, each linking to the correct anchor.
+- A learner can expand any successfully-rendered diagram to a larger view and download it as an SVG file.
+- Tabbing from a fresh page load reaches "Skip to main content" as the first stop, and activating it moves focus into the lecture/collection content.
+- `Alt+M` and `Alt+R`'s existence is discoverable from visible on-page text, verified without reading source.
+- No visual diff versus 014-018's established baseline outside the specific elements this spec deliberately changes.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests pass, with any necessary, intentional updates documented.
+- A learner can highlight a passage, reload the page, and see the same passage still highlighted.
+- A learner can add a note to a section using only a keyboard, with no text selection required.
+- "Your highlights & notes" lists every highlight and note the learner has created in a lecture and links each one to the correct section.
+
+## Acceptance Criteria
+
+- `layout.tsx` renders a working skip-to-content link as the first focusable element, targeting a `<main id="main-content">` from `PageShell.tsx`.
+- `SectionCompletionToggle` and `LectureProgressBar`'s reset button both carry `aria-keyshortcuts` and adjacent visible shortcut text.
+- `Quiz` and `QuestionSet` items persist the learner's most recent selection and correctness per item, restore that state on return, and continue to work (falling back to blank state) when storage is unavailable.
+- A "Review your answers" surface appears on `LecturePage` between the glossary index and the answer key appendix, shows only missed/unattempted `quiz`/`question_set` items once at least one attempt exists, and renders nothing before then.
+- Every successfully-rendered `Diagram` offers an "Expand diagram" control opening a native `<dialog>` with the enlarged SVG and a working "Download SVG" action; failed diagrams are unaffected.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests pass, with any necessary, intentional updates documented.
+- A learner can select text in a section, mark it as a highlight, and see it rendered as highlighted on reload; removing a highlight removes it immediately.
+- Every authored section offers an "Add a note" control usable without a text selection; a saved note persists across reload and is indicated on the section in `LearningPathNavigation`.
+- "Your highlights & notes" renders nothing until the learner has created at least one highlight or note, then lists all of them with working links, positioned between the glossary index and the answer key appendix.
+- Verification includes a keyboard-only pass (skip link, shortcut discovery, quiz review, diagram dialog, section notes) and a visual check at 390px/768px/1280px in light and dark themes, before and after.
+
+## Out Of Scope For 019
+
+- Any grading, scoring, mastery tracking, or streak/percentage display (Non-Goals above).
+- Attempt history/timestamps beyond the single most recent attempt per item.
+- Correctness tracking for `free_response` or `practice_task` (remain self-assessed, per 011/015).
+- Full-text or fuzzy search across lecture content, the glossary index, or the collection list — the current course's scale (4 glossary terms, 9 lectures) does not justify it; candidate for a future spec if the collection or glossary genuinely grows.
+- Diagram pan/zoom gestures or a JS zoom/pan library — native scroll and browser pinch-zoom only.
+- A keyboard-shortcut help panel, legend, remapping UI, or command palette.
+- Export of highlights or notes as a file, multi-device sync, or shared/collaborative annotation — local-only, single-browser, consistent with the rest of this product's progress model.
+- Rich text, images, or attachments in notes, and a highlight color picker — plain text and one highlight treatment only.
+- Annotating diagrams, code blocks, or the internals of any interactive component — highlighting and notes apply to authored section prose only.
+- Reading-comfort controls (font-size stepper, measure/line-length constraints on `.lecture-content`) — a real, separately-scoped typography gap noticed during this spec's research (`globals.css:503-519` has no max-width on prose text), but a 016-style visual-system decision, not a feedback-loop gap; candidate for a future spec.

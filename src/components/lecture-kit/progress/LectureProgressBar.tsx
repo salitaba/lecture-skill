@@ -3,8 +3,6 @@
 import { useProgress } from "./ProgressProvider";
 import { Button, ProgressMeter } from "@/components/component-kit";
 
-const milestones = [25, 50, 75, 100];
-
 export function LectureProgressBar() {
   const { completedSections, totalSections, percentComplete, resetProgress, storageAvailable, loaded } = useProgress();
 
@@ -27,23 +25,20 @@ export function LectureProgressBar() {
 
       <ProgressMeter value={percentComplete} label="Lecture progress" />
 
-      <div className="lecture-progress-milestones-wrapper">
-        <ol className="lecture-progress-milestones" aria-label="Progress milestones">
-          {milestones.map((milestone) => (
-            <li key={milestone} className={percentComplete >= milestone ? "milestone-complete" : undefined}>
-              <span>{milestone}%</span>
-            </li>
-          ))}
-        </ol>
-        <p className="lecture-progress-milestones-summary" aria-label="Progress milestones">
-          {milestones.filter((m) => percentComplete >= m).length} of {milestones.length} milestones reached
-        </p>
-      </div>
-
       <div className="lecture-progress-footer">
-        <Button variant="ghost" tone="muted" className="progress-reset-button" onClick={onReset} disabled={totalSections === 0}>
-          Reset progress
-        </Button>
+        <span className="progress-reset-row">
+          <Button
+            variant="ghost"
+            tone="muted"
+            className="progress-reset-button"
+            onClick={onReset}
+            disabled={totalSections === 0}
+            aria-keyshortcuts="Alt+R"
+          >
+            Reset progress
+          </Button>
+          <span className="progress-reset-shortcut-hint">Alt+R</span>
+        </span>
       </div>
     </section>
   );

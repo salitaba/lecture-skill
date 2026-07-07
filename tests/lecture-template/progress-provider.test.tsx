@@ -179,7 +179,69 @@ describe("ProgressProvider", () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ block: "start", behavior: "smooth" });
     expect(screen.queryByText(/Continue from/)).not.toBeInTheDocument();
   });
+
+  it("loads and persists answer attempts under a sibling storage key when lectureId is provided", async () => {
+    const answersKey = "lecture-progress:test-lecture:answers";
+    window.localStorage.setItem(answersKey, JSON.stringify({ "quiz-one": { selected: "A", correct: true } }));
+
+    render(
+      <ProgressProvider storageKey={storageKey} sections={sections} lectureId="test-lecture">
+        <AnswersHarness />
+      </ProgressProvider>
+    );
+
+    await waitFor(() => expect(screen.getByText("quiz-one: A (correct)")).toBeInTheDocument());
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Record quiz-two" }));
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(JSON.parse(window.localStorage.getItem(answersKey) ?? "{}")).toEqual({
+      "quiz-one": { selected: "A", correct: true },
+      "quiz-two": { selected: "B", correct: false }
+    });
+  });
+
+  it("does not persist answer attempts when no lectureId is provided", async () => {
+    render(
+      <ProgressProvider storageKey={storageKey} sections={sections}>
+        <AnswersHarness />
+      </ProgressProvider>
+    );
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Record quiz-two" }));
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(window.localStorage.getItem("lecture-progress:test-lecture:answers")).toBeNull();
+    expect(screen.getByText("quiz-two: B (incorrect)")).toBeInTheDocument();
+  });
 });
+
+function AnswersHarness() {
+  const { answers, recordAnswer } = useProgress();
+
+  return (
+    <>
+      <ul>
+        {Object.entries(answers).map(([key, attempt]) => (
+          <li key={key}>
+            {key}: {attempt.selected} ({attempt.correct ? "correct" : "incorrect"})
+          </li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => recordAnswer("quiz-two", "B", false)}>
+        Record quiz-two
+      </button>
+    </>
+  );
+}
 
 function renderProgress() {
   return render(

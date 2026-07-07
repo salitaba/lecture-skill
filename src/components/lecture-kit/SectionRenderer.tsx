@@ -23,7 +23,9 @@ import { Summary } from "./Summary";
 import { Tabs } from "./Tabs";
 import { Timeline } from "./Timeline";
 import { WorkedExample } from "./WorkedExample";
+import { HighlightableContent } from "./progress/HighlightableContent";
 import { SectionCompletionToggle } from "./progress/SectionCompletionToggle";
+import { SectionNote } from "./progress/SectionNote";
 import { SectionProgressFrame } from "./progress/SectionProgressFrame";
 
 export function SectionRenderer({ section, index, lectureId }: { section: LectureSection; index: number; lectureId?: string }) {
@@ -34,9 +36,14 @@ export function SectionRenderer({ section, index, lectureId }: { section: Lectur
       <p className="section-number">Section {index + 1}</p>
       <div className="section-heading-row">
         <h2 id={`${section.anchor}-heading`}>{section.title}</h2>
-        <SectionCompletionToggle anchor={section.anchor} title={section.title} />
+        <div className="section-heading-actions">
+          <SectionCompletionToggle anchor={section.anchor} title={section.title} />
+          <SectionNote anchor={section.anchor} title={section.title} />
+        </div>
       </div>
-      <RenderBlocks blocks={section.blocks} sectionAnchor={section.anchor} lectureId={lectureId} glossaryAnchors={glossaryAnchors} />
+      <HighlightableContent anchor={section.anchor}>
+        <RenderBlocks blocks={section.blocks} sectionAnchor={section.anchor} lectureId={lectureId} glossaryAnchors={glossaryAnchors} />
+      </HighlightableContent>
     </SectionProgressFrame>
   );
 }

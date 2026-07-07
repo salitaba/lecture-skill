@@ -4,9 +4,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   calculateCollectionProgress,
   calculateLectureProgress,
+  singleLectureAnswersKey,
+  type AnswerAttempts,
   type LectureProgress,
   type ProgressLecture,
   type ProgressSection,
+  validateAnswerAttempts,
   validateLectureProgress
 } from "@/lib/lecture-template/progress";
 
@@ -29,6 +32,9 @@ export interface ProgressContextValue {
   resumeTarget?: ProgressSection;
   dismissResumePrompt: () => void;
   jumpToResumeTarget: () => void;
+  answers: AnswerAttempts;
+  answersLoaded: boolean;
+  recordAnswer: (key: string, selected: string, correct: boolean) => void;
 }
 
 export interface ProgressProviderProps {
@@ -37,6 +43,8 @@ export interface ProgressProviderProps {
   children: ReactNode;
   collectionStorageKey?: string;
   collectionLectures?: ProgressLecture[];
+  /** Enables answer-attempt persistence (a sibling `localStorage` key derived from this id). Optional so tests can render `ProgressProvider` without it. */
+  lectureId?: string;
 }
 
 const ProgressContext = createContext<ProgressContextValue | undefined>(undefined);
@@ -44,7 +52,7 @@ const writeDelayMs = 300;
 const toastDelayMs = 1500;
 const milestoneToastDelayMs = 3200;
 
-export function ProgressProvider({ storageKey, sections, children, collectionStorageKey, collectionLectures }: ProgressProviderProps) {
+export function ProgressProvider({ storageKey, sections, children, collectionStorageKey, collectionLectures, lectureId }: ProgressProviderProps) {
   const [progress, setProgress] = useState<LectureProgress>({});
   const [loaded, setLoaded] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
@@ -53,15 +61,19 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
   const [toastVariant, setToastVariant] = useState<ProgressToastVariant>("default");
   const [currentSectionAnchor, setCurrentSectionAnchor] = useState<string | undefined>(sections[0]?.anchor);
   const [resumeDismissed, setResumeDismissed] = useState(false);
+  const [answers, setAnswers] = useState<AnswerAttempts>({});
+  const [answersLoaded, setAnswersLoaded] = useState(false);
   const storageAvailableRef = useRef(true);
   const skipNextWriteRef = useRef(false);
   const writeTimerRef = useRef<number | undefined>(undefined);
   const toastTimerRef = useRef<number | undefined>(undefined);
+  const answersWriteTimerRef = useRef<number | undefined>(undefined);
   const collectionStorageKeyRef = useRef(collectionStorageKey);
   const collectionLecturesRef = useRef(collectionLectures);
   const sectionAnchors = useMemo(() => sections.map((section) => section.anchor), [sections]);
   const sectionAnchorKey = sectionAnchors.join("\u001f");
   const summary = useMemo(() => calculateLectureProgress(progress, sections), [progress, sections]);
+  const answersKey = useMemo(() => (lectureId ? singleLectureAnswersKey(lectureId) : undefined), [lectureId]);
 
   const announce = useCallback((message: string, variant: ProgressToastVariant = "default") => {
     setAnnouncement(message);
@@ -127,6 +139,51 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
       if (writeTimerRef.current) window.clearTimeout(writeTimerRef.current);
     };
   }, [loaded, progress, storageAvailable, storageKey]);
+
+  useEffect(() => {
+    if (!answersKey) return undefined;
+    let cancelled = false;
+    let nextAnswers: AnswerAttempts = {};
+
+    try {
+      const stored = window.localStorage.getItem(answersKey);
+      if (stored) {
+        try {
+          nextAnswers = validateAnswerAttempts(JSON.parse(stored));
+        } catch (error) {
+          console.warn(`Ignoring corrupted answer attempts for ${answersKey}.`, error);
+        }
+      }
+    } catch {
+      /* answer-attempt storage is best-effort; a read failure just leaves answers empty */
+    }
+
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setAnswers(nextAnswers);
+      setAnswersLoaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [answersKey]);
+
+  useEffect(() => {
+    if (!answersKey || !answersLoaded || !storageAvailable) return undefined;
+
+    answersWriteTimerRef.current = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(answersKey, JSON.stringify(answers));
+      } catch {
+        /* answer-attempt persistence is best-effort and does not flip the shared storageAvailable flag */
+      }
+    }, writeDelayMs);
+
+    return () => {
+      if (answersWriteTimerRef.current) window.clearTimeout(answersWriteTimerRef.current);
+    };
+  }, [answers, answersKey, answersLoaded, storageAvailable]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -287,6 +344,10 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
 
   const dismissResumePrompt = useCallback(() => setResumeDismissed(true), []);
 
+  const recordAnswer = useCallback((key: string, selected: string, correct: boolean) => {
+    setAnswers((current) => ({ ...current, [key]: { selected, correct } }));
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented) return;
@@ -324,15 +385,21 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
       currentSectionAnchor,
       resumeTarget,
       dismissResumePrompt,
-      jumpToResumeTarget
+      jumpToResumeTarget,
+      answers,
+      answersLoaded,
+      recordAnswer
     }),
     [
       announcement,
+      answers,
+      answersLoaded,
       progress,
       currentSectionAnchor,
       dismissResumePrompt,
       jumpToResumeTarget,
       loaded,
+      recordAnswer,
       resetProgress,
       resumeTarget,
       sections,

@@ -1,3 +1,5 @@
+import { Icon } from "@/components/component-kit";
+
 export interface NavTarget {
   slug: string;
   title: string;
@@ -16,7 +18,7 @@ export function LectureNavigation({ previous, next, backHref = "/", backLabel = 
       <div className="lecture-nav-inner">
         {previous ? (
           <a className="lecture-nav-link lecture-nav-prev" href={`/lectures/${previous.slug}`}>
-            ← {previous.title}
+            <Icon name="arrow-prev" /> {previous.title}
           </a>
         ) : null}
         <a className="lecture-nav-link lecture-nav-back" href={backHref}>
@@ -24,7 +26,7 @@ export function LectureNavigation({ previous, next, backHref = "/", backLabel = 
         </a>
         {next ? (
           <a className="lecture-nav-link lecture-nav-next" href={`/lectures/${next.slug}`}>
-            {next.title} →
+            {next.title} <Icon name="arrow-next" />
           </a>
         ) : null}
       </div>

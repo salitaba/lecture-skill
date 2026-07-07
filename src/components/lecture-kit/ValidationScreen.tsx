@@ -18,7 +18,7 @@ export function ValidationScreen({
   eyebrow?: string;
 }) {
   return (
-    <main className="page-shell validation-screen">
+    <main id="main-content" className="page-shell validation-screen">
       <section className="validation-panel" aria-labelledby="validation-heading">
         <p className="eyebrow">{eyebrow}</p>
         <h1 id="validation-heading">{heading}</h1>

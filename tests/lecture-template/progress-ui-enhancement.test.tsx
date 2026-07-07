@@ -71,15 +71,6 @@ describe("progress UI enhancement", () => {
     expect(ariaLabel).toBe("Mark First Topic incomplete");
   });
 
-  it("renders milestones summary for screen readers and hides boxes on small viewports", async () => {
-    renderProgress();
-
-    await waitFor(() => expect(screen.getByText("0 of 2 sections completed")).toBeInTheDocument());
-    const milestoneLabels = screen.getAllByLabelText("Progress milestones");
-    expect(milestoneLabels.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("0 of 4 milestones reached")).toBeInTheDocument();
-  });
-
   it("renders completion toggle with print fallback text", async () => {
     renderProgress();
 

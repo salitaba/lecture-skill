@@ -1,0 +1,221 @@
+Feature: Interface Polish Pass — Progress Display, Navigation Consistency, Notes, and Form Control Styling
+
+Authors: senior UI/UX designer.
+
+Relationship to prior work: this spec does not add a capability; it corrects eight concrete visual and interaction defects in surfaces `spec/012-progress-tracking.txt`, `spec/016-visual-design-system.txt`, `spec/017-component-kit-primitives.txt`, and `spec/019-close-the-feedback-loop.txt` already shipped. Every fix here reuses a pattern the product already established elsewhere in the same codebase — the `Icon` SVG component (`component-kit/Icon.tsx`), the native `<dialog>` pattern `spec/019`'s diagram-expand feature (`Diagram.tsx:102-115`) introduced, and the existing `accent`/`border-strong` design tokens from `spec/016`. Nothing here introduces a new visual language, a new primitive, or a new dependency; it makes the product consistent with itself.
+
+## Product Summary
+
+A pass over the rendered product surfaced eight defects, each traceable to a specific inconsistency between two places in the codebase that solve the same problem two different ways:
+
+1. `LectureProgressBar.tsx:6,30-41` renders a 25/50/75/100% milestone block row (`.lecture-progress-milestones`, `globals.css:747-780`) alongside the progress bar it already has (`ProgressMeter`, line 28) — a second, visually busy progress indicator duplicating information the bar and the "X of Y sections completed" text already communicate.
+2. `LearningPathNavigation.tsx:83,158` prints a "~X min" estimate on every section entry in the learning-path sidebar — noise on a list whose job is wayfinding, not scheduling. (This is distinct from the lecture-level "~X min read" total in `LectureHeader.tsx:26-29` and the collection page's total in `CollectionLanding.tsx:48`, both unaffected.)
+3. `SectionNote.tsx` opens its editor as an inline disclosure that pushes section content down and expands/contracts in place — visually noisy next to `SectionCompletionToggle`, and inconsistent with `spec/019`'s own diagram-expand pattern, which puts expanded, focused content in a `<dialog>` instead of inline.
+4. `LectureNavigation.tsx:18-29` (the previous/back/next row at the bottom of every lecture) renders raw `←`/`→` text characters, while `CollectionTopNav` in `LecturePage.tsx:135-147` — the *same concept*, rendered at the top of the page — already uses `<Icon name="arrow-next" />`. Worse, `.lecture-nav-inner` (`globals.css:2539-2544`) is a 3-column CSS grid with no explicit `grid-column` assignments; when a `previous` or `next` link is absent (the first or last lecture in a course), "Back to course" becomes the first DOM child and grid auto-placement drops it into column 1 instead of the center column, so its horizontal position visibly shifts lecture to lecture depending on which links exist.
+5. `SectionCompletionToggle.tsx:21` renders the completion mark as a literal `"✓"` text glyph inside a 34×34 circular button (`.section-completion-toggle`, `globals.css:880-901`), while the equivalent completion mark in `LearningPathNavigation.tsx:150` already uses a properly centered `<Icon name="check" />`. The text glyph's font metrics don't optically center the same way the empty unchecked state does, reading as if the mark itself relocates inside the circle when toggled.
+6. Neither `RadioOptionGroup.tsx` (used by `Quiz.tsx`, `QuestionSet.tsx`) nor `.checklist-item input` (`globals.css:1821-1835`) sets `accent-color`, and the page sets `color-scheme: light dark` globally (`globals.css:2`). Native radio/checkbox controls therefore render in the browser/OS's own accent (system blue on most platforms), not this product's teal `--accent-strong` (`#0f766e` light / `#2dd4bf` dark) — most visible in light mode, where the mismatch sits directly inside otherwise fully-themed quiz, question-set, and checklist cards.
+7. `PracticeTask.tsx:48-77` renders "Show hints" and "Show solution" as two sibling `DisclosureTrigger` buttons with no wrapping container between their two conditional blocks; `.btn-primary` (`globals.css:1400-1407`) sets `margin: 4px 0 12px` — vertical margin only. When both reveal regions are collapsed, the two buttons sit flush against each other with no horizontal gap.
+8. Points 5 and 8 above share one root cause: three raw-glyph "icons" remain in the product (`"✓"` in `SectionCompletionToggle.tsx:21`, `"←"`/`"→"` in `LectureNavigation.tsx:19,27`) alongside a complete, already-adopted `Icon` SVG set (`Icon.tsx`) used everywhere else (`LearningPathNavigation`'s check and note icons, `CollectionTopNav`'s arrow, `Diagram`'s expand/download). These three are the only holdouts.
+
+## Product Outcome
+
+- A lecture's progress section shows one clear indicator of completion — the bar and its summary sentence — not a bar plus a second row of four boxes saying the same thing differently.
+- The learning-path sidebar reads as a clean list of section titles and status, with no per-item time estimate competing for attention.
+- Adding or editing a section note opens a focused popup, the same interaction shape as expanding a diagram, and doesn't shove the rest of the section down the page.
+- The previous/back/next row at the bottom of every lecture sits in the same visual position and uses the same icon treatment on the first lecture, the last lecture, and every lecture in between.
+- The "mark complete" circle renders its checkmark as a properly centered icon, so toggling it never reads as the mark jumping.
+- Radio buttons and checklist checkboxes pick up this product's own accent color in both themes, not the browser's default.
+- The practice-task "Show hints" and "Show solution" buttons have clear, consistent spacing between them, matching every other adjacent-button pairing in the product.
+- Every remaining icon in the rendered product is a real SVG from the existing icon set — no bare text glyphs standing in for one.
+
+## Users And Jobs
+
+Primary users: every learner using the product (all eight fixes are on paths every learner crosses: the progress bar, the sidebar, section notes, inter-lecture navigation, quizzes, checklists, and practice tasks), and this spec's author, a UI/UX reviewer treating internal visual consistency as a first-class bug class rather than eight unrelated cosmetic tweaks.
+
+Jobs to be done:
+
+- As a learner, I want the progress bar to tell me one clear thing, not repeat itself in a second, cluttered row of milestone boxes.
+- As a learner, I want the section list in the sidebar to help me navigate, not clutter each entry with a small time estimate I don't act on.
+- As a learner, I want to add or edit a note without the page shifting content around me.
+- As a learner moving between lectures, I want the back/previous/next controls to stay put and look consistent no matter which lecture I'm on.
+- As a learner, I want the "mark complete" control to look stable when I click it, not like something moved.
+- As a learner using a light-themed screen, I want the radio buttons and checkboxes to match the rest of the product's color language, not clash with a foreign blue.
+- As a learner in a practice task, I want the hint and solution buttons to be visually separate controls, not a single fused block.
+- As an author, I want none of this to change how lectures are written or validated — every fix is presentational or structural inside existing components, not a new authoring field.
+
+## Problem
+
+- **Duplicated progress signal.** `LectureProgressBar.tsx` renders both a filled bar (`ProgressMeter`, line 28) and a 25/50/75/100% milestone block row (lines 30-41; `globals.css:747-780`) directly beneath it — two visual encodings of the same number, and the boxes carry no information the bar and the "X of Y sections completed" summary (line 22) don't already state more legibly.
+- **Noisy sidebar entries.** `LearningPathNavigation.tsx:83,158` attaches a "~X min" label (`.nav-section-minutes`, `globals.css:542-548`) to every section row, adding a small numeric distraction to a list whose only job is showing where you are and where you can go.
+- **Inline note editor disrupts reading flow.** `SectionNote.tsx:33-60` toggles a `<textarea>` open inline via `useDisclosure`/`DisclosureTrigger`, pushing everything below it down the page while open — a heavier, less contained interaction than the dialog-based pattern `spec/019` already established for diagram inspection.
+- **Inter-lecture navigation is visually unstable.** `LectureNavigation.tsx:13-33`'s `.lecture-nav-inner` grid (`globals.css:2539-2544`) has three implicit columns and no explicit column assignment on `.lecture-nav-back`; because `previous`/`next` links are conditionally rendered, "Back to course" lands in a different grid cell — and therefore a different horizontal position on screen — depending on whether the current lecture has a previous and/or next sibling. It also renders `←`/`→` as plain text (`LectureNavigation.tsx:19,27`) where the structurally identical `CollectionTopNav` (`LecturePage.tsx:140-143`) already uses `<Icon name="arrow-next" />`.
+- **Mark-complete circle reads as relocating.** `SectionCompletionToggle.tsx:21` swaps between an empty string and a bare `"✓"` character glyph inside a fixed 34×34 circle; unlike `LearningPathNavigation.tsx:150`'s already-centered `<Icon name="check" />` treatment of the same state, the glyph's rendering isn't guaranteed to sit at the same optical center as nothing, so the toggle reads as if the mark shifts position rather than simply appearing.
+- **Native form controls ignore the product's theme.** No selector in `globals.css` sets `accent-color` on the `<input type="radio">` elements `RadioOptionGroup.tsx:36-44` renders (used by `Quiz`'s `.quiz-option` and `QuestionSet`'s `.assessment-option`) or on `.checklist-item input` (`globals.css:1821-1835`); combined with the page-wide `color-scheme: light dark` (`globals.css:2`), every radio and checkbox in the product renders in the browser's own default accent color instead of this product's teal, most jarring in light mode.
+- **No gap between adjacent practice-task reveal buttons.** `PracticeTask.tsx:48-77` renders "Show hints" and "Show solution" as two separately-conditioned `<DisclosureTrigger>` elements with no shared wrapping element; `.btn-primary`'s margin (`globals.css:1400-1407`) is vertical-only, so with both reveal regions collapsed the two buttons render with zero horizontal space between them.
+- **Three raw-glyph icons remain in an otherwise all-SVG icon system.** `"✓"` (`SectionCompletionToggle.tsx:21`) and `"←"`/`"→"` (`LectureNavigation.tsx:19,27`) are plain characters standing in for concepts (`check`, `arrow-prev`, `arrow-next`) that already exist as SVG paths in `Icon.tsx` and are already used correctly elsewhere in the same product for the same concepts.
+
+## Goals
+
+P0 — Icon and Control Consistency (touches the most pages, lowest implementation risk):
+
+- G1. Replace the `"✓"` glyph in `SectionCompletionToggle` and the `"←"`/`"→"` glyphs in `LectureNavigation` with the existing `Icon` component (`check`, `arrow-prev`, `arrow-next`), matching how `LearningPathNavigation` and `CollectionTopNav` already render the same concepts.
+- G2. Set the product's accent color (`--accent-strong`, matching theme) as `accent-color` on every native radio input (`Quiz`, `QuestionSet`) and checkbox input (`Checklist`) in both light and dark themes.
+- G3. Add visible, consistent horizontal spacing between "Show hints" and "Show solution" in `PracticeTask`, and between any other pair of adjacent `Button`/`DisclosureTrigger` siblings that currently render with no wrapping gap container.
+
+P1 — Progress Bar Simplification:
+
+- G4. Remove the 25/50/75/100% milestone block row from `LectureProgressBar`; the fill bar and the existing "X of Y sections completed" summary remain the sole progress indicator.
+
+P2 — Learning Path Sidebar Cleanup:
+
+- G5. Remove the per-section "~X min" label from `LearningPathNavigation`'s entries. `LectureHeader`'s lecture-level "~X min read" and the collection page's course-level total are unaffected.
+
+P3 — Lecture-to-Lecture Navigation Redesign:
+
+- G6. Give `LectureNavigation`'s previous/back/next row a layout where "Back to course" always renders in the same visual position regardless of whether a previous and/or next lecture exists — on the first lecture, the last lecture, a single-lecture course, and every lecture in between.
+- G7. Bring `LectureNavigation`'s arrow treatment in line with `CollectionTopNav`'s existing `Icon`-based rendering (folds into G1 for the glyph swap; this goal covers the layout-level consistency between the two navigation instances).
+
+P4 — Section Notes as a Popup:
+
+- G8. Replace `SectionNote`'s inline expand-in-place editor with a popup/dialog editing surface, opened from the same "Add a note" / "Edit note" control, following the native-`<dialog>` pattern `spec/019`'s diagram expand (`Diagram.tsx:102-115`) already established — not a new modal primitive.
+
+## Non-Goals
+
+- No change to what a note, a highlight, a quiz answer, a checklist item, or section-completion state *is* or how it's stored — `spec/019`'s `AnnotationsProvider`/`ProgressProvider` storage model, keys, and persistence semantics are untouched. This spec only changes how these things are rendered and laid out.
+- No new milestone, streak, gamification, or celebratory system introduced to replace the removed 25/50/75/100% blocks — `spec/018`'s existing lecture/course-completion milestone toast (`ProgressProvider.tsx:254,284`) is untouched and unrelated; removing the block row does not touch it.
+- No change to how section reading-time is computed (`sectionReadingMinutes`, `lectureReadingMinutes`) — only where it is displayed. Lecture-level and course-level minute totals remain exactly as they render today.
+- No new modal/dialog primitive — G8 reuses the native `<dialog>` element and the existing focus/`Escape`/backdrop behavior `spec/019`'s `Diagram` component already relies on; no dialog library, no custom overlay component.
+- No new icon shapes beyond what `Icon.tsx` already defines (`check`, `arrow-prev`, `arrow-next`) — G1 is a substitution of existing SVG paths for existing text glyphs, not new iconography.
+- No redesign of quiz/question-set/checklist option layout, selection ring, or feedback tinting — G2 changes only the native control's own rendered color via `accent-color`, not the surrounding option card styling `spec/015`/`spec/017` already established.
+- No change to `PracticeTask`'s content structure (scenario/task/steps/starter code/rubric/hints/solution) — G3 only adds spacing between two existing buttons.
+- No change to `LectureNavigation`'s or `CollectionTopNav`'s link targets, labels, or `aria-label`s — G6/G7 fix layout stability and icon consistency, not navigation behavior or copy.
+- No accessibility rework of components this spec doesn't touch beyond what each goal directly requires.
+
+## Product Decisions
+
+- Every fix in this spec is a substitution of an existing, already-correct pattern used elsewhere in the same codebase for an inconsistent one — not an invented solution. G1 substitutes existing `Icon` usage for stray text glyphs the same product already renders correctly in a sibling component. G8 substitutes the existing diagram-dialog pattern for an ad hoc inline disclosure. This keeps the fix set small and low-risk: nothing here requires inventing new visual language, only applying what `spec/016`/`spec/017`/`spec/019` already settled, consistently.
+- Removing the milestone block row (G4) is a subtraction, not a replacement — no new summary element takes its place. The existing bar plus "X of Y sections completed" text was always the primary signal; the blocks were redundant, not complementary.
+- `accent-color` (G2) is the correct, lowest-effort fix for native-control theming — it changes only the control's own checked-state color while leaving all other native behavior (focus ring, keyboard interaction, screen-reader semantics) untouched, unlike a custom-appearance rebuild of radio/checkbox controls, which this spec explicitly avoids.
+- The note popup (G8) carries over exactly what `SectionNote` does today — one plain-text `<textarea>`, autosave on blur/debounce, no rich text — the only change is the container it renders in. This is presentation-layer only; `AnnotationsProvider`'s data and API are untouched.
+- The previous/back/next layout fix (G6) should guarantee "Back to course" a fixed grid/flex slot independent of DOM order — for example, giving it an explicit `grid-column` (or restructuring to always render all three logical slots, using `visibility`/empty placeholders instead of conditional unmounting) — so its position is a function of which lecture-position role it plays, never a function of which sibling links happen to exist.
+
+## UX Designer Notes
+
+Every one of these eight items has the same shape: somewhere else in this exact product, the same problem was already solved correctly. `LearningPathNavigation` already centers its check icon properly; `SectionCompletionToggle` doesn't. `CollectionTopNav` already uses a real arrow icon; `LectureNavigation` doesn't. `Diagram` already has a dialog pattern for "show me more, in a focused surface"; `SectionNote` doesn't use it. The fix in every case is to make the inconsistent instance match the consistent one — resist the temptation to redesign the *correct* instance in the process. `LearningPathNavigation`'s check icon, `CollectionTopNav`'s arrow, and `Diagram`'s dialog chrome are the reference implementations; copy their shape, don't reinvent it.
+
+The milestone-block removal (G4) is the one item worth stating plainly: don't replace it with anything. A bar and a sentence are enough to answer "how far am I." A second row of four boxes restating the same percentage in coarser buckets was never adding information — it was adding visual weight. Deleting it is the fix.
+
+The note popup (G8) should feel exactly like the diagram-expand dialog: same open/close motion tokens, same "Close" control placement, same restraint. Don't use this as an opportunity to add note formatting, resize handles, or a bigger editing surface than the current `<textarea>` — the scope is "move the same editor into a popup," not "build a richer note editor."
+
+## Priority
+
+### P0: Icon and Control Consistency
+
+Highest reach (every quiz, checklist, practice task, and lecture page), lowest implementation risk (swap-ins for existing, already-proven patterns).
+
+#### C1. Real icons everywhere
+
+- `SectionCompletionToggle`'s completion mark renders `<Icon name="check" />` instead of `"✓"`, matching `LearningPathNavigation.tsx:150`'s existing treatment of the same state.
+- `LectureNavigation`'s previous/next links render `<Icon name="arrow-prev" />` / `<Icon name="arrow-next" />` instead of `"←"`/`"→"`, matching `CollectionTopNav`'s existing `arrow-next` usage.
+- No other icon substitution is in scope — every other icon in the product already uses `Icon.tsx`.
+
+#### C2. Themed radio and checkbox controls
+
+- `accent-color: var(--accent-strong)` (or the theme-appropriate equivalent) applied to the `<input type="radio">` rendered by `RadioOptionGroup` (covering `Quiz`'s `.quiz-option` and `QuestionSet`'s `.assessment-option`) and to `.checklist-item input`.
+- Verified correct in both light and dark themes; no change to focus ring, keyboard behavior, or `aria` semantics of either control.
+
+#### C3. Spaced practice-task buttons
+
+- "Show hints" and "Show solution" in `PracticeTask` render with clear, consistent horizontal spacing between them — either a shared wrapping element with `gap`, or an explicit horizontal margin — matching the spacing already used between adjacent controls elsewhere in the product (e.g. `.section-heading-actions`'s `gap: 10px`).
+
+### P1: Progress Bar Simplification
+
+#### B1. Remove the milestone block row
+
+- `LectureProgressBar` no longer renders the `milestones` array, the `.lecture-progress-milestones` list, or `.lecture-progress-milestones-summary`.
+- The `ProgressMeter` fill bar and the "X of Y sections completed" summary text remain, unchanged in content and position.
+
+### P2: Learning Path Sidebar Cleanup
+
+#### N1. Remove per-section time estimates
+
+- `LearningPathNavigation` no longer renders `.nav-section-minutes` or accepts/uses a per-item minutes value for display purposes in the list.
+- `LectureHeader`'s lecture-level reading time and `CollectionLanding`'s course-level total are unaffected — this is scoped to the sidebar list only.
+
+### P3: Lecture-to-Lecture Navigation Redesign
+
+#### L1. Stable back-link position
+
+- `LectureNavigation`'s layout guarantees "Back to course" always occupies the same visual position (center) whether or not `previous` and/or `next` are present — verified on a first lecture (no previous), a last lecture (no next), and a middle lecture (both present).
+
+#### L2. Consistent arrow icons
+
+- Covered by C1; called out here because it's part of what makes `LectureNavigation` and `CollectionTopNav` visually consistent with each other as the two instances of "lecture-to-lecture navigation" in the product.
+
+### P4: Section Notes as a Popup
+
+#### P1-Note. Popup note editor
+
+- The "Add a note" / "Edit note" control (`SectionRenderer.tsx:41`) opens a native `<dialog>` containing the same `<textarea>`, save-on-blur/debounce behavior, and empty/has-note copy `SectionNote` already implements — not a redesigned editor, just a relocated one.
+- Closing the dialog (native `Escape`, backdrop click, or an explicit "Close"/"Save" control) preserves whatever autosave has already committed, exactly like today's blur-triggered save.
+- The section-note-present indicator in `LearningPathNavigation` (`nav-item-note-icon`, line 156) is unaffected — it already reflects saved-note state regardless of how the editor is presented.
+
+## Accessibility Requirements
+
+- `Icon`-based replacements (C1) remain `aria-hidden`, exactly as every existing `Icon` usage already is; the accessible name of each control continues to come from its `aria-label`/visible text, not the icon.
+- `accent-color` (C2) is a rendering hint only — it does not change either control's role, keyboard operability, or focus-visible treatment, which are unaffected by this spec.
+- The note popup (G8) uses native `<dialog>` semantics for focus trapping and restores focus to the triggering "Add a note"/"Edit note" button on close, exactly as `Diagram`'s expand dialog already does.
+- The note `<textarea>`'s existing `sr-only` label (`SectionNote.tsx:47-49`) is preserved unchanged inside the popup.
+- Motion on the note dialog's open/close (if any is added) respects `prefers-reduced-motion`, consistent with `globals.css:2418-2432`'s existing pattern and `spec/019`'s D1 requirement for the diagram dialog.
+- The stabilized `LectureNavigation` layout (L1) does not change tab order or link semantics — only visual position.
+
+## Responsive Requirements
+
+- No regression at the 390px/768px/1280px breakpoints already established for `LectureProgressBar`, `LearningPathNavigation`, `LectureNavigation`, `PracticeTask`, `Quiz`, `QuestionSet`, and `Checklist`.
+- The stabilized `LectureNavigation` layout (L1) continues to stack sensibly on narrow viewports without reintroducing a position-shift between lectures at any breakpoint.
+- The note popup (G8) fills the viewport responsibly at 390px (near-fullscreen, consistent with the diagram dialog) and remains a comfortably sized, centered dialog at 1280px.
+- The added spacing between "Show hints" and "Show solution" (C3) does not cause the buttons to overflow or wrap awkwardly at 390px.
+
+## Functional Requirements
+
+- Every existing lecture template and collection continues to render identically in content terms; no authoring-schema changes.
+- No new runtime dependency for any goal in this spec — `accent-color` and `<dialog>` are native CSS/HTML already relied on elsewhere in the product.
+- `AnnotationsProvider`'s note storage, keys, and persistence semantics (`spec/019`) are unchanged; G8 changes only the editor's container.
+- `ProgressProvider`'s section-completion and milestone-toast logic (`spec/012`, `spec/018`) are unchanged; G4 only removes a rendering block, not any progress-computation logic.
+- `sectionReadingMinutes`/`lectureReadingMinutes` computation is unchanged; G5 only stops rendering the per-section value in one location.
+- The full existing test suite (`tests/lecture-template/*`) passes; any test asserting on the removed milestone-block markup, the removed per-section minutes markup, the inline note-disclosure markup, or the literal `"✓"`/`"←"`/`"→"` glyphs is updated deliberately to match the new markup, not left broken.
+- Static export and review-package output remain functional and visually consistent with the dev preview for every element this spec touches.
+
+## Success Metrics / Quality Gates
+
+- The lecture progress section shows a single progress indicator (bar + summary text); no milestone block row remains.
+- The learning-path sidebar list shows no per-section time estimate; the lecture header's and collection page's total reading-time figures are unchanged.
+- Opening a section's note control opens a popup, not an inline-expanding region; the rest of the section's layout doesn't shift when it opens or closes.
+- Visiting the first lecture, a middle lecture, and the last lecture in a course shows "Back to course" in the identical visual position each time.
+- Toggling "Mark complete" shows the checkmark appear/disappear without any perceptible shift in the mark's position within the circle.
+- Radio buttons (quiz/question-set) and checklist checkboxes render in the product's teal accent, not the browser default, verified in both light and dark themes.
+- "Show hints" and "Show solution" render with clearly visible, consistent spacing between them.
+- No bare text glyph (`✓`, `←`, `→`, or similar) remains anywhere in the rendered product where `Icon.tsx` already defines the equivalent SVG.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests pass, with any necessary, intentional updates documented.
+- No visual diff versus the current baseline outside the specific elements this spec deliberately changes.
+
+## Acceptance Criteria
+
+- `LectureProgressBar` renders the progress bar and completion summary text only; the 25/50/75/100% milestone block row and its markup are removed.
+- `LearningPathNavigation` no longer displays a per-section "~X min" label; `LectureHeader` and `CollectionLanding`'s reading-time displays are unchanged.
+- `SectionNote`'s editor opens in a popup/dialog triggered by the existing "Add a note"/"Edit note" control, with the same autosave behavior and copy as before; the section-note-present indicator in the sidebar is unaffected.
+- `LectureNavigation` renders "Back to course" in a fixed visual position independent of whether `previous`/`next` are present, verified on first, middle, and last lectures of a course.
+- `LectureNavigation`'s previous/next links and `SectionCompletionToggle`'s completion mark render via `Icon` (SVG), not raw text glyphs.
+- Radio inputs in `Quiz`/`QuestionSet` and checkbox inputs in `Checklist` render in the product's accent color in both light and dark themes.
+- `PracticeTask`'s "Show hints" and "Show solution" buttons render with visible horizontal spacing between them.
+- Existing parser, validator, rendering, progress, collection, review-package, and component tests pass, with any necessary, intentional updates documented.
+- Verification includes a visual check at 390px/768px/1280px in light and dark themes, before and after, covering every component this spec touches, plus a spot-check of a first, middle, and last lecture in a multi-lecture course for the navigation-position fix.
+
+## Out Of Scope For 020
+
+- Any new progress-communication element (streak, percentage badge, celebratory state) replacing the removed milestone blocks — a subtraction, not a replacement.
+- Any change to how reading-time minutes are computed, only where the per-section figure is displayed.
+- Rich text, resizing, formatting, or any new capability in the note editor — G8 relocates the existing plain-text editor, it does not enhance it.
+- A general audit of every dialog/disclosure/button spacing pattern in the codebase beyond the specific instances named in this spec (`PracticeTask`'s hint/solution pair, `LectureNavigation`'s layout) — if a future review finds more instances of the same class of bug, that is a candidate for a follow-up spec, not silently expanded scope here.
+- A broader native-form-control theming pass (e.g. `<select>`, `<input type="text">` focus styling) beyond radio and checkbox `accent-color` — scoped to the two controls named in the Problem section.
+- Any redesign of `Icon.tsx`'s existing SVG paths or the addition of new icon concepts beyond `check`/`arrow-prev`/`arrow-next`, which already exist and are only being applied consistently.

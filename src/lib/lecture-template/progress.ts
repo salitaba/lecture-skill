@@ -27,8 +27,41 @@ export interface CollectionProgressSummary extends LectureProgressSummary {
   lectures: CollectionLectureProgressSummary[];
 }
 
+export interface AnswerAttempt {
+  selected: string;
+  correct: boolean;
+}
+
+export type AnswerAttempts = Record<string, AnswerAttempt>;
+
+export interface Highlight {
+  id: string;
+  sectionAnchor: string;
+  blockIndex: number;
+  start: number;
+  end: number;
+  snippet: string;
+}
+
+export interface Annotations {
+  highlights: Highlight[];
+  notes: Record<string, string>;
+}
+
+export function highlightId(sectionAnchor: string, blockIndex: number, start: number, end: number): string {
+  return `${sectionAnchor}:${blockIndex}:${start}:${end}`;
+}
+
 export function singleLectureProgressKey(lectureId: string): string {
   return `lecture-progress:${lectureId}`;
+}
+
+export function singleLectureAnswersKey(lectureId: string): string {
+  return `lecture-progress:${lectureId}:answers`;
+}
+
+export function singleLectureAnnotationsKey(lectureId: string): string {
+  return `lecture-progress:${lectureId}:annotations`;
 }
 
 export function collectionProgressKey(collectionId: string): string {
@@ -68,6 +101,47 @@ export function validateLectureProgress(value: unknown, allowedAnchors: Iterable
   }
 
   return normalized;
+}
+
+export function validateAnswerAttempts(value: unknown): AnswerAttempts {
+  if (!isPlainRecord(value)) return {};
+
+  const normalized: AnswerAttempts = {};
+
+  for (const [key, attempt] of Object.entries(value)) {
+    if (!isPlainRecord(attempt)) continue;
+    if (typeof attempt.selected !== "string" || typeof attempt.correct !== "boolean") continue;
+    normalized[key] = { selected: attempt.selected, correct: attempt.correct };
+  }
+
+  return normalized;
+}
+
+export function validateAnnotations(value: unknown): Annotations {
+  if (!isPlainRecord(value)) return { highlights: [], notes: {} };
+
+  const highlights: Highlight[] = Array.isArray(value.highlights) ? value.highlights.filter(isValidHighlight) : [];
+  const notes: Record<string, string> = {};
+
+  if (isPlainRecord(value.notes)) {
+    for (const [anchor, note] of Object.entries(value.notes)) {
+      if (typeof note === "string" && note.trim() !== "") notes[anchor] = note;
+    }
+  }
+
+  return { highlights, notes };
+}
+
+function isValidHighlight(value: unknown): value is Highlight {
+  if (!isPlainRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.sectionAnchor === "string" &&
+    typeof value.blockIndex === "number" &&
+    typeof value.start === "number" &&
+    typeof value.end === "number" &&
+    typeof value.snippet === "string"
+  );
 }
 
 export function validateCollectionProgress(value: unknown, lectures: ProgressLecture[]): CollectionProgress {

@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/component-kit";
 import { useProgressOptional } from "./ProgressProvider";
 
 export function SectionCompletionToggle({ anchor, title }: { anchor: string; title: string }) {
@@ -15,13 +16,15 @@ export function SectionCompletionToggle({ anchor, title }: { anchor: string; tit
         className="section-completion-toggle"
         aria-pressed={completed}
         aria-label={completed ? `Mark ${title} incomplete` : `Mark ${title} complete`}
+        aria-keyshortcuts="Alt+M"
         onClick={() => toggleSection?.(anchor)}
       >
-        <span aria-hidden="true">{completed ? "✓" : ""}</span>
+        {completed ? <Icon name="check" /> : null}
       </button>
       <span className="section-completion-label" aria-hidden="true">
         {completed ? "Completed" : "Mark complete"}
       </span>
+      <span className="section-completion-shortcut-hint">Alt+M</span>
       <span className="section-completion-print">Progress: {completed ? "complete" : "incomplete"}</span>
     </div>
   );

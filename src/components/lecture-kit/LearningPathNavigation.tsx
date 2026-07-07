@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { LectureSection } from "@/lib/lecture-template/types";
 import { lectureNavigationTargets } from "@/lib/lecture-template/navigationTargets";
 import { useProgressOptional } from "./progress/ProgressProvider";
+import { useAnnotationsOptional } from "./progress/AnnotationsProvider";
 import { Icon } from "@/components/component-kit";
 
 const nonAuthoredAnchors = [
@@ -13,13 +14,12 @@ const nonAuthoredAnchors = [
 ];
 
 export function LearningPathNavigation({
-  sections,
-  sectionMinutes
+  sections
 }: {
   sections: LectureSection[];
-  sectionMinutes?: Record<string, number>;
 }) {
   const progressContext = useProgressOptional();
+  const annotationsContext = useAnnotationsOptional();
   const [activeAnchor, setActiveAnchor] = useState<string | undefined>(undefined);
 
   const allAnchors = useMemo(
@@ -54,6 +54,11 @@ export function LearningPathNavigation({
     if (!progress) return undefined;
     return new Set(Object.keys(progress).filter((anchor) => progress[anchor] === true));
   }, [progressContext?.progress]);
+  const notedAnchors = useMemo(() => {
+    const notes = annotationsContext?.notes;
+    if (!notes) return undefined;
+    return new Set(Object.keys(notes).filter((anchor) => notes[anchor].trim() !== ""));
+  }, [annotationsContext?.notes]);
 
   const items = [
     {
@@ -72,8 +77,7 @@ export function LearningPathNavigation({
       key: section.anchor,
       href: `#${section.anchor}`,
       prefix: `Section ${index + 1}`,
-      label: section.title,
-      minutes: sectionMinutes?.[section.anchor]
+      label: section.title
     })),
     {
       key: "takeaways",
@@ -90,7 +94,7 @@ export function LearningPathNavigation({
         <p className="nav-summary-count">
           {sections.length} {sections.length === 1 ? "section" : "sections"}
         </p>
-        <NavigationList items={items} activeAnchor={currentAnchor} completedAnchors={completedAnchors} />
+        <NavigationList items={items} activeAnchor={currentAnchor} completedAnchors={completedAnchors} notedAnchors={notedAnchors} />
       </div>
       <details className="learning-path learning-path-mobile">
         <summary>
@@ -102,7 +106,7 @@ export function LearningPathNavigation({
             <Icon name="chevron" className="learning-path-chevron" />
           </span>
         </summary>
-        <NavigationList items={items} activeAnchor={currentAnchor} completedAnchors={completedAnchors} />
+        <NavigationList items={items} activeAnchor={currentAnchor} completedAnchors={completedAnchors} notedAnchors={notedAnchors} />
       </details>
     </nav>
   );
@@ -111,17 +115,18 @@ export function LearningPathNavigation({
 function NavigationList({
   items,
   activeAnchor,
-  completedAnchors
+  completedAnchors,
+  notedAnchors
 }: {
   items: Array<{
     key: string;
     href: string;
     prefix: string;
     label: string;
-    minutes?: number;
   }>;
   activeAnchor?: string;
   completedAnchors?: Set<string>;
+  notedAnchors?: Set<string>;
 }) {
   return (
     <ol>
@@ -129,6 +134,7 @@ function NavigationList({
         const anchor = item.href.startsWith("#") ? item.href.slice(1) : undefined;
         const isActive = anchor !== undefined && anchor === activeAnchor;
         const isComplete = anchor !== undefined && completedAnchors?.has(anchor) === true;
+        const hasNote = anchor !== undefined && notedAnchors?.has(anchor) === true;
         return (
           <li className={`nav-item${isComplete ? " nav-item-complete" : ""}`} key={item.key}>
             <a
@@ -141,10 +147,13 @@ function NavigationList({
               </span>
               <span className="nav-item-text">
                 <span className="nav-prefix">{item.prefix}</span>
-                <span>{item.label}</span>
-                {item.minutes ? <span className="nav-section-minutes">~{item.minutes} min</span> : null}
+                <span>
+                  {item.label}
+                  {hasNote ? <Icon name="note" className="nav-item-note-icon" /> : null}
+                </span>
                 {isComplete ? <span className="sr-only"> (completed)</span> : null}
                 {isActive ? <span className="sr-only"> (current)</span> : null}
+                {hasNote ? <span className="sr-only"> (has your note)</span> : null}
               </span>
             </a>
           </li>

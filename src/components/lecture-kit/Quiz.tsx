@@ -1,16 +1,45 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { QuizComponent } from "@/lib/lecture-template/types";
-import { Button, Card, RadioOptionGroup, useDisclosure } from "@/components/component-kit";
+import { Button, Card, RadioOptionGroup } from "@/components/component-kit";
+import { useProgressOptional } from "./progress/ProgressProvider";
 
 export function Quiz({ component }: { component: QuizComponent }) {
+  const progressContext = useProgressOptional();
   const [selected, setSelected] = useState<string | null>(null);
-  const { open: revealed, toggle: toggleRevealed, regionId: answerRegionId } = useDisclosure("answer");
+  const [revealed, setRevealed] = useState(false);
+  const hydratedRef = useRef(false);
   const baseId = useId();
+  const answerRegionId = `${baseId}-answer`;
   const answerLabelId = `${answerRegionId}-label`;
   const isCorrect = selected === component.answer;
   const hasSelection = selected !== null;
+
+  useEffect(() => {
+    if (hydratedRef.current || !progressContext?.answersLoaded) return undefined;
+    hydratedRef.current = true;
+    const attempt = progressContext.answers[component.anchor];
+    if (!attempt) return undefined;
+
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setSelected(attempt.selected);
+      setRevealed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [component.anchor, progressContext?.answers, progressContext?.answersLoaded]);
+
+  const toggleRevealed = () => {
+    const next = !revealed;
+    if (next && selected !== null) {
+      progressContext?.recordAnswer(component.anchor, selected, selected === component.answer);
+    }
+    setRevealed(next);
+  };
 
   return (
     <Card id={component.anchor} altitude="emphasis" label="Quiz: Knowledge check" className="quiz-card">

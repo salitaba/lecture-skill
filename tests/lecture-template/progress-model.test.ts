@@ -6,7 +6,9 @@ import {
   progressIdFromCollectionBase,
   progressIdFromTemplatePath,
   sanitizeProgressId,
+  singleLectureAnswersKey,
   singleLectureProgressKey,
+  validateAnswerAttempts,
   validateCollectionProgress,
   validateLectureProgress
 } from "../../src/lib/lecture-template/progress";
@@ -19,6 +21,7 @@ describe("progress model helpers", () => {
 
   it("builds exact storage keys and sanitized ids", () => {
     expect(singleLectureProgressKey("content-lecture-template-md")).toBe("lecture-progress:content-lecture-template-md");
+    expect(singleLectureAnswersKey("content-lecture-template-md")).toBe("lecture-progress:content-lecture-template-md:answers");
     expect(collectionProgressKey("lectures")).toBe("lecture-progress:collection:lectures");
     expect(sanitizeProgressId(" Content/Lecture Template.md ")).toBe("content-lecture-template-md");
     expect(sanitizeProgressId("!!!")).toBe("default");
@@ -45,6 +48,23 @@ describe("progress model helpers", () => {
     ).toEqual({
       "first-topic": true,
       "second-topic": false
+    });
+  });
+
+  it("validates answer attempts without coercing malformed values", () => {
+    expect(validateAnswerAttempts(null)).toEqual({});
+    expect(validateAnswerAttempts([])).toEqual({});
+    expect(validateAnswerAttempts("bad")).toEqual({});
+    expect(
+      validateAnswerAttempts({
+        "quiz-one": { selected: "A", correct: true },
+        "quiz-two": { selected: "B", correct: "true" },
+        "quiz-three": { selected: 1, correct: false },
+        "quiz-four": "not-an-object",
+        "quiz-five": { selected: "C" }
+      })
+    ).toEqual({
+      "quiz-one": { selected: "A", correct: true }
     });
   });
 

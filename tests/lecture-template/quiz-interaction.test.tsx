@@ -1,12 +1,15 @@
 /* @vitest-environment jsdom */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Quiz } from "../../src/components/lecture-kit/Quiz";
+import { ProgressProvider } from "../../src/components/lecture-kit/progress/ProgressProvider";
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
+  window.localStorage.clear();
 });
 
 describe("quiz reveal interaction", () => {
@@ -202,6 +205,54 @@ describe("quiz reveal interaction", () => {
     await user.keyboard("{Enter}");
 
     expect(screen.getByRole("button", { name: "Hide answer" })).toBeInTheDocument();
+    expect(screen.getByText("Not quite.")).toBeInTheDocument();
+  });
+
+  it("restores a checked selection from a prior attempt when wrapped in ProgressProvider", async () => {
+    const quiz = (
+      <Quiz
+        component={{
+          type: "quiz",
+          anchor: "quiz-persisted",
+          question: "Which command validates?",
+          options: ["npm run validate", "npm run dev"],
+          answer: "npm run validate"
+        }}
+      />
+    );
+
+    const first = render(
+      <ProgressProvider storageKey="lecture-progress:test-lecture" sections={[]} lectureId="test-lecture">
+        {quiz}
+      </ProgressProvider>
+    );
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: "npm run dev" })).toBeInTheDocument());
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("radio", { name: "npm run dev" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check answer" }));
+    expect(screen.getByText("Not quite.")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    vi.useRealTimers();
+
+    expect(JSON.parse(window.localStorage.getItem("lecture-progress:test-lecture:answers") ?? "{}")).toEqual({
+      "quiz-persisted": { selected: "npm run dev", correct: false }
+    });
+
+    first.unmount();
+
+    render(
+      <ProgressProvider storageKey="lecture-progress:test-lecture" sections={[]} lectureId="test-lecture">
+        {quiz}
+      </ProgressProvider>
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Hide answer" })).toBeInTheDocument());
+    expect(screen.getByRole("radio", { name: "npm run dev" })).toBeChecked();
     expect(screen.getByText("Not quite.")).toBeInTheDocument();
   });
 });
