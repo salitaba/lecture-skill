@@ -6,6 +6,9 @@ export const ACTIVE_TEMPLATE_PATH = "content/lecture.template.md";
 export const LECTURES_DIR = "lectures";
 
 export function repositoryPath(relativePath: string): string {
+  if (process.env.LECTURE_CONTENT_ROOT) {
+    return path.join(process.env.LECTURE_CONTENT_ROOT, relativePath);
+  }
   return path.join(/*turbopackIgnore: true*/ process.cwd(), relativePath);
 }
 

@@ -11,3 +11,4 @@ lectures/
 out/
 .next-review/
 review-packages/
+.lecture-site-engine/

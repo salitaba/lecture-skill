@@ -7,6 +7,8 @@ description: Converts a raw lecture source into content/lecture.template.md (or 
 
 Use this skill to convert one raw lecture source into `content/lecture.template.md` using the supported Lecture Site Engine schema.
 
+Every `npm run <command>` instruction below has an equivalent `npx lecture-site-engine <command>` form (same command names, e.g. `npx lecture-site-engine validate`, `npx lecture-site-engine new:lecture`, `npx lecture-site-engine dev`). Use the `npm run` form when working inside this repo; use the `npx` form when authoring in a project that doesn't have this repo cloned.
+
 ## Inputs
 
 - Read one raw lecture source.

@@ -6,9 +6,23 @@
   "engines": {
     "node": ">=24"
   },
+  "bin": {
+    "lecture-site-engine": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src/app",
+    "src/components",
+    "src/lib",
+    "next.config.ts",
+    "next-env.d.ts",
+    "tsconfig.app.json"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:cli": "tsup",
+    "prepublishOnly": "npm run build:cli",
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
@@ -20,24 +34,25 @@
     "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts"
   },
   "dependencies": {
+    "@types/node": "26.1.0",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
     "mermaid": "^10.9.6",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "typescript": "6.0.3",
     "yaml": "2.9.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "26.1.0",
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.10",
     "jsdom": "^29.1.1",
+    "tsup": "^8.5.1",
     "tsx": "4.22.5",
-    "typescript": "6.0.3",
     "vitest": "4.1.9"
   }
 }
