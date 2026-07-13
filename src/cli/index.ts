@@ -7,10 +7,12 @@ import { runReviewSource } from "./commands/reviewSource";
 import { runDev } from "./commands/dev";
 import { runBuild } from "./commands/build";
 import { runPackageReview } from "./commands/packageReview";
+import { runInit } from "./commands/init";
 
 const usage = `Usage: lecture-site-engine <command> [options]
 
 Commands:
+  init                        Install agent skills and scaffold a lecture collection
   validate [--json] [path]   Validate the active lecture template or collection
   new:lecture                 Scaffold the next lecture template
   new:collection               Scaffold a new lecture collection
@@ -25,6 +27,8 @@ async function main(): Promise<number> {
   const [command, ...rest] = process.argv.slice(2);
 
   switch (command) {
+    case "init":
+      return runInit(rest);
     case "validate":
       return runValidate(rest);
     case "new:lecture":

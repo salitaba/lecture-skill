@@ -1,12 +1,28 @@
 {
   "name": "lecture-site-engine",
   "version": "0.1.0",
-  "private": true,
+  "description": "A local visual lecture site engine with a reusable Claude Code and Codex authoring skill.",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/salitaba/lecture-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/salitaba/lecture-skill/issues"
+  },
+  "homepage": "https://github.com/salitaba/lecture-skill#readme",
+  "keywords": [
+    "lecture",
+    "education",
+    "course-authoring",
+    "codex",
+    "claude-code"
+  ],
   "engines": {
     "node": ">=24"
   },
-  "bin": {
+    "bin": {
     "lecture-site-engine": "dist/cli.js"
   },
   "files": [
@@ -16,7 +32,10 @@
     "src/lib",
     "next.config.ts",
     "next-env.d.ts",
-    "tsconfig.app.json"
+    "tsconfig.app.json",
+    "SKILL.md",
+    ".claude/skills/lecture-site-engine/SKILL.md",
+    ".codex/skills/lecture-site-engine/SKILL.md"
   ],
   "scripts": {
     "dev": "next dev",
@@ -31,7 +50,8 @@
     "new:lecture": "node --import ./scripts/register-ts-loader.mjs scripts/newLecture.ts",
     "doctor": "node --import ./scripts/register-ts-loader.mjs scripts/doctor.ts",
     "review:source": "node --import ./scripts/register-ts-loader.mjs scripts/reviewSource.ts",
-    "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts"
+    "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts",
+    "release:check": "npm run lint && npm run typecheck && npm run test && npm run build && npm run build:cli && npm pack --dry-run"
   },
   "dependencies": {
     "@types/node": "26.1.0",

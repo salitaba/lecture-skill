@@ -15,6 +15,14 @@ Install dependencies:
 npm install
 ```
 
+Initialize a new consumer project with the Claude Code and Codex skills plus a starter lecture collection:
+
+```bash
+npx lecture-site-engine init
+```
+
+The initializer creates `lectures/course.yaml`, `lectures/01-introduction/lecture.template.md`, and `lectures/01-introduction/raw-lecture.txt`. It preserves existing skill files and authored templates.
+
 Validate the active lecture or collection:
 
 ```bash
@@ -52,6 +60,16 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+## Use With Claude Code And Codex
+
+This repository ships the lecture-authoring workflow as a project skill:
+
+- Claude Code discovers `.claude/skills/lecture-site-engine/SKILL.md`.
+- Codex discovers `.codex/skills/lecture-site-engine/SKILL.md`.
+- Other agents can follow the root `SKILL.md` entry point.
+
+The skill converts raw lecture source into the supported template schema, preserves source evidence, validates the result, and documents the review-package workflow. Read the skill before asking an agent to author or change lecture content.
 
 Create a portable static review package when you are ready to hand off a validated lecture or collection:
 
@@ -671,7 +689,7 @@ steps:
 ## Creating A New Lecture With An AI Agent
 
 1. Put one raw lecture source in `content/raw-lecture.txt`.
-2. If your agent is Claude Code, it auto-discovers the `lecture-site-engine` skill from `.claude/skills/lecture-site-engine/SKILL.md`. Otherwise, ask the agent to follow that file directly.
+2. Claude Code auto-discovers the `lecture-site-engine` skill from `.claude/skills/lecture-site-engine/SKILL.md`. Codex discovers the matching entry point at `.codex/skills/lecture-site-engine/SKILL.md`; other agents can follow the root `SKILL.md` directly.
 3. The agent should create or update `content/lecture.template.md`.
 4. Run `npm run validate`.
 5. Fix validation errors until the command passes.
@@ -681,6 +699,38 @@ steps:
 9. When a handoff artifact is requested, run `npm run package:review` and send the generated `review-packages/<timestamp>-lecture-site/` folder to reviewers.
 
 For the golden MVP workflow, use `examples/raw-lecture.txt` as the only raw source. Before giving the prompt to the agent, make `examples/golden.template.md` inaccessible and remove or replace `content/lecture.template.md` with a minimal non-golden placeholder if it contains the shipping demo answer. The agent-accessible workspace must not expose the golden answer until after generation and validation are complete. Record the batch in `docs/golden-conversion-batch.md`.
+
+## Release The CLI
+
+The package is configured for npm release as `lecture-site-engine`. Run the complete local release check before publishing:
+
+```bash
+npm run release:check
+```
+
+Inspect the `npm pack --dry-run` file list, then publish from an authenticated npm session when the release is approved:
+
+```bash
+npm publish
+```
+
+The package includes the CLI runtime and the root, Claude Code, and Codex skill entry points. GitHub publication still requires committing and pushing the approved changes to the repository configured in `package.json`.
+
+## GitHub Actions
+
+The repository includes two workflows:
+
+- `.github/workflows/ci.yml` runs validation, lint, typecheck, tests, production build, CLI build, and npm package checks on pull requests targeting `main` and manual dispatches.
+- `.github/workflows/release.yml` publishes the npm package when a semver Git tag is pushed. The tag supplies the package version: pushing `v0.2.0` publishes version `0.2.0`.
+
+CI does not run for pushes to `main`; it runs for pull requests targeting `main` and manual dispatches. Before pushing a release tag, add an npm access token as the repository secret `NPM_TOKEN`. The release workflow uses npm provenance and requires the token to have permission to publish `lecture-site-engine`.
+
+Create a release from a tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
 
 ## Common Validation Errors
 

@@ -9,6 +9,8 @@ Use this skill to convert one raw lecture source into `content/lecture.template.
 
 Every `npm run <command>` instruction below has an equivalent `npx lecture-site-engine <command>` form (same command names, e.g. `npx lecture-site-engine validate`, `npx lecture-site-engine new:lecture`, `npx lecture-site-engine dev`). Use the `npm run` form when working inside this repo; use the `npx` form when authoring in a project that doesn't have this repo cloned.
 
+To bootstrap another project with this skill and a starter collection, run `npx lecture-site-engine init`. The initializer installs the root, Claude Code, and Codex skill entry points without overwriting existing authored files.
+
 ## Inputs
 
 - Read one raw lecture source.
