@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import type { CollectionValidationResult, LectureValidationResult } from "@/lib/lecture-template/types";
+import type { CollectionValidationResult, CourseMetadata, LectureValidationResult } from "@/lib/lecture-template/types";
 import type { ProgressLecture } from "@/lib/lecture-template/progress";
 import { calculateResumeTarget } from "@/lib/lecture-template/resumeTarget";
+import { FactsList } from "../component-kit";
+import { COLLECTION_REVIEW_STATUS_ID } from "./CollectionReviewStatus";
 import { useCollectionProgress } from "./progress/CollectionProgressProvider";
 import { CollectionLectureProgress } from "./progress/CollectionProgressBar";
 
@@ -11,10 +13,12 @@ type LearnerState = "not-started" | "in-progress" | "completed";
 
 export function LectureList({
   results,
-  progressLectures
+  progressLectures,
+  courseMetadata
 }: {
   results: CollectionValidationResult["results"];
   progressLectures: ProgressLecture[];
+  courseMetadata?: CourseMetadata;
 }) {
   const { progress, lectures, loaded } = useCollectionProgress();
   const resumeTarget = useMemo(() => calculateResumeTarget(progress, progressLectures), [progress, progressLectures]);
@@ -60,30 +64,19 @@ export function LectureList({
                 <p className="lecture-list-description">{template.metadata.description}</p>
               </div>
 
-              <dl className="lecture-list-meta" aria-label="Lecture metadata">
-                <div>
-                  <dt>Audience</dt>
-                  <dd>{template.metadata.audience}</dd>
-                </div>
-                <div>
-                  <dt>Level</dt>
-                  <dd>{template.metadata.level}</dd>
-                </div>
-                <div>
-                  <dt>Duration</dt>
-                  <dd>{template.metadata.duration}</dd>
-                </div>
-                <div>
-                  <dt>Sections</dt>
-                  <dd>
-                    {template.sections.length} {template.sections.length === 1 ? "section" : "sections"}
-                  </dd>
-                </div>
-              </dl>
+              <FactsList
+                aria-label="Lecture metadata"
+                className="lecture-list-meta"
+                variant="compact"
+                items={lectureFacts(template.metadata, template.sections.length, courseMetadata)}
+              />
               {result.valid ? (
                 <CollectionLectureProgress slug={result.slug} />
               ) : (
-                <p className="collection-progress-unavailable">Progress unavailable until this lecture validates.</p>
+                <p className="collection-progress-unavailable lecture-list-validation">
+                  <strong>Author/reviewer note:</strong> This lecture is not available to learners until its template issues are fixed. {" "}
+                  <a href={`#${COLLECTION_REVIEW_STATUS_ID}`}>Review validation details</a>.
+                </p>
               )}
             </article>
           </li>
@@ -91,6 +84,30 @@ export function LectureList({
       })}
     </ol>
   );
+}
+
+function lectureFacts(
+  metadata: { audience: string; duration: string; level: string },
+  sectionCount: number,
+  courseMetadata?: CourseMetadata
+) {
+  const facts = [
+    { label: "Estimated study time", value: metadata.duration },
+    { label: "Sections", value: `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}` }
+  ];
+
+  if (!courseMetadata || normalize(metadata.audience) !== normalize(courseMetadata.audience)) {
+    facts.push({ label: "Audience", value: metadata.audience });
+  }
+  if (!courseMetadata || normalize(metadata.level) !== normalize(courseMetadata.level)) {
+    facts.push({ label: "Level", value: metadata.level });
+  }
+
+  return facts;
+}
+
+function normalize(value: string | undefined): string {
+  return value?.trim().toLocaleLowerCase() ?? "";
 }
 
 function learnerStateLabel(state: LearnerState): string {

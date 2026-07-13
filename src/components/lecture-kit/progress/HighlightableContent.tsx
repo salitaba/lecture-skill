@@ -16,7 +16,7 @@ interface PendingSelection {
 const excludedBlockClassName = "lecture-component";
 const highlightAttribute = "data-highlight-id";
 
-export function HighlightableContent({ anchor, children }: { anchor: string; children: ReactNode }) {
+export function HighlightableContent({ anchor, children, className }: { anchor: string; children: ReactNode; className?: string }) {
   const annotations = useAnnotationsOptional();
   const containerRef = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<PendingSelection | null>(null);
@@ -123,7 +123,7 @@ export function HighlightableContent({ anchor, children }: { anchor: string; chi
   };
 
   return (
-    <div className="highlightable-content" ref={containerRef}>
+    <div className={["highlightable-content", className].filter(Boolean).join(" ")} ref={containerRef}>
       {children}
       {pending && annotations ? (
         <button

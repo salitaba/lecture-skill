@@ -89,4 +89,24 @@ describe("SectionNote", () => {
 
     expect(window.localStorage.getItem(annotationsKey)).toBeNull();
   });
+
+  it("focuses the note field and saves the draft before restoring trigger focus on close", async () => {
+    stubDialog();
+    const user = userEvent.setup();
+    render(
+      <AnnotationsProvider lectureId="test-lecture">
+        <SectionNote anchor="intro" title="Introduction" />
+      </AnnotationsProvider>
+    );
+
+    const trigger = screen.getByRole("button", { name: "Add a note" });
+    await user.click(trigger);
+    const textarea = screen.getByLabelText("Your note");
+    await waitFor(() => expect(textarea).toHaveFocus());
+    await user.type(textarea, "Saved on close");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem(annotationsKey) ?? "{}").notes).toEqual({ intro: "Saved on close" }));
+  });
 });

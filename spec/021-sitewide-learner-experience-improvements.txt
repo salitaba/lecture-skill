@@ -1,0 +1,355 @@
+Feature: Sitewide Learner Experience Improvements — Content Hierarchy, Responsive Scanning, Navigation, and Accessibility
+
+Authors: senior UI/UX designer, informed by a `ui-ux-pro-max` audit of the current collection and lecture experiences.
+
+Relationship to prior work: specs 014–020 established the current learner journey, design tokens, shared component primitives, progress, annotations, interaction feedback, and a focused interface-polish pass. This spec does not replace those systems. It is the next product-level pass: it corrects the remaining hierarchy and responsive problems that only become obvious when the shipped pieces are used together across a real 11-lecture collection and a component-heavy lecture.
+
+Audit basis:
+
+- Current collection landing at 1440px and 390px, using the active 11-lecture Life Cycle Assessment collection.
+- Current first-lecture and component-demo pages at 1440px and 390px in dark mode.
+- Source review of `CollectionLanding`, `LectureList`, `LectureHeader`, `LecturePage`, `LearningPathNavigation`, `LectureProgressBar`, `ThemeToggle`, interactive assessment components, dialogs, and `globals.css`.
+- `ui-ux-pro-max` design-system and UX searches for technical education, long-form reading, responsive navigation, keyboard access, focus, reduced motion, form feedback, and readable line length.
+
+## Product Summary
+
+Make the Lecture Site Engine feel like one coherent learning product rather than a sequence of individually polished cards. The site already looks credible and supports a rich set of learning interactions, but the complete experience still asks learners to parse too much metadata, repeated status, review-only language, and container chrome before reaching the lesson itself.
+
+The improvement has four connected outcomes:
+
+1. Collection pages become fast to understand and scan: one clear course promise, one primary action, concise learner-relevant facts, and lecture cards that emphasize sequence, title, description, duration, progress, and resume state.
+2. Lecture pages move learners into the content sooner: compact metadata, honest progress states, stable course navigation, a readable text measure, and less “card inside card” visual weight.
+3. Mobile layouts become intentionally composed instead of merely wrapped: metadata values align consistently, actions do not compete or form awkward pill rows, long descriptions do not consume the entire first viewport, and controls remain at least 44px.
+4. Every interaction works predictably with keyboard, screen reader, reduced motion, zoom, dark mode, static export, and delayed or unavailable JavaScript.
+
+## Product Outcome
+
+- A learner can answer “What is this course, how long will it take, and where do I start?” from the first collection viewport without reading internal validation status.
+- A returning learner sees “Resume course” and the relevant lecture state before repeated course metadata.
+- A learner scanning 10–20 lectures can distinguish the sequence and topic of each lecture without rereading the same audience and level values on every card.
+- A lecture’s title, estimated effort, progress, and next action form a single hierarchy; progress and navigation no longer feel like detached full-width cards between the title and lesson.
+- Long-form lecture text stays within a comfortable 65–75 character measure on wide screens while diagrams, tables, code, and comparisons may use the available content width.
+- At 390px, definition-list labels and values align from the same left edge; values never inherit browser `dd` indentation or appear as centered, jagged blocks.
+- Keyboard users can operate tabs, disclosures, quizzes, dialogs, theme controls, completion controls, and course navigation using expected web patterns.
+- The experience remains understandable before hydration and in static review packages.
+
+## Users And Jobs
+
+Primary user: a learner reading a technical lecture, completing practice, and returning across multiple sessions.
+
+Secondary users: an educator previewing authored content and a reviewer checking assessments, annotations, validation, and source fidelity.
+
+Jobs to be done:
+
+- As a new learner, I want the course landing to tell me what I will learn and give me one obvious starting action.
+- As a returning learner, I want the page to foreground my next unfinished lecture without making me interpret several progress summaries.
+- As a learner on a phone, I want course and lecture facts to scan as a clean list rather than a wrapped sentence with irregular indentation.
+- As a learner reading a dense technical topic, I want the typography and surface hierarchy to support sustained reading.
+- As a keyboard or screen-reader user, I want controls to behave like the interaction pattern they announce.
+- As an educator, I want validation and reviewer utilities to remain available without competing with the learner-facing hierarchy.
+- As a static-package reviewer, I want the same content and orientation even if client-side state has not loaded.
+
+## Problem
+
+### 1. The collection hero mixes learner, author, and implementation language
+
+The active collection hero shows “11 lectures • 625 minutes total • ~81 min read • 11 passing.” “Passing” is a validation result for authors/reviewers, not a learner concept. “625 minutes total” and “81 min read” are both potentially useful, but the UI does not explain that the first is authored study duration and the second is estimated text-reading time. The result reads like contradictory duration data.
+
+The course description can also be long enough to occupy most of the first mobile viewport. With summary, metadata, CTA, and secondary link below it, a learner may not see course progress or a lecture title without substantial scrolling.
+
+### 2. Mobile metadata wraps, but it does not become a mobile layout
+
+`LectureHeader`, `CollectionLanding`, and `LectureList` use wrapping flex definition lists. At 390px, long `dd` values retain browser definition-list indentation and can appear centered under a short `dt`, producing jagged blocks such as the course audience and lecture audience. Labels and values change alignment from row to row, which makes basic facts harder to scan.
+
+The same audience and level are repeated on every lecture card even when they match the course. For the active 11-lecture collection, this creates more visual weight than the title and progress state deserve.
+
+### 3. The collection is structurally correct but visually over-specified
+
+The collection hero, progress block, and every lecture are separate bordered cards. Each lecture card contains a heading, state pill, description, four metadata fields, a textual progress summary, and a progress bar. At zero progress this repeats “Not started,” “0 of N sections completed (0%),” and an empty bar for every lecture.
+
+This is accurate but low-signal. Repetition makes an 11-lecture collection feel longer and more administrative than it is. It also pushes the later lecture titles far down the page and makes the global course progress visually equal to an individual lecture card.
+
+### 4. Lecture entry has too many competing containers and controls
+
+The lecture hero, progress card, top course-navigation pills, learning-path card, overview card, objectives card, and first section card all appear before or near the beginning of the lesson. Each part is individually consistent with the token system, yet together they produce “card soup”: boundaries are plentiful, so none of them clearly signals the primary reading surface.
+
+At zero progress, “Reset progress” and its `Alt+R` hint remain visible even though there is nothing to reset. On mobile, the reset control and shortcut split onto separate lines and take disproportionate space. Before persisted progress has loaded, zero can also be shown as if it were a confirmed state.
+
+### 5. Course navigation is duplicated without a unified hierarchy
+
+Collection lectures show course navigation both above and below the lecture. The top instance appears as detached “Back to course” and “Next lecture” pills between the progress card and the content. On a phone, long lecture titles turn the pair into large rounded shapes with uneven text wrapping. The bottom navigation has a different three-slot role.
+
+Both locations are useful, but they need distinct jobs: a compact breadcrumb/back affordance near the lecture title, and a complete previous/course/next pager after the lesson. The current top treatment resembles a second primary CTA row.
+
+### 6. Long-form reading width is governed by container width, not prose width
+
+The desktop lecture content column can render paragraphs across most of its available card width. The current visual system does not consistently cap prose to the skill-recommended 65–75 characters per line. Tables, diagrams, code, and comparisons should remain wide, but ordinary paragraphs, list content, explanations, and callout copy should be easier to track across long technical readings.
+
+### 7. Some accessibility support is global, while some is pattern-specific or incomplete
+
+- Global `:focus-visible` styling covers anchors, buttons, and summaries, but textareas, radio inputs, and checkboxes do not share an explicit, consistent focus treatment.
+- `Tabs` exposes `role="tablist"`, `role="tab"`, `aria-selected`, and roving `tabIndex`, but it does not implement the expected Left/Right/Home/End keyboard navigation.
+- Dialogs use native `<dialog>`, but the product contract does not yet require initial focus placement, trigger-focus restoration, labelled descriptions, or protection against accidental loss of unsaved edits.
+- The theme toggle renders `null` until a client effect determines the theme. This can make the control absent during delayed hydration and visual/static review, and the manual theme choice does not update the exported viewport theme-color contract.
+- Interactive row labels generally provide large visual areas, but the spec suite does not yet require the entire option/checklist row to be the operable target at touch sizes.
+
+### 8. Loading, empty, unavailable, and complete states need clearer separation
+
+Progress UI has meaningful loaded and storage-availability data, but the rendered hierarchy still tends to treat “not yet loaded,” “zero,” “not saved,” “invalid,” and “complete” as variations of one progress block. A learner should not see a false zero during hydration, and an educator-facing validation failure should not be phrased as learner progress.
+
+## Design Direction
+
+Use the `ui-ux-pro-max` recommendation as a direction, not as a literal template:
+
+- Product pattern: content-first, editorial, calm, and reading-led.
+- Style: subtle micro-interactions that explain hover, press, selected, expanded, saved, and completed states; no decorative motion.
+- Palette: keep the existing semantic teal brand and warm highlight system. Do not introduce a second palette or raw per-component colors.
+- Theme support: retain full light and dark modes and test their states independently.
+- Typography: retain Inter for body/UI and Fraunces for display headings. Reject the generic child-oriented Baloo 2/Comic Neue recommendation because this product serves technical educators and advanced learners.
+- Icons: keep the existing SVG icon system; do not add emoji or text-glyph icons.
+- Density: medium for reading surfaces, compact only for repeated collection metadata, and spacious around major section boundaries.
+
+## Goals
+
+### P0 — Learner-facing clarity and responsive correctness
+
+- G1. Remove validation wording such as “passing” from the collection’s primary learner summary. Preserve validation details in a clearly labelled reviewer/author disclosure or existing review surface.
+- G2. Label duration concepts unambiguously: authored course/lecture effort is “Estimated study time”; computed word-count time is “Reading time.” Do not show two unlabeled totals in one sentence.
+- G3. Replace wrapping metadata sentences with a responsive definition-list layout that has explicit columns on wide screens and a one- or two-column stacked layout on small screens. Reset `dd` margins and keep labels/values left-aligned.
+- G4. Make the first mobile viewport useful: title, concise course promise, essential facts, and primary start/resume/continue action appear before optional detail. Long course descriptions have an accessible “About this course” expansion with the full text; without JavaScript the full text remains available.
+- G5. Reduce lecture-card repetition. Default repeated metadata is lecture duration, section count, and learner state; audience and level appear only when they differ from course metadata or when no course metadata exists.
+- G6. At zero progress, use one “Not started” signal per lecture card. Do not simultaneously show a state badge, textual 0%, and an empty mini progress bar. Keep the numeric progress summary and bar for in-progress and completed lectures.
+
+### P1 — Lecture hierarchy and navigation
+
+- G7. Replace the detached top course-navigation pill row with compact page chrome: a “Back to course” breadcrumb/back link near the lecture header and, when useful, a quiet “Next: [lecture]” link. It must not visually compete with lesson progress or the first content heading.
+- G8. Keep the bottom previous/course/next pager as the complete navigation affordance. Its three logical slots remain stable on desktop and become full-width, clearly ordered controls on mobile.
+- G9. Make lecture progress compact and state-aware. While progress is loading, reserve stable space and communicate loading without announcing a false 0%. At 0%, hide reset and keyboard-hint UI. At >0%, expose reset as a secondary action. At 100%, use a concise completed state and the established milestone feedback.
+- G10. Establish a clear page altitude system: page header and teaching sections define the major rhythm; overview/objectives may use quieter boundaries; interactive teaching components retain their semantic card altitude; nested borders and shadows are removed when they do not communicate a distinct interaction or pedagogical role.
+- G11. Apply a 65–75 character measure to prose paragraphs, explanatory lists, captions, and assessment explanations on wide screens. Explicit wide-content exceptions are tables, diagrams, code blocks, comparison grids, timelines, and other structures that need horizontal room.
+- G12. Preserve reading position and relevant state when navigating back from a lecture to the collection or between in-page anchors. Native URL/deep-link behavior remains the source of truth; no scroll-jacking or custom history stack.
+
+### P2 — Interaction, accessibility, and resilience
+
+- G13. Extend visible focus treatment to `input`, `textarea`, `select`, dialog controls, native checkboxes/radios, and every custom interactive state. Focus must remain visible in both themes and at 200% zoom.
+- G14. Implement the WAI-ARIA tab keyboard pattern: Left/Right Arrow changes tab, Home selects the first tab, End selects the last tab, focus follows the active tab, and Tab exits the tablist into the selected panel content. Click/tap behavior remains unchanged.
+- G15. Treat an option/checklist row as one target: clicking or tapping anywhere on its label selects it, with a minimum 44×44px interactive area and at least 8px between distinct adjacent targets.
+- G16. Standardize native-dialog behavior for diagrams and notes: descriptive title, optional description, initial focus on the primary task, `Escape` close, visible close control, trigger-focus restoration, scroll containment, safe viewport sizing, and no content hidden behind mobile browser chrome. If a note can contain unsaved edits, closing must either persist the current value or warn before discarding it.
+- G17. Render stable theme-control chrome before hydration instead of returning no control. The control becomes interactive after hydration, has a persistent 44×44px target, never overlaps the title or mobile safe edge, communicates its current state, and updates the document theme plus browser theme color when manually switched.
+- G18. Distinguish state vocabulary and visuals for loading, not started, in progress, complete, unsaved/session-only, unavailable because content is invalid, and unexpected load failure. Never use color alone; include concise text or icon plus accessible status.
+- G19. Keep all motion within existing 150–300ms tokens, use transform/opacity where possible, and disable non-essential motion under `prefers-reduced-motion`. No scroll-triggered decorative animation, parallax, or layout-shifting hover effect.
+
+## Non-Goals
+
+- No new lecture-template syntax or required course metadata fields.
+- No account, cloud sync, analytics, grading, certification, streak, recommendation, or gamification system.
+- No replacement of localStorage progress/annotation persistence.
+- No rewrite of the parser, validator, CLI, source-fidelity workflow, or static review-package workflow.
+- No new UI framework, CSS-in-JS system, Tailwind adoption, icon library, animation library, or dialog dependency.
+- No wholesale rebrand. Existing Inter/Fraunces fonts, teal/warm semantic tokens, radius scale, and component-kit remain the foundation.
+- No hiding of invalid content from educators. Validation information moves out of the primary learner hierarchy; it remains available and actionable in reviewer/author context.
+- No blanket truncation of lecture descriptions or titles without access to the full text.
+- No forced dark or light theme and no disabling browser zoom.
+- No horizontal swipe navigation or custom back behavior.
+
+## Product Decisions
+
+### Learner information is primary; reviewer information is available, not co-equal
+
+The collection title, promise, effort, primary action, learner progress, and lecture sequence belong in the main hierarchy. Template validity, passing count, assessment locations, annotation indexes, and answer-key utilities are author/reviewer information. They remain present behind clearly labelled secondary disclosures or at the end of the experience.
+
+### Progressive disclosure is preferable to silent truncation
+
+On narrow screens, show a concise preview of an unusually long course description and a clear “About this course” control. The expanded content remains in the document and is screen-reader reachable. Static/no-JavaScript output must not permanently hide course meaning.
+
+### Repeated metadata earns its place per card
+
+Course-wide audience and level should not be repeated 11 times. A lecture card shows them only when they carry new information. Duration and section count can vary by lecture and therefore remain useful. This is presentation logic only; source metadata is unchanged.
+
+### Zero is a state, not a miniature dashboard
+
+“Not started” is sufficient for an untouched lecture card. A progress bar becomes informative once there is progress to compare or when completion needs confirmation. Removing redundant zero-state bars improves scan speed without removing data.
+
+### The reading surface is quieter than the interaction surface
+
+Whitespace and typography organize ordinary exposition. Borders, tint, elevation, and strong accent edges are reserved for interactive components, important semantic callouts, active navigation, and assessment feedback. The existing surface altitude names remain; their use is tightened.
+
+### Expected web interaction patterns win over bespoke behavior
+
+Tabs use standard arrow-key behavior, dialogs use native focus/escape behavior plus explicit focus restoration, anchors preserve deep links, labels own their entire form-control hit area, and the browser back stack is not replaced.
+
+## Detailed Requirements
+
+### A. Collection header and course facts
+
+- Primary header order: collection eyebrow, title, concise description/promise, essential facts, primary action, optional secondary “About this course” and “View lecture list” links.
+- Essential facts are no more than three learner-facing concepts by default: lecture count, estimated study time, and reading time when it adds meaningful information.
+- Validation/passing count is not rendered in `.collection-summary`.
+- “Start course,” “Resume course,” and “Continue course” remain the only primary CTA variants.
+- “View lecture list” is a text/quiet secondary action and does not stretch into a full-width input-like control on desktop. On mobile it may be full-width only if its styling remains recognizably secondary to the primary CTA.
+- The course-level audience/level/duration definition list resets default `dl`/`dd` browser spacing and uses a deliberate responsive grid.
+- Long descriptions preserve the full authored string and provide accessible expansion/collapse copy; the control exposes `aria-expanded` and `aria-controls` when scripted.
+
+### B. Lecture list
+
+- Each card’s primary scan order is lecture number + title, learner state, short description, variable metadata, then progress when progress exists.
+- The lecture title link remains the dominant interactive element. Do not make the whole card an anchor if it would nest or obscure other controls.
+- Not-started: one state label, no textual 0%, no mini bar.
+- In-progress: “X of Y sections” plus mini progress bar and, for the calculated resume target, “Resume here.”
+- Completed: completed label plus 100% state; avoid repeating “Completed” in more than two nearby forms.
+- Invalid: do not pretend a learner progress state exists. Show a secondary author/reviewer warning with a path to validation details.
+- Long titles wrap; they are never ellipsized without an accessible full-title affordance.
+- At 390px, all card text begins from a consistent inset and no metadata value inherits a 40px `dd` margin.
+
+### C. Lecture entry and progress
+
+- Header metadata uses the same responsive facts primitive/pattern as the collection.
+- Use “Estimated study time” for authored duration and “Reading time” for computed time.
+- Progress loading does not render “0 of N” until client state has been read. Use a stable neutral skeleton or “Loading progress” status only if the delay is perceptible; do not introduce shimmer under reduced motion.
+- Reset progress is absent or inertly hidden when completed sections are zero. When shown, it remains secondary, requires confirmation, and retains `Alt+R` with `aria-keyshortcuts`.
+- Keyboard shortcut hints must not be the only way to discover or operate an action. On narrow screens, hints stay adjacent to their control or move to a single optional shortcuts disclosure; they do not become isolated text rows.
+- Course back/breadcrumb chrome appears before or within the header hierarchy, not as a floating card between progress and content.
+
+### D. Reading hierarchy
+
+- Define one reusable prose-measure rule/token rather than hardcoding widths in individual components.
+- Overview, ordinary section paragraphs, list copy, explanation copy, captions, and quiet callouts use the prose measure.
+- Wide content opts out through an explicit class/primitive contract.
+- Do not center long body text.
+- Maintain a base body size of at least 16px and line-height between 1.5 and 1.75.
+- Section spacing follows the existing 4/8px rhythm with clear tiers for component gap, subsection gap, section gap, and page-region gap.
+- At most one visually dominant teal edge/elevation treatment appears at a given nesting level.
+- The active learning-path item remains clear through text/icon/shape, not teal alone.
+
+### E. Responsive behavior
+
+- Required visual widths: 375/390px, 768px, 1024px, and 1440px.
+- No horizontal page scroll at any required width or at 200% browser zoom.
+- `dl` layouts switch intentionally; they do not rely on uncontrolled flex wrapping.
+- Fixed/sticky UI reserves space and does not cover content, focus rings, browser safe areas, or the mobile keyboard.
+- Lecture top navigation does not place two long pill labels side by side when either label would wrap beyond two lines.
+- Bottom previous/course/next controls use a predictable reading order and do not leave empty visual slots on mobile.
+- Tables, code, and diagrams may scroll internally when necessary, with visible affordance and keyboard access; the page itself must not scroll horizontally.
+- Long unbroken technical strings wrap safely without forcing every normal word to break mid-word.
+
+### F. Focus and keyboard interaction
+
+- Every visible interactive element is reachable in DOM order that matches the visual order.
+- Focus indicators are 2–4px, meet at least 3:1 contrast against adjacent colors, and are not clipped by `overflow: hidden` containers.
+- Tabs implement ArrowLeft, ArrowRight, Home, and End with wraparound; selected state and focus remain synchronized.
+- Native radio groups retain arrow-key behavior; custom JavaScript must not interfere.
+- Every dialog closes from `Escape` and a visible close button. After close, focus returns to the exact trigger that opened it.
+- Opening the note dialog focuses the note field (or dialog heading followed by the field when screen-reader context requires it). Opening a diagram dialog focuses the dialog heading or first available action.
+- After route navigation, the skip link can move focus directly to `#main-content`; in-page anchors land below fixed chrome via `scroll-margin`.
+- Keyboard shortcuts do not fire while a learner is typing in an input, textarea, select, or contenteditable region.
+
+### G. Themes and visual states
+
+- Light and dark semantic tokens remain paired. No component adds a theme-specific raw hex except documented white/black utility cases already allowed by the system.
+- Body text and actionable labels meet WCAG AA 4.5:1; large text and non-text UI boundaries meet at least 3:1 where required.
+- Hover, pressed, focus, selected, disabled, loading, success, warning, and destructive states are distinguishable in both themes.
+- Manual theme choice updates `data-theme`, persists in localStorage, and synchronizes browser theme color where supported.
+- Before hydration, the system theme applies without a flash and the theme-control location is reserved so content does not shift.
+
+### H. Static, no-JavaScript, and failure behavior
+
+- Static export renders all authored lecture content, full course description, navigation links, and reviewer utilities.
+- Client-only progress controls do not claim an incorrect persisted state before loading.
+- If localStorage is blocked, progress and notes continue for the current session when possible and clearly say “Not saved” only where the information is actionable.
+- If an active lecture is invalid, the author gets an actionable validation surface; learner wording never says only “progress unavailable” without explaining the author action.
+- Unexpected app errors keep the existing retry path and readable page shell.
+
+## Accessibility Requirements
+
+- WCAG 2.2 AA is the target for color contrast, keyboard access, focus visibility, target size, semantics, status announcements, reflow, and zoom.
+- Heading order remains sequential and uses headings for structure, not styling.
+- Every icon-only button has an accessible name; decorative icons remain `aria-hidden`.
+- Color is never the sole carrier of current, complete, correct, incorrect, warning, or unavailable state.
+- Progress bars keep `role="progressbar"`, label, min, max, and current value. Loading progress does not expose an invented current value.
+- Status announcements use polite live regions and do not steal focus.
+- Forms keep visible labels and place errors/help next to the related field.
+- Touch targets are at least 44×44px, with at least 8px spacing between separate adjacent actions.
+- Reduced-motion mode disables smooth scrolling, entrance animation, hover translation, shimmer, and non-essential progress animation.
+- Content remains usable at 200% zoom and with increased text size without clipping or overlapping controls.
+
+## Performance Requirements
+
+- No new runtime dependency for this improvement.
+- The first collection and lecture viewport must not wait for optional reviewer utilities or heavy diagram code.
+- Theme initialization remains inline and minimal; it must not cause a flash of the wrong theme.
+- Reserve dimensions for client-only progress/theme UI to keep CLS below 0.1 in the tested pages.
+- Do not add continuous scroll listeners when `IntersectionObserver` or native anchor behavior is sufficient.
+- Animations stay on opacity/transform where possible and do not add layout thrashing.
+
+## Success Metrics / Quality Gates
+
+- The collection primary summary contains zero validation terms (`passing`, `valid`, `invalid`) and labels each time estimate.
+- At 390px, every course/lecture metadata `dd` has zero default indentation and aligns with its corresponding `dt` layout.
+- A not-started lecture card contains one visible zero-state signal and no empty mini progress bar.
+- Audience/level are not repeated on each lecture card when equal to the course metadata.
+- “Reset progress” is not visible at zero completed sections and appears after the first completion.
+- Ordinary prose measures no more than approximately 75 characters per line at 1440px, while diagrams/tables/code retain useful width.
+- Tabs pass keyboard tests for Left/Right/Home/End and preserve correct `aria-selected`/`tabIndex`.
+- All form fields and native controls have an explicit visible focus state in light and dark mode.
+- Theme-control space is stable before and after hydration; the control does not overlap content at 375px.
+- No horizontal overflow at 375/390/768/1024/1440px or 200% zoom.
+- All existing parser, validation, rendering, collection, progress, annotations, review-package, and interaction tests pass.
+
+## Acceptance Criteria
+
+### Collection experience
+
+- Collection hero shows title, learner-facing description, labelled essential facts, and exactly one primary CTA.
+- Primary collection summary does not show validation pass count.
+- Study time and reading time use different, explicit labels.
+- Course metadata is a deliberate responsive grid with reset `dd` margins.
+- Long course description can be expanded to its full value and is fully present without JavaScript.
+- Lecture cards omit course-redundant audience/level fields.
+- Not-started lecture cards do not render an empty mini progress meter or redundant numeric zero summary.
+- In-progress and completed cards preserve accessible numeric progress.
+
+### Lecture experience
+
+- Lecture metadata uses the same responsive facts pattern and terminology as the collection.
+- Top course navigation is compact page chrome; bottom previous/course/next navigation remains the full pager.
+- Progress loading, zero, in-progress, complete, unsaved, and unavailable states have distinct copy and semantics.
+- Reset progress and its hint are hidden at zero progress.
+- The lecture’s ordinary prose is constrained to the shared readable measure, with documented wide-content exceptions.
+- Overview/objectives/section surfaces show a clear hierarchy with fewer redundant nested borders and shadows.
+
+### Interaction and accessibility
+
+- Anchor, button, summary, input, textarea, select, checkbox, radio, tab, and dialog-control focus indicators are visible in both themes.
+- Tabs support Left/Right/Home/End and expose correct selected/focus state.
+- Quiz, question-set, and checklist labels provide a row-sized 44px minimum target.
+- Note and diagram dialogs place focus intentionally, close via visible control and `Escape`, and return focus to their trigger.
+- Global shortcuts do not fire during text entry.
+- Manual theme changes update document theme, persisted preference, accessible pressed/name state, and browser theme color where supported.
+- Reduced-motion mode removes non-essential animation and smooth scrolling.
+
+### Verification
+
+- Automated tests cover responsive metadata classes/structure, zero-progress rendering, conditional repeated metadata, tab keyboard navigation, dialog focus restoration, theme hydration state, and shortcut suppression in editable controls.
+- Run `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build`.
+- Capture collection, first lecture, middle lecture, last lecture, and component-demo screenshots at 390px, 768px, and 1440px in both light and dark themes.
+- Manually verify keyboard-only navigation from skip link through theme, header, progress, learning path, lecture content, assessments, dialogs, reviewer disclosures, and bottom pager.
+- Manually verify reduced motion, 200% zoom/reflow, delayed hydration, localStorage blocked, and static review-package output.
+- Record contrast checks for primary text, muted text, focus ring, borders, selected tabs, progress fill, success, warning, and disabled controls in both themes.
+
+## Risks And Mitigations
+
+- Risk: reducing cards makes the page feel less structured. Mitigation: preserve clear section spacing, headings, semantic accent edges, and active navigation; remove chrome only where it does not encode meaning.
+- Risk: hiding repeated metadata removes useful exceptions. Mitigation: compare each lecture value with course metadata and show values that differ; show all lecture metadata when course metadata is unavailable.
+- Risk: progressive disclosure hides important course context. Mitigation: keep a meaningful preview, use explicit “About this course” copy, preserve full content in the DOM/static output, and never hide the primary promise or prerequisites.
+- Risk: state-aware progress causes hydration layout shift. Mitigation: reserve a stable progress region and distinguish loading without rendering a false numeric state.
+- Risk: changing tab keyboard behavior surprises mouse users. Mitigation: preserve click behavior and implement the established WAI-ARIA pattern only for keyboard input.
+- Risk: prose measure is applied to inherently wide components. Mitigation: use an explicit opt-out contract for tables, diagrams, code, comparison, and other structural content rather than a global max-width on all descendants.
+- Risk: learner/reviewer separation makes author problems less visible. Mitigation: retain a clearly named review/validation disclosure and keep invalid-state warnings actionable, but outside the primary learner summary.
+
+## Open Questions To Resolve During Implementation Planning
+
+- Should the responsive course-description preview use a native `<details>` pattern or an enhanced disclosure that renders fully open without JavaScript? Choose the option with the cleanest static-export behavior.
+- Should the shared responsive facts pattern become a small `component-kit` primitive or remain semantic CSS applied to existing `dl` markup? Prefer a primitive only if at least the collection header, lecture header, and lecture cards share the same structural contract.
+- Should browser theme-color synchronization use a pair of existing meta elements or update the current theme-color element on manual selection? Keep the implementation compatible with Next.js metadata output.
+- Which top “Next lecture” treatment best avoids duplication with the bottom pager: quiet text link near the breadcrumb or omission from the top entirely? Validate on first, middle, and last lectures before deciding.
+

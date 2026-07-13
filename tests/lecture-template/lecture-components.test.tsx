@@ -43,6 +43,8 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain("Evidence-Driven Debugging for Production Incidents");
     expect(html).toContain("Early-career backend engineers");
     expect(html).toContain("45 minutes");
+    expect(html).toContain("Estimated study time");
+    expect(html).not.toContain("<dt>Duration</dt>");
     expect(html).toContain("beginner");
     expect(html).toContain("4 sections");
   });
@@ -109,14 +111,15 @@ describe("lecture component UX contracts", () => {
     expect(html).toContain('aria-label="Lecture progress"');
     expect(html).toContain('aria-valuemin="0"');
     expect(html).toContain('aria-valuemax="100"');
-    expect(html).toContain('aria-valuenow="0"');
-    expect(html).toContain("0 of 4 sections completed");
-    expect(html).toContain("Reset progress");
+    expect(html).not.toContain('aria-valuenow="0"');
+    expect(html).toContain("Loading progress");
+    expect(html).not.toContain("Reset progress");
     expect(html).toContain(`id="${lecture.sections[0].anchor}"`);
     expect(html).toContain(`aria-labelledby="${lecture.sections[0].anchor}-heading"`);
     expect(html).toContain(`aria-label="Mark ${lecture.sections[0].title} complete"`);
     expect(html).toContain('aria-pressed="false"');
     expect(html).toContain("section-completion-print");
+    expect(html).toContain("quiet-reading-surface");
     expect(html).not.toContain("Overview complete");
     expect(html).not.toContain("Key Takeaways complete");
   });
@@ -699,8 +702,10 @@ describe("lecture component UX contracts", () => {
 
     expect(html).toContain("Show 4 assessments");
     expect(html).toContain("Course progress");
-    expect(html).toContain("0 of 7 sections completed (0%)");
-    expect(html).toContain("Progress unavailable until this lecture validates.");
+    expect(html).toContain("Loading progress");
+    expect(html).toContain("Author/reviewer note");
+    expect(html).toContain("Review validation details");
+    expect(html).toContain("collection-review-status");
     expect(html).toContain('/lectures/01-demo#check-understanding-components-question-set-component-review-questions');
     expect(html).not.toContain("/lectures/02-invalid#");
   });

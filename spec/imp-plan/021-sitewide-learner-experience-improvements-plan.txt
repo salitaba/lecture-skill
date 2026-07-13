@@ -1,0 +1,255 @@
+# Implementation Plan: Sitewide Learner Experience Improvements
+
+## Summary
+
+Implement Spec 021 as a presentation and interaction pass over the existing Lecture Site Engine. The work keeps the current template schema, localStorage persistence, component-kit, and static-review workflow intact. It improves learner-facing information hierarchy, mobile facts layouts, collection scanability, progress-state truthfulness, lecture entry/navigation, reading measure, dialog/focus behavior, and the pre-hydration theme-control experience.
+
+The implementation should be delivered in small slices so that collection state, lecture progress, and accessibility behavior can each be verified independently. No parser, validator, CLI, course YAML schema, or persisted-storage shape changes are required.
+
+## Confirmed Decisions and Assumptions
+
+The following choices resolve Spec 021's implementation questions without changing its scope:
+
+1. **Responsive facts become a shared component-kit primitive.** `CollectionLanding`, `LectureHeader`, and `LectureList` all render semantically identical label/value data and need the same responsive `dl` behavior. Add a typed `FactsList` primitive with standard and compact variants rather than maintaining three wrapping-flex implementations.
+2. **Long course descriptions use native `<details>`, not a client-only disclosure.** A new server-rendered `CourseDescription` keeps a concise preview in the summary and the full authored string in the details body. This works in static exports and without JavaScript. Short descriptions remain ordinary paragraphs.
+3. **Top course navigation becomes a quiet back breadcrumb only.** Do not repeat the next-lecture action above the lesson. The bottom `LectureNavigation` remains the complete previous/course/next pager. This removes duplicated primary-looking controls while retaining a reliable return path near the title.
+4. **The computed sum of lecture durations is the learner-facing “Estimated study time.”** The word-count estimate remains “Reading time.” Optional course `duration`, audience, and level move to secondary course detail rather than competing with the three essential course facts.
+5. **Progress is unknown until its provider reports `loaded`.** Do not render a numeric zero, not-started state, or mini progress meter before storage initialization completes. A stable loading treatment prevents a false zero/flicker.
+6. **Notes save on every close route.** The existing blur save remains, and dialog Close/Escape save the current draft before closing. This satisfies the no-unsaved-edit-loss requirement without adding a confirmation flow.
+7. **Tabs are already conformant in source.** `Tabs.tsx` already supports Arrow keys, Home, End, selected state, and focus movement. Preserve the implementation and extend tests to cover Home/End and focus, rather than rewriting it.
+8. **Theme initialization remains system-first.** Keep Next's media-based viewport theme colors as the fallback. The existing before-paint script and theme toggle will add/update an owned override meta tag only when a stored/manual choice exists, so a manual choice updates browser chrome without breaking system-theme behavior.
+
+## Relevant Existing Architecture
+
+### Route and data boundary
+
+- `src/app/page.tsx` selects collection versus single-lecture mode, validates the active input, and passes a `CollectionValidationResult` to `CollectionLanding`.
+- `src/lib/lecture-template/types.ts` defines `CourseMetadata`, `LectureMetadata`, `CollectionValidationResult`, and `LectureValidationResult`. These contracts do not change.
+- `src/lib/lecture-template/courseMetadata.ts` continues to validate the optional course audience, level, and duration fields. No YAML changes are planned.
+- `src/lib/lecture-template/readingTime.ts` supplies `lectureReadingMinutes` and `sumLectureReadingMinutes`; these functions remain the source of the explicitly labelled reading-time values.
+
+### Collection and progress boundary
+
+- `src/components/lecture-kit/CollectionLanding.tsx` assembles the collection hero, course facts, primary action, course progress, lecture list, and reviewer disclosures.
+- `src/components/lecture-kit/CollectionPrimaryAction.tsx` derives Start/Resume/Continue from `calculateResumeTarget` and collection progress.
+- `src/components/lecture-kit/LectureList.tsx` renders learner state, repeated lecture metadata, invalid-state copy, and per-lecture progress.
+- `src/components/lecture-kit/progress/CollectionProgressProvider.tsx` owns collection-storage hydration and exposes `loaded`, `storageAvailable`, aggregates, and lecture summaries.
+- `src/components/lecture-kit/progress/CollectionProgressBar.tsx` owns course-level and per-lecture progress visual output.
+
+### Lecture boundary
+
+- `src/components/lecture-kit/LecturePage.tsx` composes title, resume prompt, progress, collection navigation, learning path, content, and end pager.
+- `src/components/lecture-kit/LectureHeader.tsx` renders the current wrapping metadata list.
+- `src/components/lecture-kit/LectureNavigation.tsx` owns the stable three-slot bottom pager and should retain its explicit grid slots.
+- `src/components/lecture-kit/progress/ProgressProvider.tsx` owns lecture-storage hydration, reset behavior, keyboard shortcuts, completion announcements, and current-section tracking.
+- `src/components/lecture-kit/progress/LectureProgressBar.tsx` turns the lecture summary into the visible progress region.
+- `src/components/lecture-kit/SectionRenderer.tsx` / `progress/SectionProgressFrame.tsx` define section reading structure and are the appropriate places to add only semantic classes needed for prose/surface CSS, not new authoring semantics.
+
+### Interaction, theming, and shared UI boundary
+
+- `src/components/lecture-kit/Tabs.tsx` already implements the required roving tab interaction; coverage is incomplete, not implementation.
+- `src/components/lecture-kit/Checklist.tsx` and `component-kit/RadioOptionGroup.tsx` define the option/checklist markup whose entire rows must be reliable touch targets.
+- `src/components/lecture-kit/progress/SectionNote.tsx` and `src/components/lecture-kit/Diagram.tsx` use the established native `<dialog>` pattern.
+- `src/components/lecture-kit/ThemeToggle.tsx` currently returns `null` until its client effect resolves a theme.
+- `src/app/layout.tsx` loads fonts, emits media-based viewport theme colors, injects the pre-paint theme script, and mounts `ThemeToggle`.
+- `src/components/component-kit/index.ts`, `Button.tsx`, `Card.tsx`, and `ProgressMeter.tsx` are the correct home for any reusable neutral primitive or public export.
+- `src/app/globals.css` is the sole styling system. Preserve its semantic tokens, motion tokens, dark-mode mappings, print rules, and existing component-kit class contracts.
+
+### Existing test seams
+
+- Collection: `collection-cta.test.tsx`, `lecture-list-state.test.tsx`, `collection-progress-integration.test.tsx`, `collection-route-context.test.tsx`, and `visual-hierarchy.test.tsx`.
+- Lecture/progress/navigation: `progress-ui-enhancement.test.tsx`, `progress-provider.test.tsx`, `lecture-navigation.test.tsx`, and `collection-lecture-navigation.test.tsx`.
+- Interaction: `advanced-components-interaction.test.tsx`, `quiz-interaction.test.tsx`, `assessment-interaction.test.tsx`, `section-note.test.tsx`, and `diagram-inspection.test.tsx`.
+- Rendering/static behavior: `backward-compat.test.tsx`, `lecture-components.test.tsx`, `review-package.test.ts`, and the project build command.
+
+## Goal Coverage and Current Baseline
+
+| Spec area | Current baseline | Planned work |
+| --- | --- | --- |
+| G1–G6 collection clarity | `CollectionLanding` prints a passing count; `LectureList` repeats audience/level and always mounts a mini meter; flex `dl` layouts retain browser `dd` spacing. | Shared facts primitive, native course-description disclosure, learner-only primary facts, author-review disclosure, course-aware metadata suppression, state-aware progress rendering. |
+| G7–G12 lecture hierarchy | `LecturePage` renders a top back/next pill row, a separate progress card, and all top-level regions as bordered panels. | Quiet back breadcrumb, retain bottom pager, truthful progress loading/zero/complete states, quiet overview/objectives, prose measure CSS, preserve native anchors/history. |
+| G13/G15 focus and touch | Global focus covers anchors/buttons/summaries; checklist markup separates the checkbox from its label; row target sizing is implicit. | Explicit focus selectors, label-owned checklist rows, guaranteed 44px option/checklist/completion hit areas and spacing. |
+| G14 tabs | `Tabs.tsx` already handles ArrowLeft/Right/Up/Down/Home/End and refocuses the selected tab. | Keep source unchanged unless verification finds a regression; extend test coverage for Home/End, wraparound, and focus. |
+| G16 dialogs | Native dialogs exist but do not explicitly restore trigger focus or save a note on every close route. | Add trigger/primary-focus refs, labelled dialogs, close/cancel commit behavior for notes, focus restoration, and focused tests. |
+| G17 theme | Theme choice applies before paint, but the visible button is absent before hydration and manual choice does not own a browser-theme override. | Reserve stable placeholder chrome, keep it non-misleading while loading, then synchronize document/data/theme-color on a manual choice. |
+| G18/G19 resilience | Providers expose `loaded` and storage state but renderers primarily show zero; reduced-motion rules already exist. | Consume provider state correctly, use explicit status text, preserve and regression-test existing reduced-motion token behavior. |
+
+## Proposed Implementation Steps
+
+### 1. Add shared facts and course-description presentation primitives
+
+**Files to add**
+
+- `src/components/component-kit/FactsList.tsx`
+- `src/components/lecture-kit/CourseDescription.tsx`
+
+**Files to modify**
+
+- `src/components/component-kit/index.ts`
+- `src/components/lecture-kit/CollectionLanding.tsx`
+- `src/components/lecture-kit/LectureHeader.tsx`
+- `src/components/lecture-kit/LectureList.tsx`
+- `src/app/globals.css`
+
+**Implementation details**
+
+1. Add `FactsList`, taking typed, already-filtered `{ label, value }` entries plus `variant: "default" | "compact"`, `className`, and an accessible label. Render a semantic `dl`; each item receives its own `div`, `dt`, and `dd`. Do not use a generic card wrapper.
+2. Establish `.facts-list` CSS that resets `dl`, `dt`, and `dd` defaults. Use an explicit grid on wide viewports, a controlled two-column/auto-fit arrangement at tablet widths, and a single-column list on narrow widths. Labels and values must start at the same inline edge; values must never retain user-agent `dd` indentation.
+3. Add a server-rendered `CourseDescription`. For a short string, render the existing description paragraph. For a long string, derive a word-boundary/sentence-aware preview and render it in a native `<details>` summary with an explicit “About this course” affordance; render the full original string in the body. The full string must remain in static HTML and the component must not require client hydration.
+4. Replace the collection summary sentence with labelled `FactsList` entries: lecture count, computed aggregate estimated study time, and computed reading time when nonzero. Remove the `passingCount` calculation and text.
+5. Move optional course audience, level, and authored duration into secondary course detail rather than the default essential-facts row. Do not surface both authored aggregate duration and computed aggregate study time as competing primary values.
+6. Update `LectureHeader` to use `FactsList` and label current `metadata.duration` as “Estimated study time” and `readingMinutes` as “Reading time.” Preserve section count and audience/level as lecture-specific facts.
+7. Pass optional valid `CourseMetadata` to `LectureList`. In each item, include duration and section count unconditionally; include audience and level only when course metadata is absent or the lecture value materially differs from the course value. Compare normalized trimmed text, not object identity.
+
+### 2. Rework collection learner state, reviewer status, and progress hydration
+
+**Files to add**
+
+- `src/components/lecture-kit/CollectionReviewStatus.tsx`
+
+**Files to modify**
+
+- `src/components/lecture-kit/CollectionLanding.tsx`
+- `src/components/lecture-kit/LectureList.tsx`
+- `src/components/lecture-kit/progress/CollectionProgressBar.tsx`
+- `src/app/globals.css`
+
+**Implementation details**
+
+1. Add a quiet, conditional `CollectionReviewStatus` native disclosure after learner-facing collection content. It renders only when `validation.results` contains invalid lectures; it lists the affected title/slug and concise actionable validation messages. Give it a stable `id` so invalid lecture cards can point to it.
+2. Replace invalid-card wording with an author/reviewer-oriented explanation and an anchor to the review disclosure. Do not expose fake learner progress for an invalid lecture.
+3. Treat `CollectionProgressProvider.loaded === false` as a loading state in both `CollectionProgressBar` and `LectureList`. Keep the region’s physical space stable but do not render `0 of N` or “Not started” until the provider resolves.
+4. Update `CollectionLectureProgress` so it returns no meter for confirmed not-started lectures. For in-progress lectures, render numeric summary plus mini meter. For completed lectures, render one concise completion summary and an accessible 100% meter only if it adds information rather than duplicating the visible state badge.
+5. Keep resume calculation behavior, including “Resume here,” but do not label the first unstarted lecture a resume target before hydration. Confirm that first-lecture Start course behavior remains unchanged while loading.
+6. Make the course-level progress region render explicit loading, not-saved/session-only, zero, in-progress, and complete copy without relying on color. Preserve `ProgressMeter` ARIA values only when a concrete progress value is known.
+7. Style the reviewer disclosure and invalid-card anchor as secondary author context. Keep learner cards scan-first: title, state, description, variable facts, then progress only if meaningful.
+
+### 3. Make lecture entry, progress, navigation, and reading hierarchy quieter
+
+**Files to modify**
+
+- `src/components/lecture-kit/LecturePage.tsx`
+- `src/components/lecture-kit/LectureNavigation.tsx` (only if a small exported breadcrumb helper is cleaner than local JSX)
+- `src/components/lecture-kit/progress/LectureProgressBar.tsx`
+- `src/components/lecture-kit/SectionRenderer.tsx` (only for a semantic class/wrapper where CSS cannot target prose safely)
+- `src/app/globals.css`
+
+**Implementation details**
+
+1. Replace `CollectionTopNav`’s detached back/next pill row with a small `course-breadcrumb`/back link rendered adjacent to the lecture heading. Do not render a top next link. Keep `LectureNavigation` at the end of the page as the complete, explicit previous/back/next pager and retain its desktop grid/mobile reading order.
+2. In `LectureProgressBar`, render a stable loading status before provider hydration rather than numerical zero. After hydration, hide reset and `Alt+R` hint when `completedSections === 0`; show the confirmed secondary reset action only when there is work to reset. At 100%, use concise completion copy while preserving the accessible progressbar.
+3. Keep `ProgressProvider` persistence, confirmation, announcements, and shortcut behavior unchanged except where the rendered state needs its existing `loaded`/`storageAvailable` values. Do not alter localStorage keys or schema.
+4. Introduce a semantic prose-measure token in `globals.css` (approximately `72ch`) and apply it to ordinary paragraphs, lists, captions, and explanation copy within the lecture reading flow. Preserve full-width behavior for code, tables, Mermaid diagrams, comparison grids, timelines, and other explicitly wide structures.
+5. Add a quiet surface modifier for overview/objectives rather than changing `Card` semantics or all teaching components. Remove redundant background/border/shadow only at the top-level reading regions; preserve emphasis on interactive assessment, completed-section, and semantic callout states.
+6. Tighten mobile layout rules for header facts, progress region, breadcrumb, and bottom pager. No control pair should remain side-by-side if a long label would cause awkward multi-line pill wrapping.
+7. Retain existing native anchor links, `scroll-margin`, browser history, and `IntersectionObserver` behavior. Do not introduce scroll-jacking or a custom route-state layer.
+
+### 4. Complete interaction accessibility and resilient theme/dialog behavior
+
+**Files to modify**
+
+- `src/components/lecture-kit/Checklist.tsx`
+- `src/components/component-kit/RadioOptionGroup.tsx` (only if an explicit row/label hook is needed)
+- `src/components/lecture-kit/progress/SectionCompletionToggle.tsx`
+- `src/components/lecture-kit/progress/SectionNote.tsx`
+- `src/components/lecture-kit/Diagram.tsx`
+- `src/components/lecture-kit/ThemeToggle.tsx`
+- `src/app/layout.tsx`
+- `src/app/globals.css`
+
+**Implementation details**
+
+1. Extend global focus-visible styling to textareas, inputs, selects, and native checkboxes/radios. Confirm focus outlines are not clipped and meet both light/dark contrast requirements.
+2. Restructure checklist rows so the input and text are inside a single label-owned target (while preserving list semantics and local storage behavior). Ensure quiz/question option labels and checklist rows have an explicit minimum block size of 44px, plus spacing between separate controls. Make the section-completion button itself 44px rather than relying solely on its surrounding row.
+3. Preserve radio group semantics and native arrow-key behavior. Do not replace native inputs with custom visual controls.
+4. For `SectionNote`, store the opener ref, focus the textarea after `showModal()`, use `aria-labelledby`/a descriptive relationship, save the current draft on Close and native `cancel`, and restore focus to the opener when the dialog closes. Keep blur/debounced persistence as a compatible additional save path.
+5. For `Diagram`, store the opener ref, use `aria-labelledby` for the dialog title, focus the heading or first dialog action on open, and restore opener focus on close/cancel. Do not change Mermaid lazy loading, error fallback, or download behavior.
+6. Replace ThemeToggle’s `null` pre-hydration render with stable placeholder chrome of the same 44×44 footprint. It must be non-interactive/non-misleading until theme state resolves, then become the accessible button with correct icon/name/pressed state.
+7. Extract small theme DOM helpers inside `ThemeToggle` or an adjacent module: set `data-theme`, persist the choice, and create/update an owned `meta[name="theme-color"]` override for a stored/manual theme. Extend the existing before-paint script in `layout.tsx` to apply the same override when a stored choice exists. Preserve the current media-based `viewport.themeColor` values as system fallback.
+8. Do not change `Tabs.tsx` behavior. Add coverage for Home/End, wraparound focus, and selected-state synchronization so its already-shipped WAI-ARIA behavior cannot regress.
+9. Audit all new transitions against existing `--motion-*` tokens and existing `prefers-reduced-motion` rules. Do not add layout-moving animation; preserve the current reduced-motion smooth-scroll guard.
+
+### 5. Align global visual, responsive, print, and static-output styles
+
+**Files to modify**
+
+- `src/app/globals.css`
+- `tests/lecture-template/visual-hierarchy.test.tsx` (contract assertions only)
+
+**Implementation details**
+
+1. Consolidate the affected CSS around semantic classes introduced above; do not add raw colors outside the established semantic token system.
+2. Remove duplicate/outdated treatment rules made obsolete by the shared facts list, quiet header description, top breadcrumb, and state-aware progress regions.
+3. Maintain all existing print guarantees: hidden interactive controls remain hidden, revealed/static content remains printable, and progress content stays legible without a misleading interactive control.
+4. Add contract-level static-markup assertions for the updated hierarchy (essential collection facts, reviewer disclosure placement, no primary pass count, facts-list semantics, and quiet navigation), without attempting pixel layout assertions in jsdom.
+5. Manually capture the required visual states at 390px, 768px, and 1440px in light/dark themes; use a long active course description plus the component-demo lecture to exercise wrapping, interaction cards, and wide content.
+
+## Data Model, API, Persistence, and Event Changes
+
+- **Template and YAML model:** no changes. `CourseMetadata` and `LectureMetadata` remain as defined in `types.ts`.
+- **Server route contract:** no changes to `CollectionValidationResult`, `LecturePageProps`, route paths, or static export paths.
+- **Component APIs:** add `FactsList` and `CourseDescription`; add an optional `courseMetadata` prop to `LectureList`; optionally export a small course-breadcrumb helper if it avoids duplicated navigation markup. These are local presentation APIs.
+- **Persistence:** no changes to lecture progress keys, collection progress keys, answer keys, annotation keys, serialised shapes, reset semantics, or debounce timings. Note close/cancel invokes the existing annotation setter with the current draft.
+- **Theme persistence:** retain the `theme` localStorage key. Add only a DOM meta override for browser chrome; it is derived client state, not a new persisted schema.
+- **Events/analytics:** none.
+
+## Test Plan
+
+### Automated component and integration coverage
+
+- Extend or add collection tests to verify:
+  - primary summary omits validation/pass wording and labels lecture count, estimated study time, and reading time;
+  - long course descriptions expose a native, static-HTML-reachable full description;
+  - facts render as `dl`/`dt`/`dd` with no empty entries;
+  - course-matching audience/level are omitted from lecture cards, differing/absent-course metadata remains visible;
+  - invalid lecture cards link to the author-review disclosure;
+  - no `Not started`, zero percentage, or mini meter is shown before collection progress loads;
+  - confirmed not-started, in-progress, and complete cards each have the intended distinct output.
+- Extend lecture progress tests to verify loading output, absence of reset at zero, reset after progress exists, complete state, ARIA progress values, and no localStorage-regression on reset.
+- Extend navigation tests to verify the top breadcrumb/back location and bottom pager remain correctly labelled, targeted, and ordered for first/middle/last lecture cases.
+- Extend `advanced-components-interaction.test.tsx` for Home/End, wraparound, active `tabIndex`, and focus movement; do not rewrite the existing Tabs implementation unless a test demonstrates a real defect.
+- Extend checklist/assessment tests so clicking the label row toggles exactly one input, rows retain accessible names, and native radios remain operable.
+- Extend section-note and diagram tests with focus-on-open, focus-return-on-close, Escape/cancel behavior, and note persistence on Close/cancel. Continue stubbing `HTMLDialogElement` in jsdom.
+- Add a focused ThemeToggle test file to cover stable pre-hydration placeholder markup, post-hydration accessible button state, localStorage choice, document `data-theme`, and owned theme-color meta update.
+- Update static/render tests only for intentional hierarchy markup changes; retain no-JavaScript tab, diagram, and print behavior.
+
+### Commands
+
+Run focused tests while working, then the full suite:
+
+```bash
+npm test -- tests/lecture-template/collection-cta.test.tsx tests/lecture-template/lecture-list-state.test.tsx tests/lecture-template/collection-progress-integration.test.tsx
+npm test -- tests/lecture-template/progress-ui-enhancement.test.tsx tests/lecture-template/advanced-components-interaction.test.tsx tests/lecture-template/section-note.test.tsx tests/lecture-template/diagram-inspection.test.tsx
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+### Manual quality verification
+
+- Inspect collection, first lecture, middle lecture, last lecture, and component-demo lecture at 390px, 768px, and 1440px in light and dark themes.
+- Verify 200% zoom/reflow and no horizontal page scrolling.
+- Navigate keyboard-only from the skip link through theme control, course facts/details, progress, learning path, content, radio/checklist rows, dialogs, disclosures, and end pager.
+- Verify `prefers-reduced-motion`, localStorage blocked, delayed hydration, static export/review package, a valid collection with long course description, and a collection containing an invalid lecture.
+- Check contrast for body/muted text, focus ring, selected tab, progress, success, warning, disabled state, and dialog scrim in both themes.
+
+## Risks and Mitigations
+
+- **Native `<details>` preview can hide useful context.** Derive a meaningful preview, use clear “About this course” language, and keep the full original description in static markup.
+- **Metadata comparison can accidentally hide meaningful differences.** Compare normalized values only to equal course values; include all facts when course metadata is absent.
+- **Progress loading can cause visual shift.** Keep the progress region mounted with stable dimensions and a text loading status; defer numeric values and role progressbar until known.
+- **Changing top navigation could reduce discoverability.** Keep a visible quiet back breadcrumb near the title and retain the complete end pager, then verify first/middle/last lecture screens.
+- **Focus restoration can fight native dialog behavior in jsdom/browsers.** Centralize close handlers, restore only to a connected opener, and test both click close and cancel/Escape paths.
+- **Theme meta overrides can defeat system-color media values.** Create an override only for a stored/manual choice and leave Next’s media-based viewport colors untouched otherwise.
+- **A global prose rule can break wide structures.** Apply it through specific reading selectors and explicit wide-content opt-outs, then inspect code, table, comparison, and diagram fixtures.
+- **Existing visual-hierarchy tests may encode old chrome.** Update only assertions tied to deliberate Spec 021 changes; do not weaken generic overflow/accessibility assertions.
+
+## Out of Scope Confirmations
+
+- No template parser/validator/CLI changes.
+- No new dependencies or CSS framework.
+- No remote persistence, analytics, account system, or grading behavior.
+- No changes to source review/package file contents except any visual/static rendered output naturally affected by the application changes.
+- No redesign of the established semantic token, font, icon, or component-kit foundation.
+

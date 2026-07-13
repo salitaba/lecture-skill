@@ -59,4 +59,40 @@ describe("collection landing learner-facing lecture state", () => {
     expect(items[1]).not.toHaveClass("lecture-list-item-resume");
     expect(screen.getByText("Not started")).toBeInTheDocument();
   });
+
+  it("suppresses course-matching audience and level facts while retaining differing lecture facts", async () => {
+    const first = validLecture("examples/multi-lecture/lectures/01-introduction/lecture.template.md");
+    const second = validLecture("examples/multi-lecture/lectures/02-core-concepts/lecture.template.md");
+    render(
+      <CollectionLanding
+        validation={{
+          lectureCount: 2,
+          allPassed: true,
+          courseMetadata: {
+            status: "valid",
+            path: "lectures/course.yaml",
+            errors: [],
+            metadata: {
+              title: "Course",
+              description: "Course description.",
+              audience: first.metadata.audience,
+              level: first.metadata.level
+            }
+          },
+          results: [
+            { slug: "01-introduction", templatePath: "lectures/01-introduction/lecture.template.md", valid: true, errors: [], template: first },
+            { slug: "02-core-concepts", templatePath: "lectures/02-core-concepts/lecture.template.md", valid: true, errors: [], template: second }
+          ]
+        }}
+      />
+    );
+
+    await waitFor(() => expect(document.querySelectorAll(".lecture-list-item")).toHaveLength(2));
+    const items = document.querySelectorAll(".lecture-list-item");
+    const firstLabels = Array.from(items[0]?.querySelectorAll(".lecture-list-meta dt") ?? []).map((label) => label.textContent);
+    const secondLabels = Array.from(items[1]?.querySelectorAll(".lecture-list-meta dt") ?? []).map((label) => label.textContent);
+    expect(firstLabels).not.toContain("Audience");
+    expect(firstLabels).not.toContain("Level");
+    expect(secondLabels).toContain("Level");
+  });
 });

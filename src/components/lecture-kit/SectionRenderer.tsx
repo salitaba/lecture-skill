@@ -46,7 +46,7 @@ export function SectionRenderer({ section, index, lectureId }: { section: Lectur
           <SectionNote anchor={section.anchor} title={section.title} />
         </div>
       </div>
-      <HighlightableContent anchor={section.anchor}>
+      <HighlightableContent anchor={section.anchor} className="lecture-prose">
         <RenderBlocks blocks={section.blocks} sectionAnchor={section.anchor} lectureId={lectureId} glossaryAnchors={glossaryAnchors} />
       </HighlightableContent>
     </SectionProgressFrame>

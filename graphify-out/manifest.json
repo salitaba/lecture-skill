@@ -1,0 +1,482 @@
+{
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/app/page.tsx": {
+    "mtime": 1783361859.8295991,
+    "ast_hash": "a5d153bea2aa079a3404776a5d02200e",
+    "semantic_hash": "a5d153bea2aa079a3404776a5d02200e"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/app/error.tsx": {
+    "mtime": 1783419808.5350072,
+    "ast_hash": "33f25f2e531982d9ae389d90e13b5dd7",
+    "semantic_hash": "33f25f2e531982d9ae389d90e13b5dd7"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/app/manifest.ts": {
+    "mtime": 1783420566.1984184,
+    "ast_hash": "37f0f35879f637e6b3358fd2ce33b67d",
+    "semantic_hash": "37f0f35879f637e6b3358fd2ce33b67d"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/app/icon.tsx": {
+    "mtime": 1783420621.1040354,
+    "ast_hash": "8af89846e396b20abe24a231f9e4e44e",
+    "semantic_hash": "8af89846e396b20abe24a231f9e4e44e"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/app/not-found.tsx": {
+    "mtime": 1783419795.6781886,
+    "ast_hash": "cc68cc8d894ad79167cdc121a8448853",
+    "semantic_hash": "cc68cc8d894ad79167cdc121a8448853"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/app/layout.tsx": {
+    "mtime": 1783440811.3790088,
+    "ast_hash": "f8a1db67dfe8d1c55512107a9d61c701",
+    "semantic_hash": "f8a1db67dfe8d1c55512107a9d61c701"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/app/apple-icon.tsx": {
+    "mtime": 1783420644.7066877,
+    "ast_hash": "f2b36adb8e0353062a5253ec1dc1178f",
+    "semantic_hash": "f2b36adb8e0353062a5253ec1dc1178f"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/anchors.ts": {
+    "mtime": 1783361859.838417,
+    "ast_hash": "0af6e0ce2ae2555fce621ca950108d75",
+    "semantic_hash": "0af6e0ce2ae2555fce621ca950108d75"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/reviewPackage.ts": {
+    "mtime": 1783361859.8499699,
+    "ast_hash": "3500c81f2ffcc166533b1ff3fa798927",
+    "semantic_hash": "3500c81f2ffcc166533b1ff3fa798927"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/parseTemplate.ts": {
+    "mtime": 1783361859.8405426,
+    "ast_hash": "6aa3246710a589c143071bd2b3aaeff7",
+    "semantic_hash": "6aa3246710a589c143071bd2b3aaeff7"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/assessments.ts": {
+    "mtime": 1783361859.847499,
+    "ast_hash": "e0ab250f873079cc954f1be7a507b5aa",
+    "semantic_hash": "e0ab250f873079cc954f1be7a507b5aa"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/scaffold.ts": {
+    "mtime": 1783361859.8556445,
+    "ast_hash": "91eff9cc06cb9c25ee060ce9780260d6",
+    "semantic_hash": "91eff9cc06cb9c25ee060ce9780260d6"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/resumeTarget.ts": {
+    "mtime": 1783417962.0426211,
+    "ast_hash": "0cddb3f451eb2df590caa05273a2043d",
+    "semantic_hash": "0cddb3f451eb2df590caa05273a2043d"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/readTemplate.ts": {
+    "mtime": 1783456598.5085707,
+    "ast_hash": "6231ec42b1b251b6b8a77a61a1aefbd3",
+    "semantic_hash": "6231ec42b1b251b6b8a77a61a1aefbd3"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/validateCli.ts": {
+    "mtime": 1783361859.8459451,
+    "ast_hash": "fe61d882bc32db8d2a7406b723b5ff95",
+    "semantic_hash": "fe61d882bc32db8d2a7406b723b5ff95"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/validateTemplate.ts": {
+    "mtime": 1783361859.84243,
+    "ast_hash": "a5411d42b7d6941d30605f10df16c515",
+    "semantic_hash": "a5411d42b7d6941d30605f10df16c515"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/navigationTargets.ts": {
+    "mtime": 1783361859.8488216,
+    "ast_hash": "05da113a1238344cb32f1edf10557c71",
+    "semantic_hash": "05da113a1238344cb32f1edf10557c71"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/doctor.ts": {
+    "mtime": 1783361859.8611856,
+    "ast_hash": "d48827a46662049b54e1873690c7c4d5",
+    "semantic_hash": "d48827a46662049b54e1873690c7c4d5"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/readingTime.ts": {
+    "mtime": 1783361859.862906,
+    "ast_hash": "dfdfba8c1f3077731458e5261352e2b6",
+    "semantic_hash": "dfdfba8c1f3077731458e5261352e2b6"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/types.ts": {
+    "mtime": 1783361859.8367388,
+    "ast_hash": "303a64084b23ab0f7434dd39499ce6dd",
+    "semantic_hash": "303a64084b23ab0f7434dd39499ce6dd"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/progress.ts": {
+    "mtime": 1783430458.2404344,
+    "ast_hash": "caeb0c7d1a4804f5accc2d642522c273",
+    "semantic_hash": "caeb0c7d1a4804f5accc2d642522c273"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/collection.ts": {
+    "mtime": 1783361859.834212,
+    "ast_hash": "a8b4f63cdcc96f58b840c9e942fbc7a5",
+    "semantic_hash": "a8b4f63cdcc96f58b840c9e942fbc7a5"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/courseMetadata.ts": {
+    "mtime": 1783361859.8597245,
+    "ast_hash": "25441cdd5e48e274645ba2da8e95e532",
+    "semantic_hash": "25441cdd5e48e274645ba2da8e95e532"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/sourceReview.ts": {
+    "mtime": 1783361859.8535614,
+    "ast_hash": "42cdf72c181182070bbe847bd7c0f721",
+    "semantic_hash": "42cdf72c181182070bbe847bd7c0f721"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/glossaryIndex.ts": {
+    "mtime": 1783361859.8356428,
+    "ast_hash": "edf19502a3aefe8d902e673c5eb3b4db",
+    "semantic_hash": "edf19502a3aefe8d902e673c5eb3b4db"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/lib/lecture-template/renderMarkdown.tsx": {
+    "mtime": 1783442338.6470535,
+    "ast_hash": "52a44143e4e022d6c47b719e3aa317a5",
+    "semantic_hash": "52a44143e4e022d6c47b719e3aa317a5"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/paths.ts": {
+    "mtime": 1783453884.6425328,
+    "ast_hash": "9e63b93a1dd2d36a9fc594c32b0da226",
+    "semantic_hash": "9e63b93a1dd2d36a9fc594c32b0da226"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/index.ts": {
+    "mtime": 1783455913.9705393,
+    "ast_hash": "02c5e2f9afc3ea6a3612465d08f23096",
+    "semantic_hash": "02c5e2f9afc3ea6a3612465d08f23096"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/materialize.ts": {
+    "mtime": 1783456586.516094,
+    "ast_hash": "5fa1946152f6185ac031044a2dad7835",
+    "semantic_hash": "5fa1946152f6185ac031044a2dad7835"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/reviewSource.ts": {
+    "mtime": 1783453920.2336965,
+    "ast_hash": "6451dd6365c3ddcf208651550a3d3547",
+    "semantic_hash": "6451dd6365c3ddcf208651550a3d3547"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/dev.ts": {
+    "mtime": 1783455878.9041708,
+    "ast_hash": "f6c69e53c87593c0292b0c6707f0b4b6",
+    "semantic_hash": "f6c69e53c87593c0292b0c6707f0b4b6"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/newCollection.ts": {
+    "mtime": 1783453907.1696327,
+    "ast_hash": "47697525673cbe2dc0a4c3e3f2e8bc16",
+    "semantic_hash": "47697525673cbe2dc0a4c3e3f2e8bc16"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/build.ts": {
+    "mtime": 1783455888.7237997,
+    "ast_hash": "4d175343bc0a007f81636b5cb432b5fc",
+    "semantic_hash": "4d175343bc0a007f81636b5cb432b5fc"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/packageReview.ts": {
+    "mtime": 1783455906.9669523,
+    "ast_hash": "c5f7d084a15683e855b8dc0ea133d410",
+    "semantic_hash": "c5f7d084a15683e855b8dc0ea133d410"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/doctor.ts": {
+    "mtime": 1783453912.693659,
+    "ast_hash": "8028da743fff3db527b645791ecefec0",
+    "semantic_hash": "8028da743fff3db527b645791ecefec0"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/newLecture.ts": {
+    "mtime": 1783453898.6305933,
+    "ast_hash": "e46344c9f05115c04bbca1e74c451b11",
+    "semantic_hash": "e46344c9f05115c04bbca1e74c451b11"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/cli/commands/validate.ts": {
+    "mtime": 1783453891.7935631,
+    "ast_hash": "9cbc027eaf5d10176e105f6646d602c4",
+    "semantic_hash": "9cbc027eaf5d10176e105f6646d602c4"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Quiz.tsx": {
+    "mtime": 1783429923.46072,
+    "ast_hash": "35c93f655df926efa960e4a53a7dd81c",
+    "semantic_hash": "35c93f655df926efa960e4a53a7dd81c"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/StepList.tsx": {
+    "mtime": 1783411575.6146684,
+    "ast_hash": "09dce6bbf2f5ec5829ab40884c3885d4",
+    "semantic_hash": "09dce6bbf2f5ec5829ab40884c3885d4"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Tabs.tsx": {
+    "mtime": 1783411740.0711756,
+    "ast_hash": "10e66dfa6a634c331529d75ad91bf6cd",
+    "semantic_hash": "10e66dfa6a634c331529d75ad91bf6cd"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/ResourceLinks.tsx": {
+    "mtime": 1783411635.743593,
+    "ast_hash": "5019f392749a09fdf010e0f62f0d9fc8",
+    "semantic_hash": "5019f392749a09fdf010e0f62f0d9fc8"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/MistakeCorrection.tsx": {
+    "mtime": 1783412838.2164657,
+    "ast_hash": "6f614d500762b7d4daa53fce1f4eab0a",
+    "semantic_hash": "6f614d500762b7d4daa53fce1f4eab0a"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Callout.tsx": {
+    "mtime": 1783411592.3690639,
+    "ast_hash": "35dfb2b79857ec3f394270579ab79d7b",
+    "semantic_hash": "35dfb2b79857ec3f394270579ab79d7b"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Quote.tsx": {
+    "mtime": 1783411782.905921,
+    "ast_hash": "ddd7c5bcd54d1801ebad8234fc4f070a",
+    "semantic_hash": "ddd7c5bcd54d1801ebad8234fc4f070a"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/LectureNavigation.tsx": {
+    "mtime": 1783438627.9440148,
+    "ast_hash": "86ec196f5506d8bf40d9b8781c0e51a8",
+    "semantic_hash": "86ec196f5506d8bf40d9b8781c0e51a8"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Timeline.tsx": {
+    "mtime": 1783411586.7855675,
+    "ast_hash": "b263c47365744d51aff6a67b1b7edc0a",
+    "semantic_hash": "b263c47365744d51aff6a67b1b7edc0a"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/AnswerReviewDisclosure.tsx": {
+    "mtime": 1783430021.3378983,
+    "ast_hash": "5dfd62a9473d01b74048e77690ebfc9c",
+    "semantic_hash": "5dfd62a9473d01b74048e77690ebfc9c"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/LearningPathNavigation.tsx": {
+    "mtime": 1783438755.9707274,
+    "ast_hash": "dfe1825df6ad307b44bde58206994d57",
+    "semantic_hash": "dfe1825df6ad307b44bde58206994d57"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/GlossaryTerm.tsx": {
+    "mtime": 1783411613.418274,
+    "ast_hash": "9dea89b166b2e52dbc1348db874cfa08",
+    "semantic_hash": "9dea89b166b2e52dbc1348db874cfa08"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/PracticeTask.tsx": {
+    "mtime": 1783412788.423575,
+    "ast_hash": "a8065a2b0c61a46a3d54ad694a6f4372",
+    "semantic_hash": "a8065a2b0c61a46a3d54ad694a6f4372"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Flashcard.tsx": {
+    "mtime": 1783412021.9246554,
+    "ast_hash": "933d15fea41307992a93fa36c27fa730",
+    "semantic_hash": "933d15fea41307992a93fa36c27fa730"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/FreeResponse.tsx": {
+    "mtime": 1783412049.8974206,
+    "ast_hash": "a23f734bbce1c5f1b89a893750800592",
+    "semantic_hash": "a23f734bbce1c5f1b89a893750800592"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/LecturePage.tsx": {
+    "mtime": 1783438780.988386,
+    "ast_hash": "21e23f2008aaf0a376e20b85946fefb1",
+    "semantic_hash": "21e23f2008aaf0a376e20b85946fefb1"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/SectionNavigation.tsx": {
+    "mtime": 1783438762.5009003,
+    "ast_hash": "97a9b77033b8208f957cd0f3cca447d8",
+    "semantic_hash": "97a9b77033b8208f957cd0f3cca447d8"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/CollectionLanding.tsx": {
+    "mtime": 1783417974.0423594,
+    "ast_hash": "d98fc0d3a21fe56616b7b9e97ba35a4b",
+    "semantic_hash": "d98fc0d3a21fe56616b7b9e97ba35a4b"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/CollectionGlossaryIndex.tsx": {
+    "mtime": 1783361859.916769,
+    "ast_hash": "dfc2c57007b869a623b465008107ace9",
+    "semantic_hash": "dfc2c57007b869a623b465008107ace9"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Accordion.tsx": {
+    "mtime": 1783411598.0438054,
+    "ast_hash": "83d66580f8b9ddd2ba45fb21a469a516",
+    "semantic_hash": "83d66580f8b9ddd2ba45fb21a469a516"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Diagram.tsx": {
+    "mtime": 1783430252.3349063,
+    "ast_hash": "d36e9ab0b4da8519c9028783f48503f4",
+    "semantic_hash": "d36e9ab0b4da8519c9028783f48503f4"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/LectureHeader.tsx": {
+    "mtime": 1783361859.9144418,
+    "ast_hash": "c7c59a2982072c6923422826ca1d84a7",
+    "semantic_hash": "c7c59a2982072c6923422826ca1d84a7"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/CollectionPrimaryAction.tsx": {
+    "mtime": 1783411508.1685894,
+    "ast_hash": "937baf6b839ef8f39e310a7130402e58",
+    "semantic_hash": "937baf6b839ef8f39e310a7130402e58"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/ThemeToggle.tsx": {
+    "mtime": 1783411891.4251356,
+    "ast_hash": "617aab08e9d2f0dc28511ded4d1f1647",
+    "semantic_hash": "617aab08e9d2f0dc28511ded4d1f1647"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/ConceptCard.tsx": {
+    "mtime": 1783411569.5039186,
+    "ast_hash": "c98fb4db2fcf3936df8555b0ad102dbe",
+    "semantic_hash": "c98fb4db2fcf3936df8555b0ad102dbe"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/WorkedExample.tsx": {
+    "mtime": 1783412761.5177953,
+    "ast_hash": "0f3ba0e297dad8b316a5485fafa4fbed",
+    "semantic_hash": "0f3ba0e297dad8b316a5485fafa4fbed"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/LectureList.tsx": {
+    "mtime": 1783421486.9140646,
+    "ast_hash": "a76f1f89a984aad2fd8a58b39872b352",
+    "semantic_hash": "a76f1f89a984aad2fd8a58b39872b352"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/InstructorNote.tsx": {
+    "mtime": 1783411618.7921407,
+    "ast_hash": "bda63639e62ac0a5af4b5d209086fc6b",
+    "semantic_hash": "bda63639e62ac0a5af4b5d209086fc6b"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/CodeBlock.tsx": {
+    "mtime": 1783361859.9036765,
+    "ast_hash": "e2bf3331b4e7afc324d0e6a992b51626",
+    "semantic_hash": "e2bf3331b4e7afc324d0e6a992b51626"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Comparison.tsx": {
+    "mtime": 1783411606.5415351,
+    "ast_hash": "4d62be674a9c3244c3386b551f098d67",
+    "semantic_hash": "4d62be674a9c3244c3386b551f098d67"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Checklist.tsx": {
+    "mtime": 1783411777.5190227,
+    "ast_hash": "af6577fb00d4e901f1b532ac6322c0e4",
+    "semantic_hash": "af6577fb00d4e901f1b532ac6322c0e4"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/AnswerKeyAppendix.tsx": {
+    "mtime": 1783361859.9069428,
+    "ast_hash": "01e4513a002a0637c49d6f5f755e724e",
+    "semantic_hash": "01e4513a002a0637c49d6f5f755e724e"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/AnnotationsIndexDisclosure.tsx": {
+    "mtime": 1783431458.944601,
+    "ast_hash": "57e71c944d64d5a1ce524ff58a648194",
+    "semantic_hash": "57e71c944d64d5a1ce524ff58a648194"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/Summary.tsx": {
+    "mtime": 1783411580.1673567,
+    "ast_hash": "2dc58194a7835713f547e0c1d5a381a3",
+    "semantic_hash": "2dc58194a7835713f547e0c1d5a381a3"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/ValidationScreen.tsx": {
+    "mtime": 1783425037.0370636,
+    "ast_hash": "278a5e0dc600947adc1582e086b932a3",
+    "semantic_hash": "278a5e0dc600947adc1582e086b932a3"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/PageShell.tsx": {
+    "mtime": 1783425019.529122,
+    "ast_hash": "d1e53c89d95ac761e897c5992300b446",
+    "semantic_hash": "d1e53c89d95ac761e897c5992300b446"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/QuestionSet.tsx": {
+    "mtime": 1783429929.9498656,
+    "ast_hash": "6fe5b7d1cb233ad8ebb153d0224aff43",
+    "semantic_hash": "6fe5b7d1cb233ad8ebb153d0224aff43"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/AssessmentIndexDisclosure.tsx": {
+    "mtime": 1783361859.9187038,
+    "ast_hash": "0eeea3b74473e1921c4c49d4a4a0862a",
+    "semantic_hash": "0eeea3b74473e1921c4c49d4a4a0862a"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/SectionRenderer.tsx": {
+    "mtime": 1783442559.786783,
+    "ast_hash": "5190fecbc2c7dd8edcef0144f98d492f",
+    "semantic_hash": "5190fecbc2c7dd8edcef0144f98d492f"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/GlossaryIndex.tsx": {
+    "mtime": 1783411903.4190226,
+    "ast_hash": "7341426fd4730cd30a34f4946236e6b2",
+    "semantic_hash": "7341426fd4730cd30a34f4946236e6b2"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/ProgressLiveRegion.tsx": {
+    "mtime": 1783419071.2830703,
+    "ast_hash": "7ab14d62e1138e2238164d9a6174648b",
+    "semantic_hash": "7ab14d62e1138e2238164d9a6174648b"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/SectionNote.tsx": {
+    "mtime": 1783439070.4553778,
+    "ast_hash": "52e3605394bfb8c949cd0b3b3dec1f6d",
+    "semantic_hash": "52e3605394bfb8c949cd0b3b3dec1f6d"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/HighlightableContent.tsx": {
+    "mtime": 1783431232.7480981,
+    "ast_hash": "1b98ba960f84423eeaa50849448957ec",
+    "semantic_hash": "1b98ba960f84423eeaa50849448957ec"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/SectionProgressFrame.tsx": {
+    "mtime": 1783361859.9299397,
+    "ast_hash": "0e03626135d00fe77ec5aa6585cc6621",
+    "semantic_hash": "0e03626135d00fe77ec5aa6585cc6621"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/SectionCompletionToggle.tsx": {
+    "mtime": 1783438613.9297705,
+    "ast_hash": "2a87b6dd30686d03f4afa17fd5d73908",
+    "semantic_hash": "2a87b6dd30686d03f4afa17fd5d73908"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/AnnotationsProvider.tsx": {
+    "mtime": 1783430487.9018795,
+    "ast_hash": "b5f60f87e3c5c06945c015699bd230e9",
+    "semantic_hash": "b5f60f87e3c5c06945c015699bd230e9"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/CollectionProgressBar.tsx": {
+    "mtime": 1783412368.1308107,
+    "ast_hash": "cbdcfcac9a5268bed6934acb10887e44",
+    "semantic_hash": "cbdcfcac9a5268bed6934acb10887e44"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/ResumePrompt.tsx": {
+    "mtime": 1783411499.6411023,
+    "ast_hash": "9e0fa97174809283d767fc4d72becfcc",
+    "semantic_hash": "9e0fa97174809283d767fc4d72becfcc"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/ProgressProvider.tsx": {
+    "mtime": 1783425451.6908057,
+    "ast_hash": "00f2a6bf5f5fe0cfe7495e44205ff357",
+    "semantic_hash": "00f2a6bf5f5fe0cfe7495e44205ff357"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/LectureProgressBar.tsx": {
+    "mtime": 1783438726.6729429,
+    "ast_hash": "37d7ea826e40dde6d3e0fc29e6748761",
+    "semantic_hash": "37d7ea826e40dde6d3e0fc29e6748761"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/lecture-kit/progress/CollectionProgressProvider.tsx": {
+    "mtime": 1783361859.9262373,
+    "ast_hash": "6eeb00e706e6780243c4eebb7b96d8ac",
+    "semantic_hash": "6eeb00e706e6780243c4eebb7b96d8ac"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/RadioOptionGroup.tsx": {
+    "mtime": 1783412491.5768325,
+    "ast_hash": "4c39019382ce0fc57fbb0f99f760480c",
+    "semantic_hash": "4c39019382ce0fc57fbb0f99f760480c"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/LabeledSection.tsx": {
+    "mtime": 1783412741.963796,
+    "ast_hash": "af5e24927ce0589de261eadbc4e93723",
+    "semantic_hash": "af5e24927ce0589de261eadbc4e93723"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/index.ts": {
+    "mtime": 1783412748.4694772,
+    "ast_hash": "5ef32769b36de30f29c7f9dccc448a35",
+    "semantic_hash": "5ef32769b36de30f29c7f9dccc448a35"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/Disclosure.tsx": {
+    "mtime": 1783413233.9058251,
+    "ast_hash": "495d89dbe9a5b62b6e6c0380747800f4",
+    "semantic_hash": "495d89dbe9a5b62b6e6c0380747800f4"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/ProgressMeter.tsx": {
+    "mtime": 1783412332.4239917,
+    "ast_hash": "07a2efcd00c8779399236c3340122dc6",
+    "semantic_hash": "07a2efcd00c8779399236c3340122dc6"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/Card.tsx": {
+    "mtime": 1783411667.8400686,
+    "ast_hash": "4ffbbc5fdf280ff1171705710232d399",
+    "semantic_hash": "4ffbbc5fdf280ff1171705710232d399"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/Icon.tsx": {
+    "mtime": 1783449508.473414,
+    "ast_hash": "dbac6684e2c80a94f57c8757f48b5507",
+    "semantic_hash": "dbac6684e2c80a94f57c8757f48b5507"
+  },
+  "/home/alitabatabaei/Desktop/code/lecture-test/src/components/component-kit/Button.tsx": {
+    "mtime": 1783411298.3259678,
+    "ast_hash": "c03adcc414574c59cca7ac27826de174",
+    "semantic_hash": "c03adcc414574c59cca7ac27826de174"
+  }
+}

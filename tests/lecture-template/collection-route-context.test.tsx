@@ -90,7 +90,8 @@ describe("collection lecture route context", () => {
     expect(html).not.toContain('href="/lectures/01-introduction"');
     expect(html).toContain('href="/"');
     expect(html).toContain("Back to course");
-    expect(html).toContain("lecture-nav-top");
+    expect(html).toContain("course-breadcrumb");
+    expect(html).not.toContain("lecture-nav-top");
   });
 
   it("renders last lecture with previous but no next", async () => {

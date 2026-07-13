@@ -5,3 +5,4 @@ export * from "./Disclosure";
 export * from "./ProgressMeter";
 export * from "./RadioOptionGroup";
 export * from "./LabeledSection";
+export * from "./FactsList";

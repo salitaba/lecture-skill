@@ -46,6 +46,40 @@ describe("advanced component interactions", () => {
     expect(cliTab).toHaveAttribute("aria-selected", "true");
   });
 
+  it("supports Home, End, and wraparound focus while synchronizing selected tabs", async () => {
+    const user = userEvent.setup();
+    render(
+      <Tabs
+        component={{
+          type: "tabs",
+          title: "Modes",
+          tabs: [
+            { label: "CLI", content: "Command line." },
+            { label: "Browser", content: "Browser." },
+            { label: "Review", content: "Review." }
+          ]
+        }}
+      />
+    );
+
+    const tabs = screen.getAllByRole("tab");
+    tabs[1].focus();
+    await user.keyboard("{End}");
+    expect(tabs[2]).toHaveFocus();
+    expect(tabs[2]).toHaveAttribute("aria-selected", "true");
+    expect(tabs[2]).toHaveAttribute("tabindex", "0");
+    expect(tabs[0]).toHaveAttribute("tabindex", "-1");
+
+    await user.keyboard("{ArrowRight}");
+    expect(tabs[0]).toHaveFocus();
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{Home}");
+    expect(tabs[0]).toHaveFocus();
+    await user.keyboard("{ArrowLeft}");
+    expect(tabs[2]).toHaveFocus();
+  });
+
   it("keeps repeated tab component ids unique in the DOM", () => {
     render(
       <>

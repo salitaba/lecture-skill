@@ -51,6 +51,7 @@ describe("Diagram inspection", () => {
     await user.click(expandButton);
 
     expect(showModal).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Sample Flow" })).toHaveFocus());
 
     await user.click(screen.getByRole("button", { name: /Download SVG/ }));
     expect(createObjectURL).toHaveBeenCalledTimes(1);
@@ -58,6 +59,7 @@ describe("Diagram inspection", () => {
 
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(close).toHaveBeenCalledTimes(1);
+    expect(expandButton).toHaveFocus();
   });
 
   it("does not show Expand diagram when rendering fails", async () => {

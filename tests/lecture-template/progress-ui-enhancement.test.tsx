@@ -39,7 +39,10 @@ describe("progress UI enhancement", () => {
     renderProgress();
 
     await waitFor(() => expect(screen.getByText("0 of 2 sections completed")).toBeInTheDocument());
-    const resetButton = screen.getByRole("button", { name: "Reset progress" });
+    expect(screen.queryByRole("button", { name: "Reset progress" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark First Topic complete" }));
+    const resetButton = await screen.findByRole("button", { name: "Reset progress" });
     expect(resetButton).toBeInTheDocument();
     expect(resetButton).not.toBeDisabled();
 
@@ -47,6 +50,14 @@ describe("progress UI enhancement", () => {
       resetButton.focus();
     });
     expect(resetButton).toHaveFocus();
+  });
+
+  it("communicates loading without exposing an invented zero", () => {
+    renderProgress();
+
+    expect(screen.getByText("Loading progress")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Lecture progress" })).not.toHaveAttribute("aria-valuenow");
+    expect(screen.queryByRole("button", { name: "Reset progress" })).not.toBeInTheDocument();
   });
 
   it("section completion toggle has proper ARIA and touch-friendly markup", async () => {

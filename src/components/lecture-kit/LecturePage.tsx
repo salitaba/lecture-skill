@@ -2,7 +2,6 @@ import { AnswerKeyAppendix } from "@/components/lecture-kit/AnswerKeyAppendix";
 import { AnswerReviewDisclosure } from "@/components/lecture-kit/AnswerReviewDisclosure";
 import { AnnotationsIndexDisclosure } from "@/components/lecture-kit/AnnotationsIndexDisclosure";
 import { GlossaryIndex } from "@/components/lecture-kit/GlossaryIndex";
-import { Icon } from "@/components/component-kit";
 import { LectureHeader } from "@/components/lecture-kit/LectureHeader";
 import { LectureNavigation, type NavTarget } from "@/components/lecture-kit/LectureNavigation";
 import { PageShell } from "@/components/lecture-kit/PageShell";
@@ -54,33 +53,36 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
         lectureId={lectureId}
       >
         <AnnotationsProvider lectureId={lectureId}>
-          <LectureHeader metadata={lecture.metadata} sectionCount={lecture.sections.length} readingMinutes={readingMinutes} />
+          <LectureHeader
+            metadata={lecture.metadata}
+            sectionCount={lecture.sections.length}
+            readingMinutes={readingMinutes}
+            backHref={collectionNavigation?.backHref}
+            backLabel={collectionNavigation?.backLabel}
+          />
           <ResumePrompt />
           <LectureProgressBar />
-          {collectionNavigation ? (
-            <CollectionTopNav
-              next={collectionNavigation.next}
-              backHref={collectionNavigation.backHref}
-              backLabel={collectionNavigation.backLabel}
-            />
-          ) : null}
           <div className="lecture-layout">
             <SectionNavigation sections={lecture.sections} />
             <article className="lecture-content">
-              <section className="overview-section lecture-panel" aria-labelledby={lectureNavigationTargets.overview.id}>
+              <section className="overview-section lecture-panel quiet-reading-surface" aria-labelledby={lectureNavigationTargets.overview.id}>
                 <p className="section-kicker">Start Here</p>
                 <h2 id={lectureNavigationTargets.overview.id}>{lectureNavigationTargets.overview.label}</h2>
-                <RenderBlocks blocks={lecture.overview} />
+                <div className="lecture-prose">
+                  <RenderBlocks blocks={lecture.overview} />
+                </div>
               </section>
 
-              <section className="objectives-section lecture-panel" aria-labelledby={lectureNavigationTargets.objectives.id}>
+              <section className="objectives-section lecture-panel quiet-reading-surface" aria-labelledby={lectureNavigationTargets.objectives.id}>
                 <p className="section-kicker">Outcomes</p>
                 <h2 id={lectureNavigationTargets.objectives.id}>{lectureNavigationTargets.objectives.label}</h2>
-                <ul>
-                  {lecture.objectives.map((objective, index) => (
-                    <li key={index}>{objective}</li>
-                  ))}
-                </ul>
+                <div className="lecture-prose">
+                  <ul>
+                    {lecture.objectives.map((objective, index) => (
+                      <li key={index}>{objective}</li>
+                    ))}
+                  </ul>
+                </div>
               </section>
 
               {lecture.sections.map((section, index) => (
@@ -90,11 +92,13 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
               <section className="takeaways-section lecture-panel surface-emphasis" aria-labelledby={lectureNavigationTargets.takeaways.id}>
                 <p className="section-kicker">Review</p>
                 <h2 id={lectureNavigationTargets.takeaways.id}>{lectureNavigationTargets.takeaways.label}</h2>
-                <ul>
-                  {lecture.takeaways.map((takeaway, index) => (
-                    <li key={index}>{takeaway}</li>
-                  ))}
-                </ul>
+                <div className="lecture-prose">
+                  <ul>
+                    {lecture.takeaways.map((takeaway, index) => (
+                      <li key={index}>{takeaway}</li>
+                    ))}
+                  </ul>
+                </div>
               </section>
 
               <GlossaryIndex entries={glossaryEntries} id="lecture-glossary-index" />
@@ -118,30 +122,5 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
         </AnnotationsProvider>
       </ProgressProvider>
     </PageShell>
-  );
-}
-
-function CollectionTopNav({
-  next,
-  backHref,
-  backLabel = "Back to course"
-}: {
-  next?: NavTarget;
-  backHref: string;
-  backLabel?: string;
-}) {
-  return (
-    <nav className="lecture-nav lecture-nav-top" aria-label="Course navigation">
-      <div className="lecture-nav-inner">
-        <a className="lecture-nav-link lecture-nav-back" href={backHref}>
-          {backLabel}
-        </a>
-        {next ? (
-          <a className="lecture-nav-link lecture-nav-next" href={`/lectures/${next.slug}`}>
-            {next.title} <Icon name="arrow-next" />
-          </a>
-        ) : null}
-      </div>
-    </nav>
   );
 }

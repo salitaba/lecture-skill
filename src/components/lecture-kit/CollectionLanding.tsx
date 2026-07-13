@@ -1,14 +1,17 @@
-import type { CollectionValidationResult, LectureValidationResult } from "@/lib/lecture-template/types";
+import type { CollectionValidationResult } from "@/lib/lecture-template/types";
 import { collectCollectionAssessments } from "@/lib/lecture-template/assessments";
 import { collectCollectionGlossary } from "@/lib/lecture-template/glossaryIndex";
 import { LECTURES_DIR } from "@/lib/lecture-template/readTemplate";
 import { collectionProgressKey, progressIdFromCollectionBase, type ProgressLecture } from "@/lib/lecture-template/progress";
 import { sumLectureReadingMinutes } from "@/lib/lecture-template/readingTime";
+import { FactsList } from "@/components/component-kit";
 import { AssessmentIndexDisclosure } from "./AssessmentIndexDisclosure";
 import { CollectionGlossaryIndex } from "./CollectionGlossaryIndex";
+import { CollectionReviewStatus } from "./CollectionReviewStatus";
 import { CollectionProgressBar } from "./progress/CollectionProgressBar";
 import { CollectionPrimaryAction } from "./CollectionPrimaryAction";
 import { CollectionProgressProvider } from "./progress/CollectionProgressProvider";
+import { CourseDescription } from "./CourseDescription";
 import { LectureList } from "./LectureList";
 
 export interface CollectionLandingProps {
@@ -16,8 +19,6 @@ export interface CollectionLandingProps {
 }
 
 export function CollectionLanding({ validation }: CollectionLandingProps) {
-  const totalMinutes = validation.results.reduce((sum, result) => sum + parseDurationMinutes(result), 0);
-  const passingCount = validation.results.filter((result) => result.valid).length;
   const courseMetadata = validation.courseMetadata.status === "valid" ? validation.courseMetadata.metadata : undefined;
   const title = courseMetadata?.title ?? "Lecture Collection";
   const description =
@@ -26,6 +27,7 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
   const assessments = collectCollectionAssessments(validation);
   const glossaryEntries = collectCollectionGlossary(validation);
   const validTemplates = validation.results.filter((result) => result.valid && result.template).map((result) => result.template!);
+  const totalMinutes = validTemplates.reduce((sum, template) => sum + parseDurationMinutes(template.metadata.duration), 0);
   const readingMinutes = sumLectureReadingMinutes(validTemplates);
   const progressLectures: ProgressLecture[] = validation.results
     .filter((result) => result.valid && result.template)
@@ -42,32 +44,27 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
         <header className="collection-header">
           <p className="eyebrow">Collection</p>
           <h1 id="collection-title">{title}</h1>
-          <p className="description">{description}</p>
-          <p className="collection-summary">
-            {validation.lectureCount} {validation.lectureCount === 1 ? "lecture" : "lectures"} • {formatMinutes(totalMinutes)} total
-            {readingMinutes > 0 ? <> • ~{readingMinutes} min read</> : null} • {passingCount} passing
-          </p>
+          <CourseDescription description={description} />
+          <FactsList
+            aria-label="Essential course facts"
+            className="collection-summary"
+            items={[
+              { label: "Lectures", value: `${validation.lectureCount} ${validation.lectureCount === 1 ? "lecture" : "lectures"}` },
+              { label: "Estimated study time", value: formatMinutes(totalMinutes) },
+              ...(readingMinutes > 0 ? [{ label: "Reading time", value: `~${readingMinutes} min read` }] : [])
+            ]}
+          />
           {courseMetadata ? (
-            <dl className="lecture-list-meta" aria-label="Course metadata">
-              {courseMetadata.audience ? (
-                <div>
-                  <dt>Audience</dt>
-                  <dd>{courseMetadata.audience}</dd>
-                </div>
-              ) : null}
-              {courseMetadata.level ? (
-                <div>
-                  <dt>Level</dt>
-                  <dd>{courseMetadata.level}</dd>
-                </div>
-              ) : null}
-              {courseMetadata.duration ? (
-                <div>
-                  <dt>Duration</dt>
-                  <dd>{courseMetadata.duration}</dd>
-                </div>
-              ) : null}
-            </dl>
+            <FactsList
+              aria-label="Additional course details"
+              className="course-secondary-facts"
+              variant="compact"
+              items={[
+                { label: "Audience", value: courseMetadata.audience ?? "" },
+                { label: "Level", value: courseMetadata.level ?? "" },
+                { label: "Authored duration", value: courseMetadata.duration ?? "" }
+              ]}
+            />
           ) : null}
           <CollectionPrimaryAction lectures={progressLectures} />
           <a href="#lecture-list" className="collection-view-all-lectures">
@@ -77,8 +74,9 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
 
         <CollectionProgressBar />
 
-        <LectureList results={validation.results} progressLectures={progressLectures} />
+        <LectureList results={validation.results} progressLectures={progressLectures} courseMetadata={courseMetadata} />
 
+        <CollectionReviewStatus validation={validation} />
         <AssessmentIndexDisclosure assessments={assessments} id="assessment-index" />
         <CollectionGlossaryIndex entries={glossaryEntries} />
       </section>
@@ -86,8 +84,7 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
   );
 }
 
-function parseDurationMinutes(result: LectureValidationResult): number {
-  const duration = result.template?.metadata.duration ?? "";
+function parseDurationMinutes(duration: string): number {
   const match = duration.match(/(\d+)/);
   return match ? Number.parseInt(match[1] ?? "0", 10) : 0;
 }

@@ -37,7 +37,7 @@ describe("ProgressProvider", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Mark Second Topic complete" }));
 
-    expect(screen.getByText("2 of 2 sections completed")).toBeInTheDocument();
+    expect(screen.getByText("Lecture complete — 2 of 2 sections finished.")).toBeInTheDocument();
     expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}")).toEqual({ "first-topic": true, unknown: true });
 
     act(() => {
@@ -90,10 +90,10 @@ describe("ProgressProvider", () => {
 
     renderProgress();
 
-    await waitFor(() => expect(screen.getByText("0 of 2 sections completed (not saved)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("0 of 2 sections completed (not saved; session only)")).toBeInTheDocument());
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Lecture progress storage is unavailable"), expect.any(Error));
     fireEvent.click(screen.getByRole("button", { name: "Mark First Topic complete" }));
-    expect(screen.getByText("1 of 2 sections completed (not saved)")).toBeInTheDocument();
+    expect(screen.getByText("1 of 2 sections completed (not saved; session only)")).toBeInTheDocument();
   });
 
   it("announces toggles, supports shortcuts, and clears toast timers", async () => {

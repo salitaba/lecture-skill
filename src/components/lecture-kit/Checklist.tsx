@@ -40,8 +40,15 @@ export function Checklist({ component, instanceId }: { component: ChecklistCompo
           const inputId = `${storageKey}-${index}`.replace(/[^a-zA-Z0-9_-]/g, "-");
           return (
             <li className="checklist-item" key={`${item}-${index}`}>
-              <input id={inputId} type="checkbox" checked={checked[index] ?? false} onChange={(event) => updateItem(index, event.target.checked)} />
-              <label htmlFor={inputId}>{item}</label>
+              <label htmlFor={inputId}>
+                <input
+                  id={inputId}
+                  type="checkbox"
+                  checked={checked[index] ?? false}
+                  onChange={(event) => updateItem(index, event.target.checked)}
+                />
+                <span>{item}</span>
+              </label>
             </li>
           );
         })}

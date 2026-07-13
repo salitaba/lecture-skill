@@ -45,7 +45,7 @@ export const viewport: Viewport = {
 
 // Runs before paint so a stored theme choice applies immediately, avoiding a
 // flash of the wrong theme on load.
-const themeInitScript = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);}}catch(e){}})();`;
+const themeInitScript = `(function(){try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);var m=document.head.querySelector('meta[name="theme-color"][data-lecture-theme-color]');if(!m){m=document.createElement("meta");m.name="theme-color";m.setAttribute("data-lecture-theme-color","manual");document.head.appendChild(m);}m.content=t==="dark"?"#1c2124":"#ffffff";}}catch(e){}})();`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import type { DiagramComponent } from "@/lib/lecture-template/types";
-import { useId, useEffect, useRef, useState } from "react";
+import { useId, useEffect, useRef, useState, type MouseEvent, type SyntheticEvent } from "react";
 import { Button, Card, Icon } from "@/components/component-kit";
 
 let mermaidReady: Promise<typeof import("mermaid").default> | null = null;
@@ -21,6 +21,8 @@ export function Diagram({ component }: { component: DiagramComponent }) {
   const diagramId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogTitleRef = useRef<HTMLHeadingElement>(null);
   const [loadError, setLoadError] = useState(false);
   const [renderError, setRenderError] = useState(false);
   const [svgMarkup, setSvgMarkup] = useState<string | null>(null);
@@ -58,8 +60,21 @@ export function Diagram({ component }: { component: DiagramComponent }) {
 
   const canExpand = svgMarkup !== null && !loadError && !renderError;
 
-  const openDialog = () => dialogRef.current?.showModal();
-  const closeDialog = () => dialogRef.current?.close();
+  const restoreFocus = () => openerRef.current?.focus();
+  const openDialog = (event: MouseEvent<HTMLButtonElement>) => {
+    openerRef.current = event.currentTarget;
+    dialogRef.current?.showModal();
+    queueMicrotask(() => dialogTitleRef.current?.focus());
+  };
+  const closeDialog = () => {
+    dialogRef.current?.close();
+    restoreFocus();
+  };
+  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
+    event.preventDefault();
+    dialogRef.current?.close();
+    restoreFocus();
+  };
 
   const downloadSvg = () => {
     if (!svgMarkup) return;
@@ -99,9 +114,17 @@ export function Diagram({ component }: { component: DiagramComponent }) {
         {loadError && <p className="diagram-error">Diagram library failed to load. Showing source code.</p>}
         {renderError && <p className="diagram-error">Diagram could not be rendered. Showing source code.</p>}
       </div>
-      <dialog ref={dialogRef} className="diagram-dialog" aria-label={`${component.title} (expanded)`}>
+      <dialog
+        ref={dialogRef}
+        className="diagram-dialog"
+        aria-labelledby={`${diagramId}-dialog-title`}
+        onCancel={handleCancel}
+        onClose={restoreFocus}
+      >
         <div className="diagram-dialog-header">
-          <p className="diagram-dialog-title">{component.title}</p>
+          <h2 id={`${diagramId}-dialog-title`} ref={dialogTitleRef} className="diagram-dialog-title" tabIndex={-1}>
+            {component.title}
+          </h2>
           <div className="diagram-dialog-actions">
             <Button variant="ghost" tone="muted" size="compact" onClick={downloadSvg}>
               <Icon name="download" /> Download SVG

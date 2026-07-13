@@ -43,7 +43,8 @@ export default async function CollectionLecturePage({ params }: { params: Promis
       collectionNavigation={{
         previous: previous ? { slug: previous.slug, title: previous.template!.metadata.title } : undefined,
         next: next ? { slug: next.slug, title: next.template!.metadata.title } : undefined,
-        backHref: "/"
+        backHref: "/",
+        backLabel: "Back to course"
       }}
       collectionContext={{
         collectionStorageKey: storageKey,

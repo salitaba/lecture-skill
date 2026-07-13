@@ -64,6 +64,7 @@
   --motion-duration-standard: 180ms;
   --motion-ease: ease;
   --motion-ease-out: ease-out;
+  --prose-measure: 72ch;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -191,7 +192,10 @@ a {
 
 a:focus-visible,
 button:focus-visible,
-summary:focus-visible {
+summary:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
@@ -221,6 +225,11 @@ summary:focus-visible {
 .theme-toggle:hover {
   background: var(--surface-accent);
   border-color: var(--border-strong);
+}
+
+.theme-toggle-placeholder {
+  pointer-events: none;
+  cursor: default;
 }
 
 @media print {
@@ -366,27 +375,6 @@ dt,
 .resource-link-category,
 .resource-link-url {
   font-weight: 500;
-}
-
-.metadata-grid {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 20px;
-  margin: 22px 0 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-
-.metadata-grid div {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.metadata-grid dt::after {
-  content: ":";
 }
 
 dt {
@@ -611,6 +599,31 @@ details[open] > summary .learning-path-chevron {
 
 .lecture-content p:first-child {
   margin-top: 0;
+}
+
+.lecture-prose {
+  min-width: 0;
+}
+
+.lecture-prose > :where(p, ul, ol),
+.lecture-prose :where(.quiz-explanation, .assessment-instructions, .assessment-helper, .assessment-selection, figcaption) {
+  max-width: var(--prose-measure);
+}
+
+.lecture-prose > :where(pre, table, .lecture-component, .comparison, .timeline, .diagram-card),
+.lecture-prose :where(.diagram-card, .comparison, .timeline) {
+  max-width: none;
+}
+
+.lecture-panel.quiet-reading-surface {
+  padding: 8px 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.lecture-panel.quiet-reading-surface h2 {
+  margin-bottom: 10px;
 }
 
 .glossary-index h2 {
@@ -953,8 +966,8 @@ details[open] > summary .learning-path-chevron {
 
 .section-completion-toggle {
   display: inline-grid;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   color: #ffffff;
   background: var(--surface);
@@ -1375,6 +1388,7 @@ details[open] > summary .learning-path-chevron {
 .quiz-option {
   display: flex;
   min-width: 0;
+  min-height: 44px;
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -1628,12 +1642,14 @@ details[open] > summary .learning-path-chevron {
 .assessment-option {
   display: flex;
   min-width: 0;
+  min-height: 44px;
   gap: 10px;
   align-items: flex-start;
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  cursor: pointer;
 }
 
 .assessment-option:has(input:checked) {
@@ -1909,14 +1925,20 @@ details[open] > summary .learning-path-chevron {
 }
 
 .checklist-item {
-  display: flex;
   min-width: 0;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+}
+
+.checklist-item > label {
+  display: flex;
+  min-height: 44px;
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
 }
 
 .checklist-item input {
@@ -2306,14 +2328,164 @@ td {
   gap: 10px;
 }
 
-.collection-summary {
-  margin: 0;
-  padding: 8px 12px;
-  color: var(--muted);
+.facts-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 20px;
+  min-width: 0;
+  margin: 22px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.facts-list.facts-list-compact {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 8px 18px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.facts-list .facts-list-item {
+  display: grid;
+  min-width: 0;
+  align-items: start;
+  gap: 2px;
+  padding: 0;
   background: transparent;
-  border: none;
+  border: 0;
   border-radius: 0;
+}
+
+.facts-list dt,
+.facts-list dd {
+  min-width: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.facts-list dt::after {
+  content: none;
+}
+
+.facts-list dt {
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.facts-list dd {
+  font-weight: 700;
+}
+
+.collection-summary.facts-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 4px;
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+
+.course-secondary-facts {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.course-description-disclosure {
+  max-width: 820px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.course-description-disclosure summary {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 18px;
+  align-items: center;
+  cursor: pointer;
+  font-size: 1.08rem;
+}
+
+.course-description-preview {
+  min-width: 0;
+}
+
+.course-description-label {
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.course-description-full {
+  margin-top: 12px;
+}
+
+.collection-review-disclosure {
+  min-width: 0;
+  margin-top: 24px;
+  padding: 16px 18px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning-border);
+  border-radius: var(--radius-md);
+}
+
+.collection-review-disclosure summary {
+  min-height: 44px;
+  color: var(--warning-text);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.collection-review-disclosure p {
+  max-width: var(--prose-measure);
+}
+
+.collection-review-list,
+.collection-review-list ul {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.collection-review-list {
+  padding-left: 22px;
+}
+
+.collection-review-list ul {
+  margin-top: 6px;
+  padding-left: 20px;
+}
+
+.collection-review-list code {
+  overflow-wrap: anywhere;
+}
+
+.lecture-list-validation a {
+  font-weight: 800;
+}
+
+.course-breadcrumb {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.course-breadcrumb:hover,
+.course-breadcrumb:focus-visible {
+  color: var(--accent-strong);
+  text-decoration: underline;
 }
 
 .assessment-index {
@@ -2574,27 +2746,13 @@ td {
   color: var(--muted);
 }
 
-.lecture-list-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 18px;
-  margin: 0;
-}
-
-.lecture-list-meta div {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 6px;
+.facts-list.lecture-list-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  align-items: start;
+  gap: 8px 18px;
   padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-}
-
-.lecture-list-meta dt::after {
-  content: ":";
+  border: 0;
 }
 
 .lecture-state {
@@ -2690,17 +2848,6 @@ td {
   justify-self: end;
 }
 
-.lecture-nav-top {
-  margin: 20px 0;
-  padding-top: 0;
-}
-
-.lecture-nav-top .lecture-nav-inner {
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-}
-
 @media (max-width: 900px) {
   .lecture-layout {
     grid-template-columns: 1fr;
@@ -2740,6 +2887,11 @@ td {
   .assessment-index-disclosure:not([open]) > *:not(summary) {
     display: block;
   }
+
+  .course-description-disclosure:not([open]) > *:not(summary),
+  .collection-review-disclosure:not([open]) > *:not(summary) {
+    display: block;
+  }
 }
 
 @media (max-width: 520px) {
@@ -2752,9 +2904,14 @@ td {
     font-size: 1.65rem;
   }
 
-  .metadata-grid {
-    gap: 4px 14px;
-    margin-top: 16px;
+  .facts-list,
+  .collection-summary.facts-list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .facts-list.facts-list-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .lecture-header,
@@ -2828,16 +2985,8 @@ td {
     gap: 8px;
   }
 
-  .collection-summary {
-    padding: 6px 0;
-  }
-
   .lecture-list-item {
     padding: 18px;
-  }
-
-  .lecture-list-meta {
-    gap: 4px 14px;
   }
 
   .comparison-header {
@@ -2883,6 +3032,22 @@ td {
 
   .lecture-nav-next {
     grid-row: 3;
+  }
+
+  .course-description-disclosure summary {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .course-description-label {
+    white-space: normal;
+  }
+}
+
+@media (min-width: 521px) and (max-width: 900px) {
+  .facts-list,
+  .collection-summary.facts-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

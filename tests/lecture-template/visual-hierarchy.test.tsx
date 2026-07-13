@@ -61,16 +61,15 @@ describe("visual hierarchy", () => {
 
   it("collection-summary has no heavy card treatment", () => {
     const html = renderToStaticMarkup(<CollectionLanding validation={makeValidation()} />);
-    const summaryMatch = html.match(/class="collection-summary"[^>]*style="([^"]*)"/);
-    const summaryStyle = summaryMatch?.[1] ?? "";
-
-    expect(summaryStyle).not.toContain("border: 1px solid");
-    expect(summaryStyle).not.toContain("border-radius: 8px");
+    expect(html).toContain('class="facts-list facts-list-default collection-summary"');
+    expect(html).not.toContain("passing");
+    expect(html).toContain("Estimated study time");
+    expect(html).toContain("<dt>Lectures</dt>");
   });
 
   it("lecture-list-meta items use lightweight treatment", () => {
     const html = renderToStaticMarkup(<CollectionLanding validation={makeValidation()} />);
-    const metaItems = html.match(/class="lecture-list-meta"[\s\S]*?<\/dl>/);
+    const metaItems = html.match(/class="facts-list facts-list-compact lecture-list-meta"[\s\S]*?<\/dl>/);
 
     expect(metaItems).toBeTruthy();
     if (metaItems) {
@@ -117,5 +116,37 @@ describe("visual hierarchy", () => {
 
     expect(html).toContain("collection-primary-action");
     expect(html).toContain("Start course");
+  });
+
+  it("keeps long course descriptions fully reachable through native disclosure", () => {
+    const validation = makeValidation();
+    const fullDescription =
+      "This course follows a careful path from evidence collection to practical decisions. Learners compare observations, test explanations, and document the reasoning that makes technical work easier to review and repeat.";
+    validation.courseMetadata = {
+      status: "valid",
+      path: "lectures/course.yaml",
+      errors: [],
+      metadata: {
+        title: "Evidence Course",
+        description: fullDescription,
+        audience: "Engineers",
+        level: "beginner",
+        duration: "30 minutes"
+      }
+    };
+
+    const html = renderToStaticMarkup(<CollectionLanding validation={validation} />);
+    expect(html).toContain("course-description-disclosure");
+    expect(html).toContain("About this course");
+    expect(html).toContain(fullDescription);
+    expect(html).toContain('class="facts-list facts-list-compact course-secondary-facts"');
+  });
+
+  it("uses semantic facts wrappers with no browser definition-list indentation contract", () => {
+    const html = renderToStaticMarkup(<CollectionLanding validation={makeValidation()} />);
+    expect((html.match(/class="facts-list/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(html).toContain('class="facts-list-item"');
+    expect(html).toContain("<dt>");
+    expect(html).toContain("<dd>");
   });
 });

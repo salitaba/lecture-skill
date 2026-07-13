@@ -8,6 +8,8 @@ export function SectionNote({ anchor, title }: { anchor: string; title: string }
   const annotations = useAnnotationsOptional();
   const savedNote = annotations?.notes[anchor] ?? "";
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(savedNote);
   const regionId = useId();
   const hydratedRef = useRef(false);
@@ -31,9 +33,26 @@ export function SectionNote({ anchor, title }: { anchor: string; title: string }
   const hasNote = savedNote.trim() !== "";
   const textareaId = `${regionId}-textarea`;
   const titleId = `${regionId}-title`;
+  const descriptionId = `${regionId}-description`;
 
-  const openDialog = () => dialogRef.current?.showModal();
-  const closeDialog = () => dialogRef.current?.close();
+  const saveDraft = () => annotations?.setNote(anchor, draft);
+  const restoreFocus = () => openerRef.current?.focus();
+  const openDialog = (event: React.MouseEvent<HTMLButtonElement>) => {
+    openerRef.current = event.currentTarget;
+    dialogRef.current?.showModal();
+    queueMicrotask(() => textareaRef.current?.focus());
+  };
+  const closeDialog = () => {
+    saveDraft();
+    dialogRef.current?.close();
+    restoreFocus();
+  };
+  const handleCancel = (event: React.SyntheticEvent<HTMLDialogElement>) => {
+    event.preventDefault();
+    saveDraft();
+    dialogRef.current?.close();
+    restoreFocus();
+  };
 
   return (
     <div className="section-note">
@@ -47,7 +66,14 @@ export function SectionNote({ anchor, title }: { anchor: string; title: string }
       >
         {hasNote ? "Edit note" : "Add a note"}
       </Button>
-      <dialog ref={dialogRef} className="section-note-dialog" aria-labelledby={titleId}>
+      <dialog
+        ref={dialogRef}
+        className="section-note-dialog"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        onCancel={handleCancel}
+        onClose={restoreFocus}
+      >
         <div className="section-note-dialog-header">
           <p id={titleId} className="section-note-dialog-title">
             Note for {title}
@@ -56,15 +82,19 @@ export function SectionNote({ anchor, title }: { anchor: string; title: string }
             Close
           </Button>
         </div>
+        <p id={descriptionId} className="sr-only">
+          Notes are saved in this browser when storage is available.
+        </p>
         <label className="sr-only" htmlFor={textareaId}>
           Your note
         </label>
         <textarea
           id={textareaId}
+          ref={textareaRef}
           className="section-note-textarea"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => annotations?.setNote(anchor, draft)}
+          onBlur={saveDraft}
           placeholder="Jot a note for this section…"
         />
       </dialog>
