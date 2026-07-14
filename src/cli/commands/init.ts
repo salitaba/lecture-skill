@@ -1,14 +1,14 @@
-import { cp, mkdir, stat } from "node:fs/promises";
+import { cp, mkdir, readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { scaffoldCollection } from "../../lib/lecture-template/scaffold";
 import { repositoryPath } from "../../lib/lecture-template/readTemplate";
 import { getPackageRoot } from "../paths";
 
-const skillFiles = [
+const coreSkillFiles = [
   "SKILL.md",
-  ".claude/skills/lecture-site-engine/SKILL.md",
-  ".codex/skills/lecture-site-engine/SKILL.md"
+  ".claude/skills/lecture-site-engine/SKILL.md"
 ] as const;
+const codexSkillRoot = ".codex/skills";
 
 export interface InitOptions {
   packageRoot?: string;
@@ -23,6 +23,10 @@ export async function runInit(args: string[] = [], options: InitOptions = {}): P
   const packageRoot = options.packageRoot ?? getPackageRoot();
   const installed: string[] = [];
   const skipped: string[] = [];
+  const skillFiles = [
+    ...coreSkillFiles,
+    ...(await collectFiles(path.join(packageRoot, codexSkillRoot), codexSkillRoot))
+  ];
 
   for (const relativePath of skillFiles) {
     const destination = repositoryPath(relativePath);
@@ -49,8 +53,14 @@ export async function runInit(args: string[] = [], options: InitOptions = {}): P
 
   process.stdout.write("Lecture Site Engine initialized.\n");
   process.stdout.write(`- ${scaffoldMessage}\n`);
-  if (installed.length > 0) process.stdout.write(`Installed:\n${installed.map((file) => `- ${file}`).join("\n")}\n`);
-  if (skipped.length > 0) process.stdout.write(`Preserved:\n${skipped.map((file) => `- ${file}`).join("\n")}\n`);
+  if (installed.length > 0) {
+    process.stdout.write(`Installed ${installed.length} agent skill files.\n`);
+    const installedCodexSkills = skillNames(installed);
+    if (installedCodexSkills.length > 0) {
+      process.stdout.write(`Available Codex skills:\n${installedCodexSkills.map((name) => `- ${name}`).join("\n")}\n`);
+    }
+  }
+  if (skipped.length > 0) process.stdout.write(`Preserved ${skipped.length} existing agent skill files.\n`);
   process.stdout.write(
     `Next steps:\n- ${nextSourceStep({ hasCollection, hasSingleTemplate })}\n- Ask Claude Code or Codex to follow the lecture-site-engine skill\n- Run npx lecture-site-engine validate\n- Run npx lecture-site-engine dev\n`
   );
@@ -76,4 +86,37 @@ async function pathExists(absolutePath: string): Promise<boolean> {
     if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
   }
+}
+
+async function collectFiles(absoluteDirectory: string, relativeDirectory: string): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(absoluteDirectory, { withFileTypes: true });
+  } catch (error) {
+    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  const files: string[] = [];
+  for (const entry of entries) {
+    const absolutePath = path.join(absoluteDirectory, entry.name);
+    const relativePath = path.posix.join(relativeDirectory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await collectFiles(absolutePath, relativePath)));
+    } else if (entry.isFile()) {
+      files.push(relativePath);
+    }
+  }
+  return files.sort();
+}
+
+function skillNames(files: string[]): string[] {
+  return [...new Set(
+    files
+      .filter((file) => file.startsWith(`${codexSkillRoot}/`))
+      .map((file) => file.split("/")[2])
+      .filter((name): name is string => Boolean(name))
+  )].sort();
 }

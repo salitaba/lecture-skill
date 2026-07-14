@@ -25,6 +25,8 @@ Design banners across social, ads, web, and print formats. Generates multiple ar
 
 **Python:** This skill uses Python scripts. On Windows, use `python` instead of `python3` (e.g., `python scripts/search.py` instead of `python3 scripts/search.py`).
 
+This package includes the `ui-ux-pro-max` companion skill. `frontend-design`, `ai-artist`, `ai-multimodal`, `chrome-devtools`, and `assets-organizing` are optional external companions; if they are not installed, use the agent's available design, image-generation, browser, and file-organization tools for those steps.
+
 ## Workflow
 
 ### Step 1: Gather Requirements (AskUserQuestion)

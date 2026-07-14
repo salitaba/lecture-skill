@@ -35,7 +35,7 @@
     "tsconfig.app.json",
     "SKILL.md",
     ".claude/skills/lecture-site-engine/SKILL.md",
-    ".codex/skills/lecture-site-engine/SKILL.md"
+    ".codex/skills"
   ],
   "scripts": {
     "dev": "next dev",

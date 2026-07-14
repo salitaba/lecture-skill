@@ -26,9 +26,19 @@ lectures/
     lecture.template.md
     raw-lecture.txt
 .claude/skills/lecture-site-engine/SKILL.md
-.codex/skills/lecture-site-engine/SKILL.md
+.codex/skills/
+  banner-design/
+  brand/
+  design/
+  design-system/
+  lecture-site-engine/
+  slides/
+  ui-styling/
+  ui-ux-pro-max/
 SKILL.md
 ```
+
+`init` copies every bundled Codex skill and its supporting references, data, and scripts. Existing consumer-owned skill files are preserved. These skills provide instructions and local assets; optional companion tools, API keys, and packages mentioned by a skill are installed separately when needed.
 
 Replace the placeholder with human/user/educator course material, then ask your coding agent to follow the `lecture-site-engine` skill and create the lecture. The agent should preserve that source and write the generated lesson to `lecture.template.md`. Raw-source files are never agent-generated output.
 
@@ -55,7 +65,17 @@ Codex discovers:
 .codex/skills/lecture-site-engine/SKILL.md
 ```
 
-Other agents can follow the root [`SKILL.md`](SKILL.md). The skill explains the supported frontmatter, section structure, teaching components, source-fidelity rules, validation loop, and review workflow.
+The initializer also installs these independently discoverable Codex skills:
+
+- `banner-design`
+- `brand`
+- `design`
+- `design-system`
+- `slides`
+- `ui-styling`
+- `ui-ux-pro-max`
+
+Other agents can follow the root [`SKILL.md`](SKILL.md). The lecture skill explains the supported frontmatter, section structure, teaching components, source-fidelity rules, validation loop, and review workflow.
 
 After initialization, a useful prompt is:
 

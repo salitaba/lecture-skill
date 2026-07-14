@@ -52,13 +52,15 @@ New lecture components belong in `lecture-kit` and should compose existing `comp
 
 ## Agent skill distribution
 
-The same authoring workflow is exposed through three repository entry points:
+The lecture authoring workflow is exposed through three repository entry points:
 
 - `.claude/skills/lecture-site-engine/SKILL.md` for Claude Code.
 - `.codex/skills/lecture-site-engine/SKILL.md` for Codex.
 - `SKILL.md` as a root fallback for other agents.
 
-The published npm package includes these files. `npx lecture-site-engine init` copies them into a consumer project and creates the default collection scaffold. The implementation lives in `src/cli/commands/init.ts`; its behavior is covered by `tests/lecture-template/init.test.ts`.
+The published npm package includes these entry points plus every file under `.codex/skills/`. `npx lecture-site-engine init` copies the complete bundled Codex skill tree into a consumer project, preserves existing consumer-owned files, and creates the default collection scaffold. The implementation lives in `src/cli/commands/init.ts`; its behavior is covered by `tests/lecture-template/init.test.ts`.
+
+The bundled Codex skills are `banner-design`, `brand`, `design`, `design-system`, `slides`, `ui-styling`, and `ui-ux-pro-max`. Their instructions may reference optional external companion skills or tools; `init` distributes the local instructions and assets but does not install those external dependencies.
 
 Keep the skill aligned with the validator and README. Do not expose golden-answer content in agent-accessible instructions.
 
