@@ -54,21 +54,31 @@ export async function runPackageReview(): Promise<number> {
     const missingPrimarySources = result.manifest.rawEvidence.filter(
       (source) => source.status === "missing" && source.role === "primary"
     );
+    const ignoredPlaceholders = result.manifest.rawEvidence.filter((source) => source.status === "placeholder");
 
     if (includedRawSources.length > 0) {
-      process.stdout.write("Included raw source evidence:\n");
+      process.stdout.write("Included human source evidence:\n");
       for (const source of includedRawSources) {
         process.stdout.write(`- ${source.sourcePath} -> ${source.packagePath}\n`);
       }
     } else {
-      process.stdout.write("Included raw source evidence: none\n");
+      process.stdout.write("Included human source evidence: none\n");
     }
 
     if (missingPrimarySources.length > 0) {
-      process.stdout.write("Missing raw source evidence:\n");
+      process.stdout.write("Missing primary human source evidence:\n");
       for (const source of missingPrimarySources) {
         process.stdout.write(`- ${source.sourcePath}\n`);
       }
+    } else {
+      process.stdout.write("Missing primary human source evidence: none\n");
+    }
+
+    if (ignoredPlaceholders.length > 0) {
+      process.stdout.write("Ignored scaffold placeholders (replace with human source):\n");
+      for (const source of ignoredPlaceholders) process.stdout.write(`- ${source.sourcePath}\n`);
+    } else {
+      process.stdout.write("Ignored scaffold placeholders: none\n");
     }
 
     return 0;

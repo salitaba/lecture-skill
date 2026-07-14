@@ -1,6 +1,7 @@
 import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { COURSE_METADATA_PATH } from "./courseMetadata";
+import { RAW_SOURCE_PLACEHOLDER } from "./rawSourceEvidence";
 import { ACTIVE_TEMPLATE_PATH, LECTURES_DIR, repositoryPath } from "./readTemplate";
 
 export type AuthoringMode = "single-lecture" | "collection";
@@ -40,13 +41,13 @@ export async function scaffoldCollection(): Promise<ScaffoldResult> {
   await mkdir(repositoryPath(lectureDir), { recursive: true });
   await writeFile(repositoryPath(COURSE_METADATA_PATH), defaultCourseYaml(), "utf8");
   await writeFile(repositoryPath(templatePath), defaultLectureTemplate("Introduction", "Introduces the course workflow."), "utf8");
-  await writeFile(repositoryPath(rawPath), "Add raw source evidence for this lecture here.\n", "utf8");
+  await writeFile(repositoryPath(rawPath), RAW_SOURCE_PLACEHOLDER, "utf8");
 
   return {
     ok: true,
     mode: "new-collection",
     createdPaths,
-    message: "Created a minimal lecture collection scaffold.",
+    message: "Created a minimal lecture collection scaffold with a raw-source placeholder. Replace it with real human course material before asking an agent to author the lecture or requesting source-fidelity approval.",
     nextCommands: ["npm run validate", "npm run dev", "npm run review:source"]
   };
 }
@@ -70,7 +71,7 @@ export async function scaffoldLecture(): Promise<ScaffoldResult> {
       ok: true,
       mode,
       createdPaths: [ACTIVE_TEMPLATE_PATH],
-      message: "Created a single-lecture template scaffold.",
+      message: "Created a single-lecture template scaffold. Add human source evidence before asking an agent to author the lecture.",
       nextCommands: ["npm run validate", "npm run dev", "npm run review:source"]
     };
   }
@@ -82,13 +83,13 @@ export async function scaffoldLecture(): Promise<ScaffoldResult> {
 
   await mkdir(repositoryPath(lectureDir), { recursive: false });
   await writeFile(repositoryPath(templatePath), defaultLectureTemplate("New Lecture", "A placeholder collection lecture."), { encoding: "utf8", flag: "wx" });
-  await writeFile(repositoryPath(rawPath), "Add raw source evidence for this lecture here.\n", { encoding: "utf8", flag: "wx" });
+  await writeFile(repositoryPath(rawPath), RAW_SOURCE_PLACEHOLDER, { encoding: "utf8", flag: "wx" });
 
   return {
     ok: true,
     mode,
     createdPaths: [templatePath, rawPath],
-    message: `Created collection lecture ${slug}.`,
+    message: `Created collection lecture ${slug} with a raw-source placeholder. Replace it with real human course material before asking an agent to author the lecture or requesting source-fidelity approval.`,
     nextCommands: ["npm run validate", "npm run dev", "npm run review:source"]
   };
 }

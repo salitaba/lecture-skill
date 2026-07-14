@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { RAW_SOURCE_PLACEHOLDER, readRawSourceEvidence } from "../../src/lib/lecture-template/rawSourceEvidence";
 import { detectAuthoringMode, scaffoldCollection, scaffoldLecture } from "../../src/lib/lecture-template/scaffold";
 import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
 
@@ -28,6 +29,10 @@ describe("authoring scaffolds", () => {
     expect(pathExists("lectures/course.yaml")).toBe(true);
     expect(pathExists("lectures/01-introduction/lecture.template.md")).toBe(true);
     expect(pathExists("lectures/01-introduction/raw-lecture.txt")).toBe(true);
+    expect(pathExists("lectures/raw-course.txt")).toBe(false);
+    expect(readFileSync(path.join(tempRoot, "lectures/01-introduction/raw-lecture.txt"), "utf8")).toBe(RAW_SOURCE_PLACEHOLDER);
+    expect((await readRawSourceEvidence("lectures/01-introduction/raw-lecture.txt")).status).toBe("placeholder");
+    expect(result.message).toContain("raw-source placeholder");
     expect(validateTemplateSource(readFileSync(path.join(tempRoot, "lectures/01-introduction/lecture.template.md"), "utf8")).valid).toBe(true);
   });
 
@@ -54,7 +59,22 @@ describe("authoring scaffolds", () => {
 
     expect(result.ok).toBe(true);
     expect(result.createdPaths).toEqual(["lectures/02-new-lecture/lecture.template.md", "lectures/02-new-lecture/raw-lecture.txt"]);
+    expect(readFileSync(path.join(tempRoot, "lectures/02-new-lecture/raw-lecture.txt"), "utf8")).toBe(RAW_SOURCE_PLACEHOLDER);
+    expect((await readRawSourceEvidence("lectures/02-new-lecture/raw-lecture.txt")).status).toBe("placeholder");
     expect(validateTemplateSource(readFileSync(path.join(tempRoot, "lectures/02-new-lecture/lecture.template.md"), "utf8")).valid).toBe(true);
+  });
+
+  it("preserves existing collection raw sources and does not create shared source", async () => {
+    mkdirSync(path.join(tempRoot, "lectures", "01-introduction"), { recursive: true });
+    writeText("lectures/01-introduction/lecture.template.md", "placeholder");
+    writeText("lectures/01-introduction/raw-lecture.txt", "Human lecture source.\n");
+    writeText("lectures/raw-course.txt", "Human shared source.\n");
+
+    const result = await scaffoldLecture();
+
+    expect(result.ok).toBe(true);
+    expect(readFileSync(path.join(tempRoot, "lectures/01-introduction/raw-lecture.txt"), "utf8")).toBe("Human lecture source.\n");
+    expect(readFileSync(path.join(tempRoot, "lectures/raw-course.txt"), "utf8")).toBe("Human shared source.\n");
   });
 
   it("creates a single-lecture template only when missing", async () => {

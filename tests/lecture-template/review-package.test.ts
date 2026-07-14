@@ -247,7 +247,44 @@ describe("review package helpers", () => {
       }
     ]);
     expect(manifestMarkdown).toContain("content/raw-lecture.txt: missing (primary)");
-    expect(worksheet).toContain("Primary raw source: content/raw-lecture.txt (missing)");
+    expect(worksheet).toContain("Primary human source evidence: content/raw-lecture.txt (missing)");
+    expect(pathExists(path.join(result.packageDir, "source/content/raw-lecture.txt"))).toBe(false);
+  });
+
+  it("records but never copies scaffold raw-source placeholders", async () => {
+    copyFixture("examples/golden.template.md", "content/lecture.template.md");
+    writeText("content/raw-lecture.txt", "Add raw source evidence for this lecture here.\n");
+    const preflight = await runReviewPackagePreflight();
+    writeText("content/raw-lecture.txt", "A user has not supplied source yet.\n");
+
+    expect(preflight.rawEvidence).toEqual([
+      {
+        sourcePath: "content/raw-lecture.txt",
+        packagePath: "source/content/raw-lecture.txt",
+        status: "placeholder",
+        role: "primary"
+      }
+    ]);
+    expect((await verifyReviewPackageSourceSnapshot(preflight)).ok).toBe(true);
+
+    writeText("out/index.html", '<a href="/">Home</a>');
+    const result = await assembleReviewPackage(preflight, {
+      exportedOutDir: path.join(tempRoot, "out"),
+      packagesRoot: path.join(tempRoot, "review-packages"),
+      createdAt: new Date(2026, 6, 4, 1, 30),
+      runtimeMetadata: {
+        gitCommit: "unavailable",
+        gitDirtyStatus: "unavailable",
+        npmVersion: "unavailable"
+      }
+    });
+
+    const manifest = JSON.parse(readFileSync(path.join(result.packageDir, "manifest.json"), "utf8"));
+    const manifestMarkdown = readFileSync(path.join(result.packageDir, "MANIFEST.md"), "utf8");
+    const worksheet = readFileSync(path.join(result.packageDir, "REVIEW_WORKSHEET.md"), "utf8");
+    expect(manifest.contents.rawSourceEvidence).toEqual([]);
+    expect(manifestMarkdown).toContain("Scaffold placeholder; replace with human source; not copied");
+    expect(worksheet).toContain("Primary human source evidence: content/raw-lecture.txt (placeholder;");
     expect(pathExists(path.join(result.packageDir, "source/content/raw-lecture.txt"))).toBe(false);
   });
 
@@ -400,6 +437,84 @@ describe("review package helpers", () => {
     for (const renderedPage of result.manifest.contents.renderedPages) {
       expect(pathExists(path.join(result.packageDir, renderedPage)), renderedPage).toBe(true);
     }
+  });
+
+  it("keeps missing and placeholder shared collection evidence auditable without copying it", async () => {
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+    copyFixture(
+      "examples/multi-lecture/lectures/02-core-concepts/lecture.template.md",
+      "lectures/02-core-concepts/lecture.template.md"
+    );
+    writeText("lectures/01-introduction/raw-lecture.txt", "Introduction raw source.");
+    writeText("lectures/raw-course.txt", "Add raw source evidence for this lecture here.\n");
+
+    const preflight = await runReviewPackagePreflight();
+    expect(preflight.rawEvidence.map(({ sourcePath, status, role }) => ({ sourcePath, status, role }))).toEqual([
+      { sourcePath: "lectures/raw-course.txt", status: "placeholder", role: "shared" },
+      { sourcePath: "lectures/01-introduction/raw-lecture.txt", status: "present", role: "primary" },
+      { sourcePath: "lectures/02-core-concepts/raw-lecture.txt", status: "missing", role: "primary" }
+    ]);
+
+    writeText("out/index.html", '<a href="/">Home</a>');
+    const result = await assembleReviewPackage(preflight, {
+      exportedOutDir: path.join(tempRoot, "out"),
+      packagesRoot: path.join(tempRoot, "review-packages"),
+      createdAt: new Date(2026, 6, 4, 1, 30),
+      runtimeMetadata: {
+        gitCommit: "unavailable",
+        gitDirtyStatus: "unavailable",
+        npmVersion: "unavailable"
+      }
+    });
+
+    expect(result.manifest.contents.rawSourceEvidence).toEqual([
+      "source/lectures/01-introduction/raw-lecture.txt"
+    ]);
+    expect(pathExists(path.join(result.packageDir, "source/lectures/raw-course.txt"))).toBe(false);
+    expect(pathExists(path.join(result.packageDir, "source/lectures/02-core-concepts/raw-lecture.txt"))).toBe(false);
+    const worksheet = readFileSync(path.join(result.packageDir, "REVIEW_WORKSHEET.md"), "utf8");
+    expect(worksheet).toContain("Optional shared human source evidence: lectures/raw-course.txt (placeholder;");
+    expect(worksheet).not.toContain("Additional source: lectures/raw-course.txt");
+  });
+
+  it("retains a missing shared collection source record without blocking packaging", async () => {
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+    writeText("lectures/01-introduction/raw-lecture.txt", "Introduction raw source.");
+
+    const preflight = await runReviewPackagePreflight();
+    expect(preflight.rawEvidence[0]).toMatchObject({
+      sourcePath: "lectures/raw-course.txt",
+      status: "missing",
+      role: "shared"
+    });
+
+    writeText("out/index.html", '<a href="/">Home</a>');
+    const result = await assembleReviewPackage(preflight, {
+      exportedOutDir: path.join(tempRoot, "out"),
+      packagesRoot: path.join(tempRoot, "review-packages"),
+      createdAt: new Date(2026, 6, 4, 1, 30),
+      runtimeMetadata: {
+        gitCommit: "unavailable",
+        gitDirtyStatus: "unavailable",
+        npmVersion: "unavailable"
+      }
+    });
+
+    expect(result.manifest.rawEvidence).toContainEqual({
+      sourcePath: "lectures/raw-course.txt",
+      packagePath: "source/lectures/raw-course.txt",
+      status: "missing",
+      role: "shared"
+    });
+    expect(result.manifest.contents.rawSourceEvidence).toEqual([
+      "source/lectures/01-introduction/raw-lecture.txt"
+    ]);
   });
 
   it("includes valid course metadata in collection package manifests and copied sources", async () => {

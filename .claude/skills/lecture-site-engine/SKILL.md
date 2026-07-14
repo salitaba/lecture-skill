@@ -13,10 +13,13 @@ To bootstrap another project with this skill and a starter collection, run `npx 
 
 ## Inputs
 
-- Read one raw lecture source.
+- Read one user-supplied raw lecture source.
 - For the MVP golden workflow, use `examples/raw-lecture.txt` as the only raw source.
 - For a user's own lecture, prefer `content/raw-lecture.txt`.
-- Preserve raw source files as review evidence. Never overwrite a raw source file with generated lecture prose.
+- `content/raw-lecture.txt`, `lectures/<slug>/raw-lecture.txt`, `lectures/raw-course.txt`, and raw-source fixtures under `examples/` are source evidence supplied by the user, educator, or an existing course source.
+- Agents must never create, edit, rewrite, summarize into, replace, delete, or overwrite a raw-source file. Missing source requires asking the user for source material; never fabricate or AI-generate lecture input.
+- Scaffold placeholders are not authored source evidence. Replace them with real human source before asking an agent to author a lecture or requesting source-fidelity approval.
+- Agents may generate derived artifacts such as `lecture.template.md`, worksheets, diagnostics, and review packages, but may not author raw evidence.
 - Do not read `examples/golden.template.md` while generating the golden template.
 
 ## Output
@@ -53,7 +56,7 @@ When starting new work, prefer the local scaffold commands over hand-creating pa
 
 - Run `npm run new:collection` for a new multi-lecture course workspace.
 - Run `npm run new:lecture` to create the next lecture in the active workflow.
-- Do not overwrite raw source files or existing templates unless the user explicitly asks.
+- Never create, edit, rewrite, summarize into, replace, delete, or overwrite raw source files. Preserve existing templates unless the user explicitly asks.
 
 Progress tracking is automatic in the rendered site for authored `## Section:` blocks. Do not add progress fields, localStorage keys, completion checkboxes, or custom progress syntax to lecture templates. Progress is runtime browser state only; it is not grading, analytics, source evidence, synced data, or review-package content. In collection mode, lecture progress is also written to collection-scoped storage so the landing page can display aggregate course progress.
 
@@ -74,8 +77,8 @@ For a collection:
 1. Read the course outline or multi-lecture source.
 2. Add `lectures/course.yaml` when the course title and description are known. This file is optional and separate from lecture frontmatter.
 3. Create one numbered subdirectory per lecture under `lectures/`, preferably with `npm run new:lecture`.
-4. Preserve source evidence as `lectures/<slug>/raw-lecture.txt` for each lecture when per-lecture source is available.
-5. Preserve a shared source as `lectures/raw-course.txt` when one course source is split into multiple lectures.
+4. Preserve user-supplied source evidence as `lectures/<slug>/raw-lecture.txt` for each lecture when per-lecture source is available. This is the default agent context for the requested lecture(s).
+5. Preserve a shared source as `lectures/raw-course.txt` when one course source is split into multiple lectures. Read this optional shared source only when the user explicitly requests a shared-source split, cross-lecture reconciliation, or full-course review; its presence alone is not authorization to load it into agent context.
 6. Write a valid `lecture.template.md` in each subdirectory using the same schema as the single-lecture workflow.
 7. Run `npm run validate` or `npm run validate -- --json` to validate the whole collection.
 8. Revise the lectures until every entry and course metadata passes validation.
@@ -117,7 +120,9 @@ Raw sources are review evidence, not learner-facing render inputs.
 - Single lecture generated template: `content/lecture.template.md`.
 - Collection per-lecture raw source: `lectures/<slug>/raw-lecture.txt`.
 - Collection shared raw source: `lectures/raw-course.txt`.
-- When both per-lecture and shared sources exist, treat per-lecture source as primary and shared source as additional context.
+- When both per-lecture and shared sources exist, treat per-lecture source as primary and shared source as optional additional evidence. Review tooling may inspect both files when present, but agent context remains opt-in for the shared file.
+
+Raw-file handling cannot establish provenance cryptographically. The workflow can preserve paths, classify scaffold placeholders, and prevent agent-side mutation, but it cannot determine whether text supplied by a user was originally AI-generated.
 
 Run `npm run review:source` after validation work. The command creates `docs/review-worksheets/<timestamp>-source-fidelity-review.md` even when validation fails, because invalid state is useful review evidence. Missing raw source files should be reported, but they are not schema validation failures.
 

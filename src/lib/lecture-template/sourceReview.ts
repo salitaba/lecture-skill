@@ -1,22 +1,33 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { buildLecturePreviewTemplate, isCollectionMode, validateCollection } from "./collection";
 import { parseLectureTemplate } from "./parseTemplate";
-import { ACTIVE_TEMPLATE_PATH, LECTURES_DIR, repositoryPath } from "./readTemplate";
+import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
+import {
+  COLLECTION_SHARED_RAW_SOURCE_PATH,
+  SINGLE_RAW_SOURCE_PATH,
+  collectionRawSourcePath,
+  readRawSourceEvidence,
+  type RawSourceEvidenceStatus,
+  type SourceReviewEvidenceRole
+} from "./rawSourceEvidence";
 import type { CourseMetadataValidationResult, LectureMetadata, LectureTemplate, ValidationError } from "./types";
 import { formatError } from "./validateCli";
 import { validateTemplateSource } from "./validateTemplate";
 
-export const SINGLE_RAW_SOURCE_PATH = "content/raw-lecture.txt";
+export {
+  COLLECTION_RAW_SOURCE_FILENAME,
+  COLLECTION_SHARED_RAW_SOURCE_PATH,
+  SINGLE_RAW_SOURCE_PATH,
+  collectionRawSourcePath
+} from "./rawSourceEvidence";
 export const SINGLE_TEMPLATE_PATH = ACTIVE_TEMPLATE_PATH;
-export const COLLECTION_SHARED_RAW_SOURCE_PATH = "lectures/raw-course.txt";
-export const COLLECTION_RAW_SOURCE_FILENAME = "raw-lecture.txt";
 export const SOURCE_REVIEW_WORKSHEET_DIR = "docs/review-worksheets";
 
 export type SourceReviewMode = "single-lecture" | "collection";
-export type SourceEvidenceStatus = "present" | "missing";
+export type SourceEvidenceStatus = RawSourceEvidenceStatus;
 export type SourceReviewValidationStatus = "passed" | "failed";
-export type SourceReviewEvidenceRole = "primary" | "shared";
+export type { SourceReviewEvidenceRole } from "./rawSourceEvidence";
 
 export interface SourceReviewSourceEvidence {
   sourcePath: string;
@@ -134,7 +145,7 @@ export function renderSourceReviewWorksheetMarkdown(worksheet: SourceReviewWorks
   if (worksheet.mode === "collection") {
     lines.push(`Collection landing route: ${worksheet.collectionLandingRoute ?? "/"}`);
     if (worksheet.sharedSource) {
-      lines.push(`Shared raw course source: ${formatEvidence(worksheet.sharedSource)}`);
+      lines.push(`Optional shared human source evidence: ${formatEvidence(worksheet.sharedSource)}`);
     }
   }
 
@@ -171,8 +182,11 @@ export function collectMissingPrimarySourcePaths(worksheet: SourceReviewWorkshee
     .map((source) => source.sourcePath);
 }
 
-export function collectionRawSourcePath(slug: string): string {
-  return path.posix.join(LECTURES_DIR, slug, COLLECTION_RAW_SOURCE_FILENAME);
+export function collectPlaceholderPrimarySourcePaths(worksheet: SourceReviewWorksheet): string[] {
+  return worksheet.lectures
+    .map((lecture) => lecture.primarySource)
+    .filter((source) => source.status === "placeholder")
+    .map((source) => source.sourcePath);
 }
 
 async function createSingleLectureWorksheet(
@@ -274,12 +288,8 @@ async function readEvidence(
   role: SourceReviewEvidenceRole,
   lectureSlug?: string
 ): Promise<SourceReviewSourceEvidence> {
-  try {
-    await access(repositoryPath(sourcePath));
-    return { sourcePath, status: "present", role, lectureSlug };
-  } catch {
-    return { sourcePath, status: "missing", role, lectureSlug };
-  }
+  const evidence = await readRawSourceEvidence(sourcePath);
+  return { sourcePath, status: evidence.status, role, lectureSlug };
 }
 
 function buildSingleValidation(lecture: SourceReviewLecture): SourceReviewValidation {
@@ -369,11 +379,11 @@ function appendCourseMetadataSection(lines: string[], worksheet: SourceReviewWor
 
 function appendLectureSection(lines: string[], lecture: SourceReviewLecture) {
   lines.push(
-    `Template path: ${lecture.templatePath}`,
+    `Generated lecture template: ${lecture.templatePath}`,
     `Rendered route: ${lecture.renderedRoute}`,
     `Validation result: ${lecture.validationStatus}`,
-    `Primary raw source: ${formatEvidence(lecture.primarySource)}`,
-    ...lecture.additionalSources.map((source) => `Additional source: ${formatEvidence(source)}`)
+    `Primary human source evidence: ${formatEvidence(lecture.primarySource)}`,
+    ...lecture.additionalSources.map((source) => `Optional shared human source evidence: ${formatEvidence(source)}`)
   );
   if (lecture.packageTemplatePath) lines.push(`Package template path: ${lecture.packageTemplatePath}`);
   if (lecture.renderedOutputPath) lines.push(`Rendered output path: ${lecture.renderedOutputPath}`);
@@ -444,7 +454,11 @@ function appendLectureSection(lines: string[], lecture: SourceReviewLecture) {
 
 function formatEvidence(source: SourceReviewSourceEvidence): string {
   const packagePath = source.packagePath ? ` -> ${source.packagePath}` : "";
-  return source.status === "present" ? `${source.sourcePath} (present${packagePath})` : `${source.sourcePath} (missing)`;
+  if (source.status === "present") return `${source.sourcePath} (present${packagePath})`;
+  if (source.status === "placeholder") {
+    return `${source.sourcePath} (placeholder; Scaffold placeholder; replace with human source${packagePath})`;
+  }
+  return `${source.sourcePath} (missing${packagePath})`;
 }
 
 function formatUnknownError(error: unknown): string {

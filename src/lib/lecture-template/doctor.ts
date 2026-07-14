@@ -7,9 +7,9 @@ import { detectAuthoringMode } from "./scaffold";
 import {
   COLLECTION_SHARED_RAW_SOURCE_PATH,
   SINGLE_RAW_SOURCE_PATH,
-  SOURCE_REVIEW_WORKSHEET_DIR,
-  collectionRawSourcePath
+  SOURCE_REVIEW_WORKSHEET_DIR
 } from "./sourceReview";
+import { collectionRawSourcePath, readRawSourceEvidence, type RawSourceEvidenceStatus } from "./rawSourceEvidence";
 import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
 import { collectionProgressKey, singleLectureProgressKey } from "./progress";
 import { validateTemplateSource } from "./validateTemplate";
@@ -30,7 +30,8 @@ export interface DoctorReport {
   rawSource: {
     present: string[];
     missing: string[];
-    shared?: "present" | "missing";
+    placeholder: string[];
+    shared?: RawSourceEvidenceStatus;
   };
   latestWorksheetPath?: string;
   latestReviewPackagePath?: string;
@@ -60,7 +61,7 @@ export async function createDoctorReport(): Promise<DoctorReport> {
   let courseMetadata: CourseMetadataValidationResult | undefined;
   let lectureCount = 0;
   let validationPassed = false;
-  const rawSource: DoctorReport["rawSource"] = { present: [], missing: [] };
+  const rawSource: DoctorReport["rawSource"] = { present: [], missing: [], placeholder: [] };
 
   if (!nodeSatisfiesRequirement && requiredNode) {
     warnings.push(`WARN_UNSUPPORTED_NODE: current ${process.version} does not satisfy ${requiredNode}.`);
@@ -76,14 +77,14 @@ export async function createDoctorReport(): Promise<DoctorReport> {
     if (courseMetadata.status === "invalid") warnings.push(`WARN_INVALID_METADATA: ${COURSE_METADATA_PATH} is invalid.`);
     if (!validation.allPassed) warnings.push("WARN_INVALID_TEMPLATES: validation did not pass.");
 
-    const sharedPresent = await pathExists(COLLECTION_SHARED_RAW_SOURCE_PATH);
-    rawSource.shared = sharedPresent ? "present" : "missing";
-    if (sharedPresent) rawSource.present.push(COLLECTION_SHARED_RAW_SOURCE_PATH);
+    const sharedEvidence = await readRawSourceEvidence(COLLECTION_SHARED_RAW_SOURCE_PATH);
+    rawSource.shared = sharedEvidence.status;
+    if (sharedEvidence.status === "present") rawSource.present.push(COLLECTION_SHARED_RAW_SOURCE_PATH);
 
     for (const result of validation.results) {
       const rawPath = collectionRawSourcePath(result.slug);
-      if (await pathExists(rawPath)) rawSource.present.push(rawPath);
-      else rawSource.missing.push(rawPath);
+      const evidence = await readRawSourceEvidence(rawPath);
+      addRawSourceStatus(rawSource, evidence.status, rawPath);
     }
   } else {
     templatePaths = [ACTIVE_TEMPLATE_PATH];
@@ -95,11 +96,14 @@ export async function createDoctorReport(): Promise<DoctorReport> {
       validationPassed = false;
     }
     if (!validationPassed) warnings.push("WARN_INVALID_TEMPLATES: validation did not pass.");
-    if (await pathExists(SINGLE_RAW_SOURCE_PATH)) rawSource.present.push(SINGLE_RAW_SOURCE_PATH);
-    else rawSource.missing.push(SINGLE_RAW_SOURCE_PATH);
+    const evidence = await readRawSourceEvidence(SINGLE_RAW_SOURCE_PATH);
+    addRawSourceStatus(rawSource, evidence.status, SINGLE_RAW_SOURCE_PATH);
   }
 
   if (rawSource.missing.length > 0) warnings.push("WARN_MISSING_RAW_SOURCE: one or more primary raw source files are missing.");
+  if (rawSource.placeholder.length > 0) {
+    warnings.push("WARN_PLACEHOLDER_RAW_SOURCE: one or more primary raw source files are scaffold placeholders; replace them with human source evidence.");
+  }
 
   const latestWorksheetPath = await latestPath(SOURCE_REVIEW_WORKSHEET_DIR);
   if (!latestWorksheetPath) warnings.push("WARN_MISSING_WORKSHEET: no source-fidelity worksheet was found.");
@@ -124,7 +128,7 @@ export async function createDoctorReport(): Promise<DoctorReport> {
     latestReviewPackagePath,
     readiness: {
       preview: validationPassed,
-      sourceFidelityReview: validationPassed && rawSource.missing.length === 0,
+      sourceFidelityReview: validationPassed && rawSource.missing.length === 0 && rawSource.placeholder.length === 0,
       staticPackage: validationPassed
     },
     progressTracking: createProgressTrackingReport(),
@@ -155,8 +159,16 @@ export function renderDoctorReport(report: DoctorReport): string {
   lines.push(
     "",
     "Raw source evidence:",
-    ...report.rawSource.present.map((sourcePath) => `- present: ${sourcePath}`),
-    ...report.rawSource.missing.map((sourcePath) => `- missing: ${sourcePath}`),
+    ...report.rawSource.present
+      .filter((sourcePath) => sourcePath !== COLLECTION_SHARED_RAW_SOURCE_PATH)
+      .map((sourcePath) => `- Primary human source evidence: ${sourcePath} (present)`),
+    ...report.rawSource.missing.map((sourcePath) => `- Primary human source evidence: ${sourcePath} (missing)`),
+    ...report.rawSource.placeholder.map(
+      (sourcePath) => `- Primary human source evidence: ${sourcePath} (Scaffold placeholder; replace with human source)`
+    ),
+    ...(report.mode === "collection" && report.rawSource.shared
+      ? [`- Optional shared human source evidence: ${COLLECTION_SHARED_RAW_SOURCE_PATH} (${report.rawSource.shared})`]
+      : []),
     "",
     `Latest source-fidelity worksheet: ${report.latestWorksheetPath ?? "(none)"}`,
     `Latest static review package: ${report.latestReviewPackagePath ?? "(none)"}`,
@@ -189,6 +201,16 @@ function createProgressTrackingReport(): DoctorReport["progressTracking"] {
     singleLectureKeyPrefix: singleLectureProgressKey("<lecture-id>"),
     collectionKeyPrefix: collectionProgressKey("<collection-id>")
   };
+}
+
+function addRawSourceStatus(
+  rawSource: DoctorReport["rawSource"],
+  status: RawSourceEvidenceStatus,
+  sourcePath: string
+): void {
+  if (status === "present") rawSource.present.push(sourcePath);
+  else if (status === "placeholder") rawSource.placeholder.push(sourcePath);
+  else rawSource.missing.push(sourcePath);
 }
 
 async function readPackageJson(): Promise<{ engines?: { node?: string } }> {
@@ -236,15 +258,5 @@ async function latestPath(relativeDir: string): Promise<string | undefined> {
     return candidates[0]?.relativePath;
   } catch {
     return undefined;
-  }
-}
-
-async function pathExists(relativePath: string): Promise<boolean> {
-  try {
-    await stat(repositoryPath(relativePath));
-    return true;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") return false;
-    throw error;
   }
 }

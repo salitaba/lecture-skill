@@ -16,3 +16,5 @@ The same skill is available to Codex at:
 `.codex/skills/lecture-site-engine/SKILL.md`
 
 When working inside this repository, use the local `npm run` commands documented by the skill. When using the released CLI from another project, use the equivalent `npx lecture-site-engine <command>` form.
+
+Raw source files are human/user/educator evidence, not generated output. Agents must never create, edit, rewrite, summarize into, replace, delete, or overwrite `content/raw-lecture.txt`, `lectures/<slug>/raw-lecture.txt`, `lectures/raw-course.txt`, or raw-source fixtures. Use the requested lecture's per-lecture source by default; read the optional shared course source only for an explicitly requested shared-source workflow. Scaffold placeholders are non-evidence and must be replaced before authoring approval. The system cannot cryptographically verify whether supplied text was AI-generated.

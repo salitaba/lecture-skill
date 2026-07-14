@@ -1,0 +1,1 @@
+I think raw-course.txt is redundant and make agent usage expensive for nothing

@@ -8,14 +8,19 @@ import { COURSE_METADATA_PATH } from "./courseMetadata";
 import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
 import { collectionProgressKey, singleLectureProgressKey } from "./progress";
 import {
-  COLLECTION_SHARED_RAW_SOURCE_PATH,
-  SINGLE_RAW_SOURCE_PATH,
   type SourceReviewLecture,
   type SourceReviewSourceEvidence,
   type SourceReviewWorksheet,
-  collectionRawSourcePath,
   renderSourceReviewWorksheetMarkdown
 } from "./sourceReview";
+import {
+  COLLECTION_SHARED_RAW_SOURCE_PATH,
+  SINGLE_RAW_SOURCE_PATH,
+  collectionRawSourcePath,
+  readRawSourceEvidence,
+  type RawSourceEvidenceStatus,
+  type SourceReviewEvidenceRole
+} from "./rawSourceEvidence";
 import type { CourseMetadata, CourseMetadataValidationResult, LectureMetadata, LectureTemplate } from "./types";
 import { validateTemplateSource } from "./validateTemplate";
 import { formatError } from "./validateCli";
@@ -37,8 +42,8 @@ export interface ReviewPackageCourseMetadataRecord {
 export interface ReviewPackageRawEvidenceRecord {
   sourcePath: string;
   packagePath: string;
-  status: "present" | "missing";
-  role: "primary" | "shared";
+  status: RawSourceEvidenceStatus;
+  role: SourceReviewEvidenceRole;
   lectureSlug?: string;
   contents?: string;
 }
@@ -234,7 +239,7 @@ export async function verifyReviewPackageSourceSnapshot(preflight: ReviewPackage
   }
 
   for (const source of preflight.rawEvidence) {
-    if (source.status === "missing") continue;
+    if (source.status !== "present") continue;
 
     let currentContents: string;
     try {
@@ -325,6 +330,8 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
     "",
     "## Source Templates",
     "",
+    "Generated lecture templates are derived artifacts; raw-source files are human source evidence.",
+    "",
     ...manifest.contents.sourceTemplates.map((source) => `- ${source}`),
     "",
     "## Course Metadata",
@@ -333,8 +340,12 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
     "",
     "## Raw Source Evidence",
     "",
+    "Present entries below are human source evidence copied into the package. Missing paths remain audit records. Scaffold placeholders are non-evidence and are not copied; replace them with human source before authoring approval.",
+    "",
+    ...manifest.rawEvidence.map((source) => `- ${rawEvidenceRoleLabel(source.role)}: ${source.sourcePath} (${source.status})`),
+    "",
     ...manifest.rawEvidence.map((source) =>
-      `- ${source.sourcePath}: ${source.status}${source.status === "present" ? ` -> ${source.packagePath}` : ""}${
+      `- ${source.sourcePath}: ${source.status}${source.status === "present" ? ` -> ${source.packagePath}` : source.status === "placeholder" ? " (Scaffold placeholder; replace with human source; not copied)" : ""}${
         source.lectureSlug ? ` (${source.lectureSlug}, ${source.role})` : ` (${source.role})`
       }`
     ),
@@ -408,11 +419,13 @@ export function renderReviewPackageReadme(manifest: ReviewPackageManifest): stri
     "",
     "- `index.html`: rendered entry page.",
     "- `_next/`: static assets used by the rendered pages.",
-    "- `source/`: copied active lecture template files.",
+    "- `source/`: generated lecture templates plus present human source evidence copied from canonical paths.",
     "- `manifest.json`: machine-readable package metadata.",
     "- `MANIFEST.md`: human-readable package metadata.",
     "- `REVIEW_WORKSHEET.md`: source fidelity worksheet. Start here when comparing raw source evidence to rendered output.",
     "- `REVIEW_CHECKLIST.md`: review checklist for educational quality and source fidelity.",
+    "",
+    "Raw-source files are human/user/educator evidence. Missing expected paths remain visible for audit, while scaffold placeholders are not evidence and are never copied into the package.",
     "",
     "## Progress Tracking",
     "",
@@ -812,6 +825,10 @@ function formatComponentCounts(counts: Record<string, number>): string {
   return entries.map(([type, count]) => `${type}=${count}`).join(", ");
 }
 
+function rawEvidenceRoleLabel(role: SourceReviewEvidenceRole): string {
+  return role === "primary" ? "Primary human source evidence" : "Optional shared human source evidence";
+}
+
 function activeTemplateExists(): boolean {
   try {
     accessSync(repositoryPath(ACTIVE_TEMPLATE_PATH), constants.F_OK);
@@ -910,7 +927,7 @@ async function writeCapturedCourseMetadata(packageRoot: string, source?: ReviewP
 
 async function writeCapturedRawEvidence(packageRoot: string, sources: ReviewPackageRawEvidenceRecord[]) {
   for (const source of sources) {
-    if (source.status === "missing") continue;
+    if (source.status !== "present") continue;
     const destination = path.join(packageRoot, source.packagePath);
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, source.contents ?? "", "utf8");
@@ -923,28 +940,15 @@ async function captureRawEvidence(
   role: ReviewPackageRawEvidenceRecord["role"],
   lectureSlug?: string
 ): Promise<ReviewPackageRawEvidenceRecord> {
-  try {
-    const contents = await readFile(repositoryPath(sourcePath), "utf8");
-    return {
-      sourcePath,
-      packagePath,
-      status: "present",
-      role,
-      lectureSlug,
-      contents
-    };
-  } catch (error) {
-    if (isMissingPath(error)) {
-      return {
-        sourcePath,
-        packagePath,
-        status: "missing",
-        role,
-        lectureSlug
-      };
-    }
-    throw error;
-  }
+  const evidence = await readRawSourceEvidence(sourcePath);
+  return {
+    sourcePath,
+    packagePath,
+    status: evidence.status,
+    role,
+    lectureSlug,
+    ...(evidence.status === "present" ? { contents: evidence.contents } : {})
+  };
 }
 
 function createPackageWorksheet(preflight: Extract<ReviewPackagePreflight, { valid: true }>, manifest: ReviewPackageManifest): SourceReviewWorksheet {
@@ -1064,10 +1068,6 @@ async function pathExists(targetPath: string): Promise<boolean> {
     if (error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
   }
-}
-
-function isMissingPath(error: unknown): boolean {
-  return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT";
 }
 
 async function readReviewChecklist(sourcePath?: string): Promise<string> {

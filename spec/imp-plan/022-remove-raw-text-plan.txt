@@ -1,0 +1,198 @@
+# Implementation Plan: Human-Authored Raw Source Policy
+
+## Summary
+
+Refine the Lecture Site Engine source workflow so both `raw-lecture.txt` and `raw-course.txt` are treated as human/user-provided source evidence, never as AI-generated lecture output. Keep both source paths supported: per-lecture raw sources remain the normal authoring input, while the optional shared course source remains useful as additional course-level evidence when a real course is being split across lectures. This plan supersedes the original one-line redundancy premise in Spec 022 based on the user's clarification that both raw-source families are valuable when they contain real course material.
+
+The change should reduce unnecessary agent context usage without deleting the shared-source capability. The skill must tell agents not to create, rewrite, summarize into, or replace either raw source file. Agents generate only lecture templates and related review artifacts. Repository scaffolds may create clearly marked placeholder files, but those placeholders are not source evidence until the user supplies real content.
+
+## Confirmed Decisions and Assumptions
+
+1. **Keep both raw-source paths.** `content/raw-lecture.txt`, `lectures/<slug>/raw-lecture.txt`, and optional `lectures/raw-course.txt` remain valid paths.
+2. **Raw files are source evidence, not generated output.** Their contents must originate from the user, educator, or an existing course source. The agent may read them when the workflow calls for it, but must never author or overwrite them.
+3. **Shared source is opt-in agent context.** The agent uses each lecture's `lectures/<slug>/raw-lecture.txt` as its default source. It reads `lectures/raw-course.txt` only when the user explicitly asks to split a shared course source, reconcile cross-lecture context, or perform a review that needs the full course evidence.
+4. **Review tooling may inspect both files.** `review:source`, `doctor`, and `package:review` are repository evidence workflows, not AI generation workflows. They continue to report/copy present raw files using their existing primary/shared roles.
+5. **Scaffold placeholders are not authored source.** `init` and scaffold commands may continue creating the current placeholder raw files, but documentation and output must make clear that the user must replace them with real source before authoring/review approval. Evidence classification must expose a `placeholder` state distinct from `present` and `missing`; placeholders do not satisfy source-fidelity readiness and are never copied into review packages. No command creates `lectures/raw-course.txt` automatically.
+6. **Provenance cannot be cryptographically verified.** The implementation can enforce safe file handling and agent instructions, but it cannot determine whether a user pasted AI-generated text into a raw file. This limitation must be documented rather than presented as a technical guarantee.
+
+## Relevant Existing Files and Code Paths
+
+### Agent guidance and user documentation
+
+- `.claude/skills/lecture-site-engine/SKILL.md` - full lecture-authoring workflow currently describes per-lecture and shared raw-source paths and must define the human-authored-source policy and opt-in shared-source behavior.
+- `.codex/skills/lecture-site-engine/SKILL.md` - Codex entry point that must point agents to the same policy.
+- `SKILL.md` - root fallback entry point for other agents; keep its summary aligned with the canonical skill.
+- `README.md` - user-facing setup and collection workflow; explain which files users provide and which files the agent may generate.
+- `DEVELOPMENT.md` - maintainer guidance for the source-evidence contract, tests, and review workflows.
+- `AGENTS.md` and `CLAUDE.md` - repository agent instructions that must prohibit raw-source mutation and describe the explicit shared-source exception.
+
+### Scaffolding and CLI
+
+- `src/cli/commands/init.ts` - default collection initializer installs skills and creates the first lecture/raw-source placeholders; update user-facing next steps if needed.
+- `src/lib/lecture-template/scaffold.ts` - creates collection and lecture template/raw-source placeholders and already avoids overwriting existing files.
+- `src/cli/commands/newCollection.ts` and `src/cli/commands/newLecture.ts` - command wrappers whose output should retain the distinction between scaffolding a placeholder and authoring source.
+- `tests/lecture-template/init.test.ts` and `tests/lecture-template/scaffold.test.ts` - verify initialization/scaffold paths, non-overwrite behavior, and placeholder content.
+
+### Source review and diagnostics
+
+- `src/lib/lecture-template/sourceReview.ts` - defines `SINGLE_RAW_SOURCE_PATH`, `COLLECTION_SHARED_RAW_SOURCE_PATH`, primary/shared evidence roles, collection worksheet construction, and worksheet Markdown rendering.
+- `src/lib/lecture-template/rawSourceEvidence.ts` (new) - centralizes raw-source placeholder text/classification so source review, diagnostics, and package assembly do not disagree about whether a file is real evidence.
+- `src/lib/lecture-template/doctor.ts` - reports primary raw-source presence/missing status and shared collection-source status.
+- `src/cli/commands/reviewSource.ts` and `scripts/reviewSource.ts` - expose source-review evidence to users.
+- `tests/lecture-template/source-review.test.ts` - covers per-lecture and shared evidence, missing evidence, worksheet rendering, and validation behavior.
+- `tests/lecture-template/doctor.test.ts` - covers collection raw-source diagnostics and warnings.
+
+### Review-package assembly
+
+- `src/lib/lecture-template/reviewPackage.ts` - captures per-lecture raw evidence and optional `lectures/raw-course.txt` as a shared package source, then rebuilds package worksheets from the manifest.
+- `src/cli/commands/packageReview.ts` and `scripts/packageReview.ts` - report included/missing raw evidence.
+- `tests/lecture-template/review-package.test.ts` - verifies expected raw-source paths, shared-source packaging, absent evidence, manifests, and package worksheets.
+
+## Proposed Implementation Steps
+
+### 1. Establish the raw-source provenance contract
+
+Update the canonical skill and repository agent guidance to state explicitly:
+
+- raw files are user/educator/course-source inputs;
+- agents must never create, edit, rewrite, summarize into, replace, delete, or overwrite raw files;
+- this rule applies to `content/raw-lecture.txt`, `lectures/<slug>/raw-lecture.txt`, `lectures/raw-course.txt`, and raw-source fixtures under `examples/`;
+- an agent should ask the user for missing source instead of fabricating it;
+- per-lecture raw sources for the requested lecture(s) are the default context for lecture generation;
+- `lectures/raw-course.txt` is optional additional context and is read only for an explicitly requested shared-source workflow; its presence alone is not authorization to load it into the agent context;
+- the agent may generate `lecture.template.md`, worksheets, and other derived artifacts, but not raw evidence.
+
+Keep the root, Claude, and Codex entry points aligned. Avoid duplicating the full component schema in the user README; point users to `SKILL.md`.
+
+### 2. Centralize raw-source classification and make scaffold behavior explicit
+
+Add `src/lib/lecture-template/rawSourceEvidence.ts` with shared constants/types/helpers for raw-source paths and classification. Use an explicit placeholder sentinel matching the scaffold content (and a separate shared-source sentinel only if a shared placeholder is ever introduced). Return `present`, `missing`, or `placeholder` without treating placeholder contents as user evidence.
+
+Update `sourceReview.ts`, `doctor.ts`, and `reviewPackage.ts` to use the helper. Preserve `primary`/`shared` roles and paths. Primary `placeholder` evidence must count like missing evidence for source-fidelity readiness and missing-primary reporting. Shared `placeholder` evidence must remain optional and must not become an additional source in worksheets or packages.
+
+Review package assembly must retain a manifest record for `missing`/`placeholder` expected paths when useful for audit, but only copy raw files whose status is `present`. CLI/script summaries must distinguish included human source, missing source, and ignored scaffold placeholders.
+
+Then make scaffold behavior explicit without changing source ownership:
+
+Review `init` and scaffold output so a newly created placeholder cannot be mistaken for real source evidence:
+
+- keep the existing non-overwrite behavior;
+- preserve `lectures/raw-course.txt` as a user-created optional file rather than generating it;
+- make next-step messages say that the user must replace the raw-lecture placeholder with real course material before asking an agent to author the lecture;
+- retain single-lecture compatibility and per-lecture collection scaffolding.
+
+The behavior table is:
+
+| Command/mode | Placeholder behavior | Shared course source |
+| --- | --- | --- |
+| `npx lecture-site-engine init` | Creates the first collection lecture template and marked per-lecture raw placeholder | Never created |
+| `npx lecture-site-engine new:collection` | Creates the same collection/per-lecture placeholders | Never created |
+| `npx lecture-site-engine new:lecture` in collection mode | Creates the next lecture template and marked per-lecture raw placeholder | Never created |
+| `npx lecture-site-engine new:lecture` in single mode | Creates the template only, preserving current behavior | Not applicable |
+| Existing raw source at any expected path | Preserve without modification | Readable by review tooling; agent access remains opt-in for shared source |
+
+Do not add an AI call, source generator, automatic source summarizer, or raw-source rewrite path.
+
+### 3. Preserve shared source in evidence workflows, with clear role labels
+
+Keep `sourceReview.ts`, `doctor.ts`, and `reviewPackage.ts` able to inspect `lectures/raw-course.txt` when it exists. Update exact output in `renderSourceReviewWorksheetMarkdown`, `renderDoctorReport`, `renderReviewPackageManifestMarkdown`, `renderReviewPackageReadme`, `src/cli/commands/reviewSource.ts`, `scripts/reviewSource.ts`, `src/cli/commands/packageReview.ts`, and `scripts/packageReview.ts` so reviewers can distinguish:
+
+- primary human source: the raw file next to the lecture;
+- optional shared human source: `lectures/raw-course.txt`;
+- generated derived artifact: the lecture template or review package;
+- scaffold placeholder: an expected path that is not source evidence and was not copied.
+
+Use stable wording such as `Primary human source evidence`, `Optional shared human source evidence`, `Generated lecture template`, and `Scaffold placeholder; replace with human source`. Keep JSON path/role fields stable except for the additive `placeholder` status. Do not make missing or placeholder shared source a validation failure or a package blocker.
+
+### 4. Add regression coverage for source ownership and opt-in context
+
+Extend focused tests to prove:
+
+- scaffold/init create only marked placeholders and do not overwrite an existing raw lecture or shared course source; they never create `lectures/raw-course.txt`;
+- source-review worksheets continue recording per-lecture primary evidence and optional shared evidence;
+- source-review worksheets classify placeholder primary/shared files separately from real evidence;
+- doctor reports missing/placeholder primary files as not ready while treating missing/placeholder shared evidence as optional;
+- review packages include shared raw evidence only from `lectures/raw-course.txt`, never arbitrary raw-like files, and never copy placeholders;
+- generated worksheet/package text labels raw files as human source evidence, derived templates as generated output, and placeholders as non-evidence;
+- agent-facing docs contain the exact no-raw-mutation and opt-in shared-context rules.
+
+Do not attempt to test whether text was written by an AI; test the observable file-preservation and documentation contracts instead.
+
+### 5. Update user and maintainer documentation
+
+Update `README.md` for the end-user workflow:
+
+- users supply raw source files;
+- agents create lecture templates from those files;
+- `raw-course.txt` is optional and only needed when a real course source spans multiple lectures;
+- users should not put AI-generated lecture output into raw-source files.
+
+Update `DEVELOPMENT.md`, the skill, `AGENTS.md`, and `CLAUDE.md` with implementation boundaries, review tooling behavior, and the provenance limitation.
+
+## Data Model, API, Persistence, and Event Changes
+
+- No lecture-template schema changes.
+- No course metadata schema changes.
+- No route, static export, localStorage, or progress changes.
+- Preserve `SourceReviewEvidenceRole = "primary" | "shared"`.
+- Preserve `COLLECTION_SHARED_RAW_SOURCE_PATH = "lectures/raw-course.txt"`.
+- No new AI service, source-generation API, or event/analytics integration.
+- Any wording/label changes in worksheet or package output must remain backward-compatible with existing path and role fields.
+
+## Test Plan
+
+### Focused automated tests
+
+Update or add coverage in:
+
+- `tests/lecture-template/init.test.ts`
+- `tests/lecture-template/scaffold.test.ts`
+- `tests/lecture-template/source-review.test.ts`
+- `tests/lecture-template/doctor.test.ts`
+- `tests/lecture-template/review-package.test.ts`
+
+Add a deterministic `tests/lecture-template/agent-guidance.test.ts` contract test that reads the canonical Claude skill, root `SKILL.md`, Codex entry point, `AGENTS.md`, and `CLAUDE.md`, and asserts the mutation prohibition and opt-in shared-context rule. Also verify `init` copies the updated distributed skill files; `AGENTS.md` and `CLAUDE.md` remain repository guidance and are not copied by `init.ts`.
+
+### Verification commands
+
+```bash
+npm test -- tests/lecture-template/init.test.ts tests/lecture-template/scaffold.test.ts
+npm test -- tests/lecture-template/source-review.test.ts tests/lecture-template/doctor.test.ts tests/lecture-template/review-package.test.ts
+npm test -- tests/lecture-template/agent-guidance.test.ts
+npm run validate
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run build:cli
+```
+
+Manual verification should run `npx lecture-site-engine init` in a temporary consumer workspace, confirm the raw placeholders are visibly marked and not treated as present evidence, add human-authored per-lecture and shared sources, run source review/package creation, and confirm only real sources are listed/copied as optional additional evidence.
+
+## Risks, Assumptions, and Open Questions
+
+### Risks and mitigations
+
+- **Agents may still write raw files despite instructions.** Preserve existing files by default, make the skill prohibition explicit, and add review checks that compare expected paths/content where practical. State that provenance is not cryptographically enforceable.
+- **Placeholder detection could misclassify intentionally identical user text.** Use a stable exact sentinel owned by the scaffold and document that users should replace the marker rather than author a real source equal to it.
+- **Users may confuse scaffold placeholders with source evidence.** Use explicit placeholder text and documentation that asks the user to replace it before generation.
+- **Shared source may reintroduce high context cost.** Make it opt-in in the skill and per-lecture source the default; keep repository review tools independent of agent context.
+- **Removing shared-source support accidentally breaks review packages.** Keep current path/role fields and regression tests for present/missing shared evidence.
+
+### Assumptions
+
+- The user wants to retain both raw-source files for human course provenance, not delete `lectures/raw-course.txt`.
+- Existing `raw-course.txt` files should remain readable and packageable.
+- Existing source-review and package behavior remains nonfatal when raw evidence is missing.
+
+### Resolved decisions
+
+- Clearly marked CLI placeholders are acceptable because they are not AI-generated lecture content and will be classified as `placeholder`, not `present` evidence.
+- No user-entered provenance field is added in this scope; path, status, role, and explicit documentation are sufficient for the current review workflow.
+
+## Out of Scope
+
+- Detecting whether a user-provided raw file was AI-generated.
+- Calling an LLM to create, summarize, classify, or rewrite raw source.
+- Removing raw-source files from the repository or review packages.
+- Changing lecture component schema, collection routing, learner progress, static export, or package format beyond explanatory labels.

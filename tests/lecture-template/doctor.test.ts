@@ -59,6 +59,25 @@ describe("doctor readiness report", () => {
     expect(report.warnings).toContain("WARN_MISSING_RAW_SOURCE: one or more primary raw source files are missing.");
   });
 
+  it("treats primary placeholders as not ready while shared placeholders remain optional", async () => {
+    writeText("lectures/course.yaml", 'title: "Course Title"\ndescription: "Course description."\n');
+    copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
+    writeText("lectures/01-introduction/raw-lecture.txt", "Add raw source evidence for this lecture here.\n");
+    writeText("lectures/raw-course.txt", "Add raw source evidence for this lecture here.\n");
+
+    const report = await createDoctorReport();
+    const output = renderDoctorReport(report);
+
+    expect(report.rawSource.placeholder).toEqual(["lectures/01-introduction/raw-lecture.txt"]);
+    expect(report.rawSource.shared).toBe("placeholder");
+    expect(report.readiness.sourceFidelityReview).toBe(false);
+    expect(report.warnings).toContain(
+      "WARN_PLACEHOLDER_RAW_SOURCE: one or more primary raw source files are scaffold placeholders; replace them with human source evidence."
+    );
+    expect(output).toContain("Scaffold placeholder; replace with human source");
+    expect(output).toContain("Optional shared human source evidence: lectures/raw-course.txt (placeholder)");
+  });
+
   it("warns for invalid metadata without throwing", async () => {
     writeText("lectures/course.yaml", "title: ''\ndescription: ''\n");
     copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");

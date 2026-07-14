@@ -120,6 +120,25 @@ describe("source fidelity review worksheet", () => {
     ]);
   });
 
+  it("classifies primary and shared scaffold placeholders without treating them as evidence", async () => {
+    copyFixture(
+      "examples/multi-lecture/lectures/01-introduction/lecture.template.md",
+      "lectures/01-introduction/lecture.template.md"
+    );
+    writeText("lectures/01-introduction/raw-lecture.txt", "Add raw source evidence for this lecture here.\n");
+    writeText("lectures/raw-course.txt", "Add raw source evidence for this lecture here.\n");
+
+    const worksheet = await createSourceReviewWorksheet();
+    const markdown = renderSourceReviewWorksheetMarkdown(worksheet);
+
+    expect(worksheet.sharedSource).toMatchObject({ status: "placeholder", role: "shared" });
+    expect(worksheet.lectures[0].primarySource).toMatchObject({ status: "placeholder", role: "primary" });
+    expect(worksheet.lectures[0].additionalSources).toEqual([]);
+    expect(markdown).toContain("Primary human source evidence: lectures/01-introduction/raw-lecture.txt (placeholder;");
+    expect(markdown).toContain("Optional shared human source evidence: lectures/raw-course.txt (placeholder;");
+    expect(markdown).toContain("Generated lecture template: lectures/01-introduction/lecture.template.md");
+  });
+
   it("renders valid collection course metadata in worksheets", async () => {
     writeText("lectures/course.yaml", 'title: "Course Title"\ndescription: "Course description."\naudience: "Engineers"\nlevel: "beginner"\nduration: "90 minutes"\n');
     copyFixture("examples/multi-lecture/lectures/01-introduction/lecture.template.md", "lectures/01-introduction/lecture.template.md");
@@ -199,8 +218,9 @@ describe("source fidelity review worksheet", () => {
 
     expect(markdown).toContain("Source mode: single-lecture");
     expect(markdown).toContain("Validation result: passed");
-    expect(markdown).toContain("Template path: content/lecture.template.md");
-    expect(markdown).toContain("Primary raw source: content/raw-lecture.txt (present)");
+    expect(markdown).toContain("Generated lecture template: content/lecture.template.md");
+    expect(markdown).toContain("Primary human source evidence: content/raw-lecture.txt (present)");
+    expect(markdown).toContain("Generated lecture template: content/lecture.template.md");
     expect(markdown).toContain("Rendered route: /");
     expect(markdown).toContain("Package path: review-packages/2026-07-04-0130-lecture-site");
     expect(markdown).toContain("Reviewer name:");
