@@ -11,6 +11,12 @@ Every `npm run <command>` instruction below has an equivalent `npx lecture-site-
 
 To bootstrap another project with this skill and a starter collection, run `npx lecture-site-engine init`. The initializer installs the root, Claude Code, and Codex skill entry points without overwriting existing authored files.
 
+## Preview Command Contract
+
+When the user asks to run or start the server, use `npm run dev` inside this repository or `npx lecture-site-engine dev` in a consumer project. The CLI prepares its generated app under the ignored `.lecture-site-engine/` directory, keeps the user's lecture files under `LECTURE_CONTENT_ROOT`, and starts the compatibility-safe Next preview path for the packaged app.
+
+Treat the command as successful only after the process reports a ready local URL and an HTTP check returns a response. Report the exact URL, including a changed port when one is selected. If the command exits nonzero, report the first actionable error and fix or explain that CLI/runtime failure; do not bypass the CLI by launching Next from an npm cache or by changing the user's lecture files. The generated app directory is disposable runtime state and is not authored content.
+
 ## Staged Authoring Flow
 
 Treat the repository's filesystem mode and the user's requested authoring scope as separate decisions. A `lectures/` directory tells the engine how to scan and validate the project; it does not decide whether the user wants one lecture or a course. In particular, `lectures/01-introduction/` created by `init` is a starter scaffold, not a course outline, a topic boundary, or a decision to create exactly one lecture.
@@ -131,7 +137,7 @@ duration: "3 hours"
 10. Revise `content/lecture.template.md` or collection templates until validation passes.
 11. Run `npm run review:source` before approval review so the reviewer has source paths, validation status, rendered routes, and checklist fields.
 12. Run `npm run doctor` before preview, source-review, or package handoff.
-13. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
+13. Run or tell the user to run `npm run dev` and verify the reported local URL responds before calling the preview ready. In a consumer project use `npx lecture-site-engine dev`.
 14. Finish with the staged handoff report: artifact paths, lecture count, validation status, human-source/evidence status, warnings, and next action.
 
 ## Source Fidelity Review

@@ -21,6 +21,8 @@ Use human source by default. Internet research is an agent-time option only afte
 
 Finish with an outcome-oriented handoff naming created or updated files, lecture count, validation result, human-source/evidence status, warnings, and the next action. Read the canonical skill for the complete staged authoring flow.
 
+For a server request, use `npm run dev` in this repository or `npx lecture-site-engine dev` in a consumer project. Verify that the reported local URL responds before saying the preview is ready. If it fails, report the first actionable CLI/runtime error and do not bypass the CLI with a direct Next command from an npm cache.
+
 When working inside this repository, use the local `npm run` commands documented by the skill. When using the released CLI from another project, use the equivalent `npx lecture-site-engine <command>` form.
 
 Raw source files are human/user/educator evidence, not generated output. Agents must never create, edit, rewrite, summarize into, replace, delete, or overwrite `content/raw-lecture.txt`, `lectures/<slug>/raw-lecture.txt`, `lectures/raw-course.txt`, or raw-source fixtures. Use the requested lecture's per-lecture source by default; read the optional shared course source only for an explicitly requested shared-source workflow. Scaffold placeholders are non-evidence and must be replaced before authoring approval. The system cannot cryptographically verify whether supplied text was AI-generated.

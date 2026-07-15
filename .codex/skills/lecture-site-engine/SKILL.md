@@ -20,6 +20,8 @@ Use the canonical project skill at `SKILL.md` in the repository root. Read it co
 
 User-provided human source is the default. Missing or placeholder source does not authorize browsing; agent-time internet research requires direct user authorization and produces a derived draft only, never present human evidence. Use existing `resource_links` for concise references; this workflow does not add runtime URL fetching, a bibliography schema, or source-ingestion behavior. A final handoff names created or updated files, lecture count, validation result, human-source/evidence status, warnings, and the next action.
 
+For a server request, run `npm run dev` in this repository or `npx lecture-site-engine dev` in a consumer project. Wait for the CLI to report a ready URL and verify it with an HTTP request before handing it back. If it fails, report the first actionable CLI/runtime error; do not launch Next from an npm cache or edit lecture files as a workaround. The CLI owns the ignored `.lecture-site-engine/` preview staging directory.
+
 The Claude Code discovery path contains the same skill at `.claude/skills/lecture-site-engine/SKILL.md`. Keep both agent entry points aligned when the skill changes.
 
 The workflow can preserve and classify files, but it cannot cryptographically determine whether user-supplied source text was AI-generated.

@@ -66,6 +66,9 @@ describe("raw-source agent guidance contract", () => {
       expect(contents).toMatch(/warnings/);
       expect(contents).toMatch(/next action/);
       expect(contents).toMatch(/runtime.{0,50}(?:URL )?fetch/i);
+      expect(contents).toMatch(/(?:npm run dev|npx lecture-site-engine dev)/);
+      expect(contents).toMatch(/(?:ready|reported).{0,80}(?:URL|preview)|(?:URL|preview).{0,80}(?:respond|HTTP)/i);
+      expect(contents).toMatch(/(?:do not|don't).{0,100}(?:bypass|launch Next|npm cache)/i);
     }
   });
 

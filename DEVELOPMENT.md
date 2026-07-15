@@ -28,6 +28,8 @@ npm run release:check
 
 `release:check` runs lint, typecheck, the full test suite, the production build, the CLI build, and `npm pack --dry-run`.
 
+The published CLI materializes the Next app under the consumer's ignored `.lecture-site-engine/` directory. `dev` and `build` use webpack for the packaged-app boundary, and dependency preparation falls back to the CLI package's installed runtime dependencies when the consumer has no usable `node_modules`; this keeps `npx lecture-site-engine dev` self-contained for content-only projects.
+
 Generated directories are ignored and should not be committed:
 
 - `.next/`

@@ -18,7 +18,7 @@ Commands:
   new:collection               Scaffold a new lecture collection
   doctor                       Report project readiness
   review:source                 Write a source fidelity review worksheet
-  dev                           Start a preview server at http://localhost:3000
+  dev                           Start a compatibility-safe preview server at http://localhost:3000
   build                         Run a production build
   package:review                 Validate, build, and export a static review package
 `;

@@ -42,7 +42,7 @@ npx lecture-site-engine validate
 npx lecture-site-engine dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+The CLI stages its runtime app under `.lecture-site-engine/` and chooses a compatibility-safe Next launch path, so this command is the complete preview workflow. Open the ready URL printed by the command, normally [http://localhost:3000](http://localhost:3000). If the port is already in use, Next may choose another port; use the URL it reports.
 
 ## Use the skill
 
