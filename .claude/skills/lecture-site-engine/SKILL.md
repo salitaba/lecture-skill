@@ -5,29 +5,49 @@ description: Converts a raw lecture source into content/lecture.template.md (or 
 
 # Lecture Site Engine Skill
 
-Use this skill to convert one raw lecture source into `content/lecture.template.md` using the supported Lecture Site Engine schema.
+Use this skill to convert one raw lecture source into `content/lecture.template.md` in standalone mode, or into the confirmed numbered `lectures/<slug>/lecture.template.md` collection paths, using the supported Lecture Site Engine schema.
 
 Every `npm run <command>` instruction below has an equivalent `npx lecture-site-engine <command>` form (same command names, e.g. `npx lecture-site-engine validate`, `npx lecture-site-engine new:lecture`, `npx lecture-site-engine dev`). Use the `npm run` form when working inside this repo; use the `npx` form when authoring in a project that doesn't have this repo cloned.
 
 To bootstrap another project with this skill and a starter collection, run `npx lecture-site-engine init`. The initializer installs the root, Claude Code, and Codex skill entry points without overwriting existing authored files.
 
+## Staged Authoring Flow
+
+Treat the repository's filesystem mode and the user's requested authoring scope as separate decisions. A `lectures/` directory tells the engine how to scan and validate the project; it does not decide whether the user wants one lecture or a course. In particular, `lectures/01-introduction/` created by `init` is a starter scaffold, not a course outline, a topic boundary, or a decision to create exactly one lecture.
+
+Begin every lecture- or course-authoring request with a short source-aware intake:
+
+1. Report the active single-lecture or collection mode, the relevant template/scaffold paths, the raw-source paths, and whether real human source evidence is present, missing, or a scaffold placeholder. Treat placeholders as non-evidence.
+2. Classify the requested scope from the user's wording. A clear standalone request remains one lecture and stays standalone. An umbrella topic or broad curriculum request may need a collection. When that choice materially changes the output, ask one targeted question such as: “Do you want one standalone lecture or a multi-lecture collection? I recommend a collection because the topic is broad.” Do not ask a long questionnaire. If the request is clear, state the audience, level, boundaries, lecture count, and other assumptions before proceeding; never infer them from the starter scaffold.
+3. Explain the source options. User-provided human raw source is the default. Agent-time internet research is available only after direct user authorization; missing or placeholder source alone does not authorize browsing, and research must never be written into a raw-source file.
+4. Report the work in stages:
+   - **Authoring brief:** selected mode and scope, working title, audience/level assumptions, source strategy, expected files, and immediate next step.
+   - **Research brief:** only after explicit internet authorization, conduct bounded research using authoritative primary or current sources, then identify proposed concepts/sections and concise source links. Use the existing `resource_links` component for references; do not add research notes or copied web content to raw evidence.
+   - **Scope checkpoint:** when scope remains material, show the proposed outline and source basis and wait for confirmation. For a clear request, state the outline and assumptions and proceed without an unnecessary extra turn.
+   - **Draft:** generate the selected standalone template or the confirmed numbered collection. Create only the lecture count justified by the confirmed outline; do not silently turn a standalone request into a course.
+   - **Verify and hand off:** run validation, source review, doctor, and package handoff when requested. The final report must name created or updated files, lecture count, validation result, human-source/evidence status, warnings, and the next command or user decision. Do not claim successful completion before validation and artifact paths are known.
+
+This is agent guidance only. Do not add an interactive CLI, persisted authoring-session state, runtime URL fetching, a new citation or bibliography schema, a source-ingestion service, or a source-fabrication step.
+
 ## Inputs
 
-- Read one user-supplied raw lecture source.
+- Read one user-supplied raw lecture source, or use a bounded, explicitly authorized agent-time research brief when human source is unavailable.
 - For the MVP golden workflow, use `examples/raw-lecture.txt` as the only raw source.
 - For a user's own lecture, prefer `content/raw-lecture.txt`.
 - `content/raw-lecture.txt`, `lectures/<slug>/raw-lecture.txt`, `lectures/raw-course.txt`, and raw-source fixtures under `examples/` are source evidence supplied by the user, educator, or an existing course source.
-- Agents must never create, edit, rewrite, summarize into, replace, delete, or overwrite a raw-source file. Missing source requires asking the user for source material; never fabricate or AI-generate lecture input.
-- Scaffold placeholders are not authored source evidence. Replace them with real human source before asking an agent to author a lecture or requesting source-fidelity approval.
-- Agents may generate derived artifacts such as `lecture.template.md`, worksheets, diagnostics, and review packages, but may not author raw evidence.
+- Agents must never create, edit, rewrite, summarize into, replace, delete, or overwrite a raw-source file. Missing source requires asking the user for source material or direct authorization for agent-time research; missing or placeholder source alone does not authorize browsing. Never fabricate or AI-generate raw lecture input.
+- Scaffold placeholders are not authored source evidence. Replace them with real human source before requesting source-fidelity approval. If human source is unavailable, an agent may author a derived draft only after direct user authorization for bounded internet research; the placeholder remains non-evidence.
+- Agents may generate derived artifacts such as `lecture.template.md`, worksheets, diagnostics, review packages, and externally researched derived drafts, but may not author raw evidence. An externally researched result remains a derived draft and does not become present human source evidence.
+- Use the supported `resource_links` component for concise references. It renders authored links without fetching them; do not add a citation field, bibliography schema, URL crawler, link checker, or runtime fetch promise.
 - Do not read `examples/golden.template.md` while generating the golden template.
 
 ## Output
 
-Create or update exactly:
+Create or update exactly the mode-appropriate artifact:
 
 ```text
-content/lecture.template.md
+Standalone: content/lecture.template.md
+Collection: lectures/<slug>/lecture.template.md
 ```
 
 Use YAML frontmatter plus the required Markdown headings:
@@ -62,7 +82,7 @@ Progress tracking is automatic in the rendered site for authored `## Section:` b
 
 ## Multi-Lecture Collection Workflow
 
-When the repository contains a `lectures/` directory, treat it as a collection of lecture templates instead of a single active lecture. Use numbered subdirectories so authored order stays obvious:
+When the user has confirmed a collection and the repository contains a `lectures/` directory, treat it as a collection of lecture templates. Use numbered subdirectories so authored order stays obvious:
 
 ```text
 lectures/
@@ -72,9 +92,9 @@ lectures/
     lecture.template.md
 ```
 
-For a collection:
+The existing `lectures/01-introduction/` directory may be only the starter created by `init`; it does not define the course size, topic boundaries, audience, or lecture count. For a collection:
 
-1. Read the course outline or multi-lecture source.
+1. Read the confirmed course outline or multi-lecture source. If the collection is based on explicitly authorized external research, use the approved research brief and outline instead; do not invent a raw course source.
 2. Add `lectures/course.yaml` when the course title and description are known. This file is optional and separate from lecture frontmatter.
 3. Create one numbered subdirectory per lecture under `lectures/`, preferably with `npm run new:lecture`.
 4. Preserve user-supplied source evidence as `lectures/<slug>/raw-lecture.txt` for each lecture when per-lecture source is available. This is the default agent context for the requested lecture(s).
@@ -99,18 +119,20 @@ duration: "3 hours"
 
 ## Conversion Process
 
-1. Read the raw lecture source completely.
-2. Identify the lecture title, intended audience, likely level, duration, learning objectives, major sections, examples, caveats, practical steps, and takeaways.
-3. Preserve source-grounded meaning. Reorganize and clarify, but do not add unsupported facts, statistics, tools, external references, or promises.
-4. If the source is incomplete or uncertain, preserve that uncertainty in neutral wording.
-5. Create 3-6 coherent ordered sections unless the source is clearly shorter.
-6. Use visual components only when they improve comprehension.
-7. Keep every component inside a `## Section: <section title>` block.
-8. Run `npm run validate`. Use `npm run validate -- --json` when revising from machine-readable feedback.
-9. Revise `content/lecture.template.md` or collection templates until validation passes.
-10. Run `npm run review:source` before approval review so the reviewer has source paths, validation status, rendered routes, and checklist fields.
-11. Run `npm run doctor` before preview, source-review, or package handoff.
-12. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
+1. Complete the source-aware intake and, when needed, the research brief and scope checkpoint described above.
+2. Read the requested raw lecture source completely. For an explicitly authorized external-research draft, use only the bounded approved research brief and source basis; do not treat it as human raw source.
+3. Identify the lecture title, intended audience, likely level, duration, learning objectives, major sections, examples, caveats, practical steps, and takeaways.
+4. Preserve source-grounded meaning. Reorganize and clarify, but do not add unsupported facts, statistics, tools, external references, or promises. For research-backed drafts, keep claims within the approved source basis and add concise references with `resource_links` when useful.
+5. If the source is incomplete or uncertain, preserve that uncertainty in neutral wording.
+6. Create 3-6 coherent ordered sections unless the source is clearly shorter.
+7. Use visual components only when they improve comprehension.
+8. Keep every component inside a `## Section: <section title>` block.
+9. Run `npm run validate`. Use `npm run validate -- --json` when revising from machine-readable feedback.
+10. Revise `content/lecture.template.md` or collection templates until validation passes.
+11. Run `npm run review:source` before approval review so the reviewer has source paths, validation status, rendered routes, and checklist fields.
+12. Run `npm run doctor` before preview, source-review, or package handoff.
+13. Run or tell the user to run `npm run dev` and preview `http://localhost:3000`.
+14. Finish with the staged handoff report: artifact paths, lecture count, validation status, human-source/evidence status, warnings, and next action.
 
 ## Source Fidelity Review
 
@@ -124,6 +146,8 @@ Raw sources are review evidence, not learner-facing render inputs.
 
 Raw-file handling cannot establish provenance cryptographically. The workflow can preserve paths, classify scaffold placeholders, and prevent agent-side mutation, but it cannot determine whether text supplied by a user was originally AI-generated.
 
+An externally researched lecture or collection is a derived draft. It does not change a raw file's `present`, `missing`, or `placeholder` status, and it does not satisfy the human-source requirement for source-fidelity approval. `lectures/raw-course.txt` remains optional shared human evidence: its presence alone is not authorization to load it into agent context, and it is separate from internet-research authorization.
+
 Run `npm run review:source` after validation work. The command creates `docs/review-worksheets/<timestamp>-source-fidelity-review.md` even when validation fails, because invalid state is useful review evidence. Missing raw source files should be reported, but they are not schema validation failures.
 
 ## Review Package Handoff
@@ -136,6 +160,8 @@ Create a static review package only when the user asks for a handoff artifact or
 4. Run `npm run review:source` if the reviewer needs source fidelity evidence before handoff.
 5. Run `npm run package:review`.
 6. Report the generated `review-packages/<timestamp>-lecture-site/` path.
+
+In the handoff report, also name the authored files and lecture count, state validation and human-source/evidence status, list warnings, and give the next command or user decision. A research-backed package must remain labeled as a derived draft with missing or placeholder human evidence when applicable.
 
 Packaging validates before export. Invalid single lectures or invalid collection lectures must be fixed before a completed package is created.
 Use `npm run package:review` only for portable handoff artifacts. The package includes `REVIEW_WORKSHEET.md` and any raw source files present at the expected evidence paths.
@@ -453,3 +479,4 @@ Do not invent custom component types. Unsupported component types fail validatio
 - Component YAML uses only supported types and required fields.
 - `npm run validate` passes without errors.
 - `npm run doctor` reports the project is ready for the intended next step.
+- The final report states the selected standalone/collection scope, created or updated files, lecture count, validation result, human-source/evidence status, warnings, and next action.

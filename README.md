@@ -27,20 +27,13 @@ lectures/
     raw-lecture.txt
 .claude/skills/lecture-site-engine/SKILL.md
 .codex/skills/
-  banner-design/
-  brand/
-  design/
-  design-system/
   lecture-site-engine/
-  slides/
-  ui-styling/
-  ui-ux-pro-max/
 SKILL.md
 ```
 
-`init` copies every bundled Codex skill and its supporting references, data, and scripts. Existing consumer-owned skill files are preserved. These skills provide instructions and local assets; optional companion tools, API keys, and packages mentioned by a skill are installed separately when needed.
+`init` installs only the Lecture Site Engine entry points: the root `SKILL.md`, the Claude Code skill, and the Codex `lecture-site-engine` skill. Existing consumer-owned skill files are preserved. Auxiliary skills bundled in the repository are not added to a consumer project by `init`.
 
-Replace the placeholder with human/user/educator course material, then ask your coding agent to follow the `lecture-site-engine` skill and create the lecture. The agent should preserve that source and write the generated lesson to `lecture.template.md`. Raw-source files are never agent-generated output.
+Replace the placeholder with human/user/educator course material, then ask your coding agent to follow the `lecture-site-engine` skill and create the lecture. The agent should preserve that source and write the generated lesson to `lecture.template.md`. Raw-source files are never agent-generated output. The `01-introduction` directory is only a starter scaffold; it is not a course outline or a decision to create exactly one lecture.
 
 Validate and preview:
 
@@ -65,7 +58,7 @@ Codex discovers:
 .codex/skills/lecture-site-engine/SKILL.md
 ```
 
-The initializer also installs these independently discoverable Codex skills:
+The repository may contain additional independently discoverable Codex skills for development, but `init` does not install them:
 
 - `banner-design`
 - `brand`
@@ -85,7 +78,25 @@ Read and follow the lecture-site-engine skill. Use the raw lecture source in lec
 
 ## Authoring workflow
 
-1. Supply human raw source evidence next to each lecture template.
+The agent begins by inspecting source status and reporting whether relevant raw files are present, missing, or scaffold placeholders. It then keeps a clear standalone request as one lecture. For a broad topic, it asks one targeted lecture-vs-course question, recommending a collection when the subject is naturally course-sized, or states a clear assumption when the scope is already decided. The starter scaffold never silently determines the course size.
+
+Human raw source is the default. If it is unavailable, internet research is allowed only after direct user authorization. The agent should provide a bounded research brief with a proposed outline and concise source links before drafting when scope is material. Links belong in the existing `resource_links` component; research-backed output is a derived draft and does not become human source evidence. The engine does not fetch URLs at runtime or add a bibliography schema.
+
+The staged flow is: authoring brief → (authorized) research brief → scope checkpoint → selected lecture or confirmed collection → validation and handoff. The final report should identify created/updated files, lecture count, validation result, human-source/evidence status, warnings, and the next command or decision.
+
+A preferred response shape for a broad, internet-backed request is:
+
+```text
+Authoring brief: [mode, scope, assumptions, source status, expected paths]
+Research brief: [bounded concepts, proposed outline, concise source links]
+Scope checkpoint: [one recommended lecture-vs-course decision]
+Draft and verification: [created files, lecture count, validation/source-review status]
+Handoff: [warnings, human-source limitation, next action]
+```
+
+After the scope is clear, use:
+
+1. Supply human raw source evidence next to each lecture template when available.
 2. Ask Claude Code, Codex, or another agent to follow `SKILL.md`.
 3. Run `npx lecture-site-engine validate`.
 4. Preview with `npx lecture-site-engine dev`.

@@ -1,0 +1,153 @@
+# Implementation Plan: Improve the Research-Backed Lecture Authoring UX
+
+## Summary
+
+Improve the Lecture Site Engine agent skill for the interaction shown in Spec 023. The current flow correctly notices that the starter raw file is only a placeholder, but then has two poor user-experience transitions:
+
+- it turns “create lecture for DB Internals” into a source-blocking request without explaining the available authoring paths;
+- after the user says “I don't have source find it in internet,” it researches immediately and silently treats the existing 01-introduction scaffold as the scope, producing one introductory lecture without first resolving whether the user wants a standalone lecture or a broader course.
+
+The revised skill should provide a short, staged authoring intake and progress flow. It should report the current source/evidence state, detect when a request is broad enough to represent a course, ask one targeted lecture-vs-course question when that choice materially changes the output, and recommend a multi-lecture collection for umbrella topics without creating one silently. After explicit internet-research authorization, it should produce a concise research brief and proposed outline/source basis before drafting when scope is ambiguous, then generate the selected single lecture or collection. It should finish with a clear report of files, lecture count, validation status, human-source limitation, and next action.
+
+This remains an agent-guidance improvement, not a new interactive product workflow. The engine will not fetch URLs at runtime, persist authoring-session state, create raw evidence, or add a new citation schema. Existing collection scaffolding, course metadata, validation, source review, doctor, review-package, and resource_links capabilities should be reused.
+
+## Relevant Existing Files
+
+### Canonical workflow and distributed guidance
+
+- .claude/skills/lecture-site-engine/SKILL.md: canonical authoring instructions. Update the Inputs, Multi-Lecture Collection Workflow, Conversion Process, Source Fidelity Review, Review Package Handoff, and final checklist sections with the staged intake/research/draft/handoff flow.
+- .codex/skills/lecture-site-engine/SKILL.md: Codex entry point; keep it aligned as a pointer plus concise workflow summary.
+- SKILL.md: root fallback summary; expose the same source-status, scope-selection, explicit-research, and handoff behavior.
+- AGENTS.md and CLAUDE.md: repository-specific agent rules; preserve raw-source ownership and add the concise UX boundary.
+
+### Existing authoring/scaffold behavior
+
+- src/lib/lecture-template/scaffold.ts: detectAuthoringMode() treats any lectures/ directory as collection mode, and scaffoldCollection() creates lectures/01-introduction as a minimal starter. Guidance must make clear that this starter directory is not a course outline or permission to author only one lecture.
+- src/cli/commands/init.ts: initialization reports the placeholder/source next step and installs the distributed guidance. Do not change command behavior unless implementation exposes a concrete messaging inconsistency.
+- src/lib/lecture-template/courseMetadata.ts, src/lib/lecture-template/collection.ts, and src/lib/lecture-template/types.ts: existing course metadata, ordered collection, and lecture-template contracts to reuse when the user selects a course.
+- src/lib/lecture-template/validateCli.ts, src/lib/lecture-template/sourceReview.ts, src/lib/lecture-template/doctor.ts, and src/lib/lecture-template/reviewPackage.ts: existing validation and handoff stages that the skill should sequence and report; no new runtime orchestration is required.
+
+### Documentation and tests
+
+- README.md: user-facing quick start, authoring workflow, collection structure, and command guidance; document the staged flow and the distinction between a starter scaffold and a planned course.
+- DEVELOPMENT.md: maintainer description of distributed skills, source-review semantics, and compatibility boundaries.
+- tests/lecture-template/agent-guidance.test.ts: deterministic contract test for aligned guidance; extend it for the new UX policy.
+- tests/lecture-template/init.test.ts and tests/lecture-template/scaffold.test.ts: preserve existing placeholder, non-overwrite, and starter-collection behavior.
+- tests/lecture-template/source-review.test.ts, tests/lecture-template/doctor.test.ts, and tests/lecture-template/review-package.test.ts: preserve missing/placeholder source, readiness, and package behavior.
+
+## Proposed Implementation Steps
+
+1. Define a source-aware authoring intake in the canonical skill.
+   - Start every authoring request by reporting the active mode, relevant template/scaffold paths, raw-source status, and whether a real source is available. Treat scaffold placeholders as non-evidence.
+   - Classify the request as a standalone lecture or a course/collection request based on the wording and requested scope. Treat umbrella topics such as “DB Internals” as potentially course-level rather than assuming the first scaffold lecture is the complete result.
+   - When the choice materially affects output, ask one targeted question with a recommended option, for example: “Do you want one introductory lecture or a multi-lecture DB Internals course? I recommend a collection because the topic is broad.” Do not ask a long questionnaire.
+   - If the request is sufficiently clear, state the assumption and proceed. Never let lectures/01-introduction silently decide course size, topic boundaries, audience, or lecture count.
+   - Explain the two source paths: user-provided human raw source, or agent-time external research only after direct user authorization. Missing/placeholder source alone must not authorize browsing or source fabrication.
+
+2. Define a staged external-research and authoring flow.
+   - Stage 1 — Authoring brief: summarize the selected mode, working title, audience/level assumptions, source strategy, expected output paths, and the immediate next step.
+   - Stage 2 — Research brief, only after explicit internet authorization: use authoritative primary/current sources, keep the research bounded to the requested scope, identify the proposed concepts/sections, and list concise source links. Do not write research notes or copied web content into raw-source files.
+   - Stage 3 — Scope checkpoint: when the topic or lecture-vs-course choice remains material, show the proposed outline and source basis and wait for the user’s confirmation. When the request is clear and authorization is explicit, state the outline/assumptions and proceed without unnecessary extra turns.
+   - Stage 4 — Draft: generate the selected standalone template or collection. For a collection, use lectures/course.yaml and numbered lecture templates in authored order; create only the number of lectures justified by the confirmed outline. For a standalone lecture, do not expand it into a course.
+   - Stage 5 — Verify and hand off: run validation, source review, doctor, and review-package steps when requested. Report exactly what was created/updated, lecture count, validation result, source/evidence status, warnings, and the next command or user decision.
+   - Keep progress messages user-facing and outcome-oriented. Do not expose confusing internal exploration, speculative scope changes, or a “created” success claim before validation and artifact paths are known.
+
+3. Define the provenance and research-output contract.
+   - Preserve the existing prohibition against creating, editing, rewriting, summarizing into, replacing, deleting, or overwriting content/raw-lecture.txt, lectures/<slug>/raw-lecture.txt, lectures/raw-course.txt, or raw-source fixtures.
+   - Label an externally researched result as a derived draft, not human source evidence. A missing or placeholder raw file remains missing/placeholder; it is never promoted to present.
+   - Use the existing resource_links component for concise references in the generated lecture/collection. Do not add a citation field, bibliography schema, URL crawler, link checker, or runtime fetch promise.
+   - Tell the user that source-fidelity approval still requires human review/evidence. Preserve the existing limitation that the system cannot cryptographically determine whether supplied text was AI-generated.
+   - Keep lectures/raw-course.txt as optional shared human evidence whose presence is not authorization to load it into agent context; it is separate from internet-research permission.
+
+4. Align distributed guidance and user/maintainer documentation.
+   - Update .claude/skills/lecture-site-engine/SKILL.md as the source of truth, then align .codex/skills/lecture-site-engine/SKILL.md, SKILL.md, AGENTS.md, and CLAUDE.md.
+   - Update README.md with a compact authoring flow: inspect source status, choose standalone vs collection, authorize research if needed, review the brief/outline, generate, validate, and hand off. Explain that the starter 01-introduction folder is only a scaffold.
+   - Update DEVELOPMENT.md with the agent-time-only boundary, no-session-state/no-runtime-fetch decision, reuse of existing collection and review commands, and unchanged source/readiness semantics.
+   - Include an example of the preferred response shape for a broad internet-backed request, without hardcoding DB Internals content or adding external web text to fixtures.
+   - Preserve the golden-conversion restriction: do not expose examples/golden.template.md in agent-facing authoring guidance.
+
+5. Add deterministic UX-contract tests and verify compatibility.
+   - Extend tests/lecture-template/agent-guidance.test.ts to assert that all five guidance entry points describe:
+     - source-status inspection and placeholder non-evidence;
+     - lecture-vs-course scope selection and the rule that the starter scaffold does not determine course size;
+     - one targeted clarification/recommended option for materially ambiguous scope;
+     - explicit authorization before internet research;
+     - research brief/outline/source-link and final artifact/status reporting;
+     - derived-draft labeling, raw-source protection, shared-source opt-in, and provenance limitation.
+   - Keep tests deterministic and text-contract-focused. Do not run network requests, simulate an LLM, test search quality, or attempt to prove whether content is AI-generated.
+   - Preserve init.test.ts and scaffold.test.ts coverage proving placeholders are created/classified correctly, lectures/raw-course.txt is not auto-created, and authored files are not overwritten.
+   - Preserve source-review, doctor, and review-package tests proving missing/placeholder human evidence remains reportable and nonfatal where currently specified, and external resource links remain authored metadata.
+   - Run the full validation, lint, typecheck, test, application-build, and CLI-build checks. Use a disposable manual interaction to verify both a clear standalone request and a broad “find it online” request: the former does not expand into a course; the latter presents the recommended scope/outline before generating a confirmed collection or lecture set.
+
+## Data Model, API, Persistence, and Event Changes
+
+- No lecture-template frontmatter, component, course metadata, route, or collection schema changes.
+- No new agent-session state, interactive CLI, browser UI, persistence, database, event, analytics, or remote research service.
+- Reuse existing lectures/course.yaml, numbered lecture directories, validation, source-review, doctor, review-package, and resource_links contracts.
+- No changes to present, missing, or placeholder raw-source statuses or source-fidelity readiness semantics.
+- Internet access remains an explicitly authorized authoring-agent action only. The generated site renders authored links without fetching them.
+
+## Test Plan
+
+### Focused automated tests
+
+- tests/lecture-template/agent-guidance.test.ts
+  - all five guidance entry points retain raw-source mutation prohibition, placeholder semantics, shared-source opt-in, and provenance limitation;
+  - guidance distinguishes standalone lectures from course collections and says the starter scaffold does not define scope;
+  - broad/ambiguous requests use one targeted scope question or an explicit recommended assumption;
+  - external research requires explicit user authorization and follows a brief/outline/source-link/draft/handoff sequence;
+  - final reporting includes files, lecture count, validation/evidence status, warnings, and next action.
+- tests/lecture-template/init.test.ts and tests/lecture-template/scaffold.test.ts
+  - existing starter collection behavior, placeholder classification, no automatic shared raw file, and non-overwrite guarantees remain unchanged.
+- tests/lecture-template/source-review.test.ts, tests/lecture-template/doctor.test.ts, and tests/lecture-template/review-package.test.ts
+  - existing human-source status, readiness, package, and resource-link behavior remains unchanged.
+
+### Verification commands
+
+    npm test -- tests/lecture-template/agent-guidance.test.ts tests/lecture-template/init.test.ts tests/lecture-template/scaffold.test.ts
+    npm test -- tests/lecture-template/source-review.test.ts tests/lecture-template/doctor.test.ts tests/lecture-template/review-package.test.ts
+    npm run validate
+    npm run typecheck
+    npm run lint
+    npm test
+    npm run build
+    npm run build:cli
+
+Manual verification should use a temporary consumer workspace and preserve the repository’s raw files:
+
+1. Give the agent a clear standalone topic and confirm it does not silently create a multi-lecture course.
+2. Give the agent a broad topic with no human source and explicitly authorize internet research. Confirm it reports a recommended lecture-vs-course choice, research outline, sources, and expected files before generating; after confirmation, verify the generated collection/lecture count matches the agreed scope.
+3. Confirm review:source, doctor, and package:review report missing/placeholder human evidence without relabeling the researched draft as human source.
+
+## Risks, Assumptions, and Open Questions
+
+### Risks and mitigations
+
+- The new flow could become too conversational. Limit it to one targeted scope question and one outline checkpoint only when the choice materially changes output; otherwise state assumptions and proceed.
+- Broad topics may still be under-scoped. Recommend a collection for umbrella topics but do not create multiple lectures without a confirmed outline or an explicit user-approved default.
+- The starter scaffold may continue to bias the agent toward one lecture. State in every relevant guidance entry point that 01-introduction is a placeholder, not a course plan or lecture-count decision.
+- External research may be mistaken for source fidelity. Label the result as derived, preserve raw-source statuses, and report human-source limitations in the final handoff.
+- Progress messages may expose internal tool failures or false success. Require outcome-oriented stage reporting and only claim completion after validation/artifact checks.
+- Guidance entry points may drift. Keep the canonical Claude skill authoritative and extend the existing deterministic alignment test.
+- Manual UX verification may depend on a particular agent surface. Keep the product contract in portable guidance language and test observable repository behavior separately from the conversational transcript.
+
+### Assumptions
+
+- The user’s “I don't have source find it in internet” is explicit authorization for agent-time research, but not permission to choose an unconfirmed course scope.
+- “DB Internals” is representative of a broad umbrella topic where recommending a multi-lecture collection is better UX than silently creating only 01-introduction.
+- Existing scaffolding and collection commands are sufficient for generation once the agent has a confirmed outline; this spec does not require new CLI prompts or a course-planning data model.
+- External research can be represented through existing lecture content and resource_links; no raw-source or bibliography ingestion feature is required.
+- Existing raw-source ownership and review semantics from Spec 022 remain authoritative.
+
+### Open questions
+
+- No blocking implementation question remains for this plan. The recommended default is one concise lecture-vs-course clarification for broad topics, with a collection recommendation; implementers should not auto-generate a multi-lecture course when the user has not confirmed the scope.
+
+## Out of Scope
+
+- Implementing DB Internals lecture content or selecting its final curriculum in this repository.
+- Automatically browsing the internet because a raw file is missing.
+- Creating, editing, summarizing into, replacing, deleting, or overwriting raw-source files.
+- Treating external web content or generated research notes as human present source evidence.
+- Adding an interactive course planner, conversational state machine, new CLI prompts, persistent authoring sessions, citation/bibliography schema, URL crawler, link checker, runtime fetch, hosted research service, or AI-authorship detector.
+- Changing lecture components, validation rules, collection routes, learner progress, static export, review-package paths, or doctor readiness semantics.

@@ -20,13 +20,14 @@ describe("project initialization", () => {
     if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it("installs both agent skill entry points and a collection scaffold", async () => {
+  it("installs only Lecture Site Engine skill entry points and a collection scaffold", async () => {
     const status = await runInit([], { packageRoot: repoRoot });
 
     expect(status).toBe(0);
     expect(existsSync(path.join(tempRoot, "SKILL.md"))).toBe(true);
     expect(existsSync(path.join(tempRoot, ".claude/skills/lecture-site-engine/SKILL.md"))).toBe(true);
     expect(existsSync(path.join(tempRoot, ".codex/skills/lecture-site-engine/SKILL.md"))).toBe(true);
+    expect(readdirSync(path.join(tempRoot, ".codex/skills"))).toEqual(["lecture-site-engine"]);
     expect(existsSync(path.join(tempRoot, "lectures/course.yaml"))).toBe(true);
     expect(existsSync(path.join(tempRoot, "lectures/01-introduction/lecture.template.md"))).toBe(true);
     expect(readFileSync(path.join(tempRoot, "lectures/01-introduction/raw-lecture.txt"), "utf8")).toBe(RAW_SOURCE_PLACEHOLDER);
@@ -37,20 +38,13 @@ describe("project initialization", () => {
     expect(readFileSync(path.join(tempRoot, "lectures/01-introduction/raw-lecture.txt"), "utf8")).toBe(RAW_SOURCE_PLACEHOLDER);
   });
 
-  it("installs every packaged Codex skill and its supporting files", async () => {
+  it("does not install auxiliary packaged Codex skills", async () => {
     const status = await runInit([], { packageRoot: repoRoot });
 
     expect(status).toBe(0);
-    const packageManifest = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8")) as { files?: string[] };
-    expect(packageManifest.files).toContain(".codex/skills");
-    const packagedFiles = collectFiles(path.join(repoRoot, ".codex/skills"), ".codex/skills");
-    expect(packagedFiles.length).toBeGreaterThan(1);
-
-    for (const relativePath of packagedFiles) {
-      const installedPath = path.join(tempRoot, relativePath);
-      expect(existsSync(installedPath)).toBe(true);
-      expect(readFileSync(installedPath, "utf8")).toBe(readFileSync(path.join(repoRoot, relativePath), "utf8"));
-    }
+    expect(existsSync(path.join(tempRoot, ".codex/skills/lecture-site-engine/SKILL.md"))).toBe(true);
+    expect(existsSync(path.join(tempRoot, ".codex/skills/design"))).toBe(false);
+    expect(existsSync(path.join(tempRoot, ".codex/skills/slides"))).toBe(false);
   });
 
   it("preserves existing agent files and authored project files", async () => {
@@ -95,11 +89,3 @@ describe("project initialization", () => {
     expect(readFileSync(sharedPath, "utf8")).toBe("Human shared course source.\n");
   });
 });
-
-function collectFiles(directory: string, relativeDirectory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const absolutePath = path.join(directory, entry.name);
-    const relativePath = path.posix.join(relativeDirectory, entry.name);
-    return entry.isDirectory() ? collectFiles(absolutePath, relativePath) : [relativePath];
-  }).sort();
-}

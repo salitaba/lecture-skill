@@ -1,0 +1,152 @@
+This a example of user use this skill and If need improve skill do it :
+
+ You have 1 usage limit reset available. Run /usage to use one.
+
+
+› create lecture for db internals
+
+
+• I’m using the lecture-site-engine skill to turn the repository’s DB internals material into a validated lecture page/collection, and I’ll first inspect its source structure and
+  the skill’s required workflow.
+
+• Explored
+  └ Read SKILL.md (lecture-site-engine skill)
+    List rg --files -g '!node_modules' -g '!target'
+    Read SKILL.md, course.yaml, lecture.template.md, raw-lecture.txt
+
+• Ran rg --files -g 'package.json' -g 'README*' -g 'examples/**' -g 'scripts/**' -g 'src/**' | sed -n '1,200p' && [ -f package.json ] && sed -n '1,240p' package.json
+  └ (no output)
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I can create it, but the repository only contains a placeholder raw source:
+
+  lectures/01-introduction/raw-lecture.txt
+
+  Please provide the DB Internals lecture notes/source text, and I’ll convert it into a validated lecture template.
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+› I don't have source find it in internet
+
+
+• I’ll use authoritative public material as the lecture’s evidence base—primarily PostgreSQL’s storage/architecture documentation plus a university database-systems lecture source
+  —then create the first DB Internals lecture and validate the collection. I’ll keep the lesson introductory because the repository currently has only an 01-introduction scaffold.
+
+• Searching the web
+
+• Searched the web for site:postgresql.org/docs/current PostgreSQL storage internals pages and rows heap files ...
+
+• Explored
+  └ List ls -la
+    Search ./.git/* in .
+
+• Searching the web
+
+• Searched the web
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• I found a solid, sourceable scope: an introductory storage-focused lecture. It will cover the DBMS path from query to page, fixed-size pages and heap files, the buffer pool, and
+  write-ahead logging/recovery, with PostgreSQL as the concrete case study and CMU’s database-systems material as the conceptual source.
+
+• Explored
+  └ Read course.yaml, lecture.template.md
+
+
+ The lecture and course metadata are now authored, with the raw placeholder left untouched. I’m checking the repository’s available validation path next; this checkout has no
+  package.json, so I may need to use the released Lecture Site Engine CLI instead of the local npm run validate script.
+
+• Ran npm run validate
+  └ npm error code ENOENT
+    npm error syscall open
+    … +5 lines (ctrl + t to view transcript)
+    npm error Log files were not written due to an error writing to the directory: /home/alitabatabaei/.npm/_logs
+    npm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal
+
+• Waited for background terminal · npx lecture-site-engine validate
+
+• Ran npx lecture-site-engine validate
+  └ npm error code EAI_AGAIN
+    npm error syscall getaddrinfo
+    … +2 lines (ctrl + t to view transcript)
+    npm error Log files were not written due to an error writing to the directory: /home/alitabatabaei/.npm/_logs
+    npm error You can rerun the command with `--loglevel=verbose` to see the logs in your terminal
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The local validation command cannot run because this checkout lacks its project package, and the fallback CLI hit a DNS/network restriction. I’m retrying that validation with
+  network access so the authored schema can be checked rather than relying only on manual inspection.
+
+✔ You approved codex to always run commands that start with npx lecture-site-engine
+
+• Ran npx lecture-site-engine validate
+  └ npm warn exec The following package was not found and will be installed: lecture-site-engine@0.1.1
+    npm notice run npx
+    … +9 lines (ctrl + t to view transcript)
+
+    0 of 1 lectures passed validation.
+
+• Edited lectures/01-introduction/lecture.template.md (+7 -8)
+    164
+    165 -## Key Takeaways
+    166 -
+    167 -- A DBMS turns logical data access into movement and modification of fixed-size pages.
+    168 -- The storage manager owns the mapping between page identifiers and persistent files.
+    169 -- The buffer pool keeps a working set in memory and coordinates fetches, dirty pages, and eviction.
+    170 -- A page and a memory frame are related but different: one is a logical database unit, the other is a memory location.
+    171 -- Write-ahead logging records changes durably before dirty data pages are flushed, giving crash recovery something to replay.
+    172 -
+    165  ```lecture-component
+        ⋮
+    185
+    186 +## Key Takeaways
+    187 +
+    188 +- A DBMS turns logical data access into movement and modification of fixed-size pages.
+    189 +- The storage manager owns the mapping between page identifiers and persistent files.
+    190 +- The buffer pool keeps a working set in memory and coordinates fetches, dirty pages, and eviction.
+    191 +- A page and a memory frame are related but different: one is a logical database unit, the other is a memory location.
+    192 +- Write-ahead logging records changes durably before dirty data pages are flushed, giving crash recovery something to replay.
+
+• Ran npx lecture-site-engine validate
+  └ npm notice run npx
+    npm notice run 'lecture-site-engine' validate
+    … +7 lines (ctrl + t to view transcript)
+
+    1 of 1 lectures passed validation.
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• The lecture now passes collection validation. I’m running the skill’s source-fidelity review and project doctor checks next; these will verify that the external-reference-based
+  lesson is reviewable and that the collection is ready for handoff.
+
+• Ran npx lecture-site-engine review:source
+  └ npm notice run npx
+    npm notice run 'lecture-site-engine' review:source
+    … +9 lines (ctrl + t to view transcript)
+    Optional shared human source evidence: lectures/raw-course.txt (missing)
+    Human review fields still need completion before source fidelity approval.
+
+• Ran npx lecture-site-engine doctor
+  └ npm notice run npx
+    npm notice run 'lecture-site-engine' doctor
+    … +35 lines (ctrl + t to view transcript)
+    - WARN_PLACEHOLDER_RAW_SOURCE: one or more primary raw source files are scaffold placeholders; replace them with human source evidence.
+    - WARN_MISSING_PACKAGE: no static review package was found.
+
+• Ran git status --short && git diff --stat && git diff -- lectures/course.yaml lectures/01-introduction/lecture.template.md | sed -n '1,260p'
+  └ fatal: not a git repository (or any of the parent directories): .git
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+• Created and validated the introductory DB Internals lecture:
+
+  - lectures/01-introduction/lecture.template.md
+  - lectures/course.yaml
+  - docs/review-worksheets/2026-07-14-1831-source-fidelity-review.md
+
+  Content is based on CMU’s database storage material (https://15445.courses.cs.cmu.edu/fall2020/notes/03-storage1.pdf), CMU’s buffer-pool project
+  (https://15445.courses.cs.cmu.edu/spring2025/project1/), and PostgreSQL internals documentation (https://www.postgresql.org/docs/current/storage.html).
+
+  Validation passed. The doctor check reports preview-ready, with a warning that the repository’s raw source remains only a scaffold placeholder.

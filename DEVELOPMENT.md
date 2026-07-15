@@ -58,11 +58,19 @@ The lecture authoring workflow is exposed through three repository entry points:
 - `.codex/skills/lecture-site-engine/SKILL.md` for Codex.
 - `SKILL.md` as a root fallback for other agents.
 
-The published npm package includes these entry points plus every file under `.codex/skills/`. `npx lecture-site-engine init` copies the complete bundled Codex skill tree into a consumer project, preserves existing consumer-owned files, and creates the default collection scaffold. The implementation lives in `src/cli/commands/init.ts`; its behavior is covered by `tests/lecture-template/init.test.ts`.
+The published npm package includes these entry points plus the repository's auxiliary `.codex/skills/` assets. `npx lecture-site-engine init` copies only the Lecture Site Engine entry points into a consumer project, preserves existing consumer-owned files, and creates the default collection scaffold. The implementation lives in `src/cli/commands/init.ts`; its behavior is covered by `tests/lecture-template/init.test.ts`.
 
-The bundled Codex skills are `banner-design`, `brand`, `design`, `design-system`, `slides`, `ui-styling`, and `ui-ux-pro-max`. Their instructions may reference optional external companion skills or tools; `init` distributes the local instructions and assets but does not install those external dependencies.
+The repository's auxiliary Codex skills are `banner-design`, `brand`, `design`, `design-system`, `slides`, `ui-styling`, and `ui-ux-pro-max`. They remain available for repository development and packaging, but `init` does not copy them into consumer projects. Their instructions may reference optional external companion skills or tools.
 
 Keep the skill aligned with the validator and README. Do not expose golden-answer content in agent-accessible instructions.
+
+### Agent authoring UX boundary
+
+The staged authoring flow is guidance-only. It starts with source-status intake, distinguishes a clear standalone lecture from a confirmed collection, and treats `lectures/01-introduction/` as a starter scaffold rather than a course plan. Broad or materially ambiguous requests get one targeted lecture-vs-course decision or a stated recommended assumption; the agent must not silently reduce a broad topic to the starter lecture.
+
+Human raw source remains the default evidence path. Direct user authorization is required before agent-time internet research. That research is bounded, summarized as a brief and proposed outline with concise `resource_links`, and labeled as a derived draft. It never creates or changes raw-source files and never promotes external research to present human evidence. Per-lecture sources remain the default context; `lectures/raw-course.txt` is optional shared human evidence and its presence alone is not authorization to load it.
+
+This UX does not add session state, an interactive CLI, runtime URL fetching, a citation or bibliography schema, a source-ingestion service, a route, learner progress behavior, or readiness semantics. It reuses the existing collection scaffold, validation, `review:source`, `doctor`, and `package:review` commands. A handoff reports created/updated files, lecture count, validation result, human-source/evidence status, warnings, and the next action. Source-review worksheets and doctor output continue to use `present`, `missing`, and `placeholder`; file handling cannot cryptographically determine whether supplied text was AI-generated.
 
 ## Documentation and review workflows
 
