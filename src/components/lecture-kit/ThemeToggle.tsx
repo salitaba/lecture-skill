@@ -41,7 +41,11 @@ export function ThemeToggle() {
   }
 
   if (theme === null) {
-    return <span className="theme-toggle theme-toggle-placeholder" aria-hidden="true" />;
+    return (
+      <span className="theme-toggle theme-toggle-placeholder" aria-hidden="true">
+        <Icon name="moon" />
+      </span>
+    );
   }
 
   return (

@@ -4,7 +4,7 @@ import { collectCollectionGlossary } from "@/lib/lecture-template/glossaryIndex"
 import { LECTURES_DIR } from "@/lib/lecture-template/readTemplate";
 import { collectionProgressKey, progressIdFromCollectionBase, type ProgressLecture } from "@/lib/lecture-template/progress";
 import { sumLectureReadingMinutes } from "@/lib/lecture-template/readingTime";
-import { FactsList } from "@/components/component-kit";
+import { FactsList, Icon } from "@/components/component-kit";
 import { AssessmentIndexDisclosure } from "./AssessmentIndexDisclosure";
 import { CollectionGlossaryIndex } from "./CollectionGlossaryIndex";
 import { CollectionReviewStatus } from "./CollectionReviewStatus";
@@ -66,10 +66,12 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
               ]}
             />
           ) : null}
-          <CollectionPrimaryAction lectures={progressLectures} />
-          <a href="#lecture-list" className="collection-view-all-lectures">
-            View all lectures
-          </a>
+          <div className="collection-header-actions">
+            <CollectionPrimaryAction lectures={progressLectures} />
+            <a href="#lecture-list" className="collection-view-all-lectures">
+              View all lectures <Icon name="arrow-next" />
+            </a>
+          </div>
         </header>
 
         <CollectionProgressBar />

@@ -25,64 +25,71 @@ export function LectureList({
   const resumeSlug = loaded && resumeTarget.label !== "Continue course" ? resumeTarget.slug : undefined;
 
   return (
-    <ol className="lecture-list" id="lecture-list">
-      {results.map((result, index) => {
-        const template = result.template ?? fallbackTemplate(result);
-        const lectureNumber = lectureNumberFromSlug(result.slug, index);
-        const lectureTitle = template.metadata.title.trim() || humanizeSlug(result.slug);
-        const summary = lectures.find((lecture) => lecture.slug === result.slug);
-        const learnerState: LearnerState | undefined = !result.valid || !summary
-          ? undefined
-          : summary.percentComplete === 100
-            ? "completed"
-            : summary.percentComplete > 0
-              ? "in-progress"
-              : "not-started";
-        const isResumeCard = result.slug === resumeSlug;
-        const itemClassName = [
-          "lecture-list-item",
-          isResumeCard ? "lecture-list-item-resume" : null,
-          learnerState === "completed" ? "lecture-list-item-complete" : null
-        ]
-          .filter(Boolean)
-          .join(" ");
+    <section className="lecture-list-section" aria-labelledby="lecture-list-heading">
+      <header className="lecture-list-heading">
+        <p className="section-kicker">Course map</p>
+        <h2 id="lecture-list-heading">Lectures</h2>
+        <p>Move through the course in order, or resume where you left off.</p>
+      </header>
+      <ol className="lecture-list" id="lecture-list">
+        {results.map((result, index) => {
+          const template = result.template ?? fallbackTemplate(result);
+          const lectureNumber = lectureNumberFromSlug(result.slug, index);
+          const lectureTitle = template.metadata.title.trim() || humanizeSlug(result.slug);
+          const summary = lectures.find((lecture) => lecture.slug === result.slug);
+          const learnerState: LearnerState | undefined = !loaded || !result.valid || !summary
+            ? undefined
+            : summary.percentComplete === 100
+              ? "completed"
+              : summary.percentComplete > 0
+                ? "in-progress"
+                : "not-started";
+          const isResumeCard = result.slug === resumeSlug;
+          const itemClassName = [
+            "lecture-list-item",
+            isResumeCard ? "lecture-list-item-resume" : null,
+            learnerState === "completed" ? "lecture-list-item-complete" : null
+          ]
+            .filter(Boolean)
+            .join(" ");
 
-        return (
-          <li key={result.slug} className={itemClassName}>
-            <article aria-labelledby={`lecture-${result.slug}-title`}>
-              <div className="lecture-list-header">
-                <h2 id={`lecture-${result.slug}-title`}>
-                  <a className="lecture-list-link" href={`/lectures/${result.slug}`}>
-                    {lectureNumber}. {lectureTitle}
-                  </a>
-                </h2>
-                {isResumeCard ? (
-                  <span className="lecture-state lecture-state-resume">Resume here</span>
-                ) : learnerState ? (
-                  <span className={`lecture-state lecture-state-${learnerState}`}>{learnerStateLabel(learnerState)}</span>
-                ) : null}
-                <p className="lecture-list-description">{template.metadata.description}</p>
-              </div>
+          return (
+            <li key={result.slug} className={itemClassName}>
+              <article aria-labelledby={`lecture-${result.slug}-title`}>
+                <div className="lecture-list-header">
+                  <h2 id={`lecture-${result.slug}-title`}>
+                    <a className="lecture-list-link" href={`/lectures/${result.slug}`}>
+                      {lectureNumber}. {lectureTitle}
+                    </a>
+                  </h2>
+                  {isResumeCard ? (
+                    <span className="lecture-state lecture-state-resume">Resume here</span>
+                  ) : learnerState ? (
+                    <span className={`lecture-state lecture-state-${learnerState}`}>{learnerStateLabel(learnerState)}</span>
+                  ) : null}
+                  <p className="lecture-list-description">{template.metadata.description}</p>
+                </div>
 
-              <FactsList
-                aria-label="Lecture metadata"
-                className="lecture-list-meta"
-                variant="compact"
-                items={lectureFacts(template.metadata, template.sections.length, courseMetadata)}
-              />
-              {result.valid ? (
-                <CollectionLectureProgress slug={result.slug} />
-              ) : (
-                <p className="collection-progress-unavailable lecture-list-validation">
-                  <strong>Author/reviewer note:</strong> This lecture is not available to learners until its template issues are fixed. {" "}
-                  <a href={`#${COLLECTION_REVIEW_STATUS_ID}`}>Review validation details</a>.
-                </p>
-              )}
-            </article>
-          </li>
-        );
-      })}
-    </ol>
+                <FactsList
+                  aria-label="Lecture metadata"
+                  className="lecture-list-meta"
+                  variant="compact"
+                  items={lectureFacts(template.metadata, template.sections.length, courseMetadata)}
+                />
+                {result.valid ? (
+                  <CollectionLectureProgress slug={result.slug} />
+                ) : (
+                  <p className="collection-progress-unavailable lecture-list-validation">
+                    <strong>Author/reviewer note:</strong> This lecture is not available to learners until its template issues are fixed. {" "}
+                    <a href={`#${COLLECTION_REVIEW_STATUS_ID}`}>Review validation details</a>.
+                  </p>
+                )}
+              </article>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
