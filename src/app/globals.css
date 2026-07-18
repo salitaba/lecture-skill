@@ -1,6 +1,6 @@
 :root {
   color-scheme: light dark;
-  --background: #f6f7f5;
+  --background: #f4f7f5;
   --surface: #ffffff;
   --surface-soft: #f9faf8;
   --surface-accent: #eef8f5;
@@ -65,6 +65,7 @@
   --motion-ease: ease;
   --motion-ease-out: ease-out;
   --prose-measure: 72ch;
+  --content-measure: 820px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -179,7 +180,9 @@
 body {
   margin: 0;
   overflow-x: clip;
-  background: var(--background);
+  background:
+    radial-gradient(900px 420px at 50% -180px, var(--surface-accent), transparent 72%),
+    var(--background);
   color: var(--text);
   font-family: var(--font-body), Arial, Helvetica, sans-serif;
   font-weight: 400;
@@ -206,8 +209,8 @@ select:focus-visible {
 
 .theme-toggle {
   position: fixed;
-  top: 16px;
-  right: 16px;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
   z-index: 30;
   display: inline-grid;
   width: 44px;
@@ -235,31 +238,47 @@ select:focus-visible {
 
 @media print {
   .theme-toggle,
-  .highlight-action-button {
+  .highlight-action-button,
+  .lecture-header-actions {
     display: none;
   }
 }
 
 .page-shell {
-  width: min(1160px, calc(100% - 32px));
+  width: min(1200px, calc(100% - 32px));
+  min-height: 100dvh;
   margin: 0 auto;
-  padding: 28px 0 56px;
+  padding: 40px 0 72px;
 }
 
 .lecture-header,
 .collection-header {
   position: relative;
   min-width: 0;
-  padding: 36px 32px 32px;
-  margin-bottom: 24px;
+  padding: 44px 40px 36px;
+  margin-bottom: 28px;
   border: 1px solid var(--border);
+  border-top: 4px solid var(--accent);
   border-radius: var(--radius-lg);
   background:
     radial-gradient(130% 160% at 0% 0%, var(--surface-accent) 0%, transparent 55%),
     radial-gradient(110% 130% at 100% 0%, var(--highlight-bg) 0%, transparent 45%),
     var(--surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   overflow: hidden;
+}
+
+.lecture-header::after,
+.collection-header::after {
+  position: absolute;
+  top: -120px;
+  right: -80px;
+  width: 280px;
+  height: 280px;
+  content: "";
+  border: 1px solid var(--surface-accent);
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .eyebrow,
@@ -335,7 +354,7 @@ h3 {
 }
 
 h1 {
-  max-width: 900px;
+  max-width: var(--content-measure);
   margin: 0 0 12px;
   font-family: var(--font-display), Georgia, "Times New Roman", serif;
   font-size: clamp(2.1rem, 4vw, 3.15rem);
@@ -363,7 +382,7 @@ th {
 }
 
 .description {
-  max-width: 820px;
+  max-width: 68ch;
   margin: 0;
   color: var(--muted);
   font-size: 1.08rem;
@@ -390,10 +409,11 @@ dd {
 
 .lecture-layout {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: minmax(220px, 252px) minmax(0, 820px);
+  gap: 36px;
   align-items: start;
   padding-top: 28px;
+  justify-content: space-between;
 }
 
 .section-nav {
@@ -405,7 +425,7 @@ dd {
 .learning-path {
   min-width: 0;
   padding: 14px 14px 14px 12px;
-  background: var(--surface-soft);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-md);
@@ -496,6 +516,18 @@ details[open] > summary .learning-path-chevron {
   gap: 2px;
 }
 
+.nav-item-current {
+  width: fit-content;
+  padding: 1px 6px;
+  color: var(--accent-strong);
+  background: var(--surface-accent);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .nav-item-status {
   display: inline-grid;
   flex: 0 0 auto;
@@ -566,7 +598,7 @@ details[open] > summary .learning-path-chevron {
 .lecture-content {
   display: grid;
   min-width: 0;
-  gap: 26px;
+  gap: 32px;
   overflow-x: clip;
 }
 
@@ -578,7 +610,7 @@ details[open] > summary .learning-path-chevron {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .overview-section {
@@ -617,10 +649,10 @@ details[open] > summary .learning-path-chevron {
 }
 
 .lecture-panel.quiet-reading-surface {
-  padding: 8px 0;
+  padding: 16px 0 22px;
   background: transparent;
   border: 0;
-  box-shadow: none;
+  border-bottom: 1px solid var(--border);
 }
 
 .lecture-panel.quiet-reading-surface h2 {
@@ -699,6 +731,8 @@ details[open] > summary .learning-path-chevron {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  padding: 32px;
+  border-radius: 18px;
   counter-increment: section-index;
 }
 
@@ -768,11 +802,11 @@ details[open] > summary .learning-path-chevron {
   gap: 14px;
   min-width: 0;
   margin-top: 20px;
-  padding: 18px;
-  background: linear-gradient(155deg, var(--surface) 0%, var(--surface-accent) 140%);
+  padding: 16px 18px;
+  background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
 }
 
 .lecture-progress-header {
@@ -963,6 +997,7 @@ details[open] > summary .learning-path-chevron {
   gap: 8px;
   align-items: center;
   min-height: 44px;
+  padding: 0;
 }
 
 .section-completion-toggle {
@@ -970,27 +1005,40 @@ details[open] > summary .learning-path-chevron {
   width: 44px;
   height: 44px;
   place-items: center;
-  color: #ffffff;
-  background: var(--surface);
+  color: transparent;
+  background: var(--surface-soft);
   border: 2px solid var(--border-strong);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   font: inherit;
   font-weight: 900;
   cursor: pointer;
+  transition: background var(--motion-duration-fast) var(--motion-ease), border-color var(--motion-duration-fast) var(--motion-ease),
+    transform var(--motion-duration-fast) var(--motion-ease);
 }
 
 .section-completion-toggle:hover {
+  background: var(--surface-accent);
   border-color: var(--accent);
+}
+
+.section-completion-toggle:active {
+  transform: scale(0.96);
 }
 
 .section-completion-toggle[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent-strong);
+  color: #ffffff;
+}
+
+.section-completion-toggle svg {
+  width: 18px;
+  height: 18px;
 }
 
 .section-completion-label,
 .section-completion-print {
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.84rem;
   font-weight: 800;
 }
@@ -1001,9 +1049,19 @@ details[open] > summary .learning-path-chevron {
 
 .section-completion-shortcut-hint {
   color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 500;
+  padding: 2px 6px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   white-space: nowrap;
+}
+
+.section-completion-toggle[aria-pressed="true"] + .section-completion-label {
+  color: var(--success-text);
 }
 
 .lecture-section-complete::before {
@@ -1019,10 +1077,11 @@ details[open] > summary .learning-path-chevron {
   gap: 14px;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 12px 16px;
   margin: 4px 0 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  background: var(--highlight-bg);
+  border: 1px solid var(--highlight-border);
+  border-radius: var(--radius-md);
 }
 
 .resume-prompt p {
@@ -1035,6 +1094,60 @@ details[open] > summary .learning-path-chevron {
   flex-shrink: 0;
   align-items: center;
   gap: 14px;
+}
+
+.lecture-header-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  margin-top: 24px;
+}
+
+.header-action-primary,
+.header-action-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  text-decoration: none;
+  transition: transform var(--motion-duration-fast) var(--motion-ease), background var(--motion-duration-fast) var(--motion-ease);
+}
+
+.header-action-primary {
+  color: #ffffff;
+  background: var(--action);
+}
+
+.header-action-primary:hover,
+.header-action-primary:focus-visible {
+  background: var(--action-hover);
+  transform: translateY(-1px);
+}
+
+.header-action-primary svg {
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+
+.header-action-primary:hover svg,
+.header-action-primary:focus-visible svg {
+  transform: translateX(2px);
+}
+
+.header-action-secondary {
+  color: var(--accent-strong);
+  background: transparent;
+}
+
+.header-action-secondary:hover,
+.header-action-secondary:focus-visible {
+  background: var(--surface-accent);
 }
 
 .btn-primary-compact {
@@ -2731,7 +2844,7 @@ td {
 
 .lecture-list-item {
   min-width: 0;
-  padding: 20px;
+  padding: 22px 24px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2749,7 +2862,8 @@ td {
 .lecture-list-item-resume {
   border-left-width: 7px;
   border-color: var(--highlight-solid);
-  box-shadow: var(--shadow-sm);
+  background: linear-gradient(90deg, var(--highlight-bg), var(--surface) 38%);
+  box-shadow: none;
 }
 
 .lecture-list-item-complete {
@@ -3002,6 +3116,16 @@ td {
   .collection-header {
     padding: 22px 20px 20px;
     border-radius: var(--radius-md);
+  }
+
+  .lecture-header-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .header-action-primary,
+  .header-action-secondary {
+    width: 100%;
   }
 
   .lecture-progress-header,

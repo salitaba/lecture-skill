@@ -36,6 +36,14 @@ export function LectureHeader({
           { label: "Sections", value: `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}` }
         ]}
       />
+      <div className="lecture-header-actions">
+        <a className="header-action-primary" href="#overview-heading">
+          Start reading <Icon name="arrow-next" />
+        </a>
+        <a className="header-action-secondary" href="#learning-path">
+          View learning path
+        </a>
+      </div>
     </header>
   );
 }

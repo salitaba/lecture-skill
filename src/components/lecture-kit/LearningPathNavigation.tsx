@@ -88,7 +88,7 @@ export function LearningPathNavigation({
   ];
 
   return (
-    <nav className="section-nav" aria-label="Learning path">
+    <nav id="learning-path" className="section-nav" aria-label="Learning path">
       <div className="learning-path learning-path-desktop">
         <h2>Learning path</h2>
         <p className="nav-summary-count">
@@ -154,6 +154,7 @@ function NavigationList({
                 {isComplete ? <span className="sr-only"> (completed)</span> : null}
                 {isActive ? <span className="sr-only"> (current)</span> : null}
                 {hasNote ? <span className="sr-only"> (has your note)</span> : null}
+                {isActive ? <span className="nav-item-current">Current</span> : null}
               </span>
             </a>
           </li>
