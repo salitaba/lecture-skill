@@ -1,0 +1,37 @@
+{
+  "name": "lecture-site-engine",
+  "version": "0.1.2",
+  "description": "Create validated visual lecture sites from raw lecture source.",
+  "author": {
+    "name": "Salitabaei",
+    "url": "https://github.com/salitaba"
+  },
+  "homepage": "https://github.com/salitaba/lecture-skill#readme",
+  "repository": "https://github.com/salitaba/lecture-skill",
+  "license": "MIT",
+  "keywords": [
+    "lecture",
+    "education",
+    "course-authoring",
+    "visual-learning"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Lecture Site Engine",
+    "shortDescription": "Turn lecture source into validated visual lessons.",
+    "longDescription": "Author standalone lectures or confirmed course collections with the Lecture Site Engine schema, then validate, review, and preview the result.",
+    "developerName": "Salitabaei",
+    "category": "Education",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/salitaba/lecture-skill",
+    "defaultPrompt": [
+      "Convert my raw lecture source into a validated lecture.",
+      "Review this lecture for schema and source-fidelity issues.",
+      "Start a local preview of my lecture site."
+    ],
+    "brandColor": "#10A37F"
+  }
+}

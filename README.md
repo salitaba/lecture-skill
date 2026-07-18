@@ -76,6 +76,31 @@ The repository may contain additional independently discoverable Codex skills fo
 - `ui-styling`
 - `ui-ux-pro-max`
 
+## Install as a ChatGPT/Codex plugin
+
+This repository also contains a skills-only plugin at
+[`plugins/lecture-site-engine`](plugins/lecture-site-engine). It packages the
+lecture-authoring workflow for sharing through a GitHub-backed marketplace.
+
+After cloning or publishing this repository, add its marketplace:
+
+```bash
+codex plugin marketplace add salitaba/lecture-skill
+```
+
+Then install `lecture-site-engine` from the **Lecture Site Engine** marketplace
+in the ChatGPT desktop app, or run:
+
+```bash
+codex plugin add lecture-site-engine@lecture-site-engine
+```
+
+This is a skills-only plugin. It provides authoring guidance and local CLI
+workflows; it does not expose the Next.js site as a hosted ChatGPT app or
+remote MCP service. For public visibility in the official ChatGPT Plugins
+Directory, submit the skills bundle through the OpenAI Platform after pushing
+the repository.
+
 Other agents can follow the root [`SKILL.md`](SKILL.md). The lecture skill explains the supported frontmatter, section structure, teaching components, source-fidelity rules, validation loop, and review workflow.
 
 After initialization, a useful prompt is:

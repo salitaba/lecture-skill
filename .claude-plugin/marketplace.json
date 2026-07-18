@@ -1,0 +1,20 @@
+{
+  "name": "lecture-site-engine",
+  "interface": {
+    "displayName": "Lecture Site Engine"
+  },
+  "plugins": [
+    {
+      "name": "lecture-site-engine",
+      "source": {
+        "source": "local",
+        "path": "./plugins/lecture-site-engine"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Education"
+    }
+  ]
+}
