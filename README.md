@@ -1,5 +1,7 @@
 # Lecture Site Engine
 
+[![skills.sh](https://skills.sh/b/salitaba/lecture-skill)](https://skills.sh/salitaba/lecture-skill)
+
 Turn raw lecture notes into a local, visual lecture collection with help from Claude Code, Codex, or another coding agent.
 
 The engine provides the lecture template format, accessible teaching components, validation, local preview, learner progress, and reviewer handoff packages. The included skill tells an agent how to turn source material into that format without inventing unsupported content.
@@ -45,6 +47,12 @@ npx lecture-site-engine dev
 The CLI stages its runtime app under `.lecture-site-engine/` and chooses a compatibility-safe Next launch path, so this command is the complete preview workflow. Open the ready URL printed by the command, normally [http://localhost:3000](http://localhost:3000). If the port is already in use, Next may choose another port; use the URL it reports.
 
 ## Use the skill
+
+Install the authoring skill from skills.sh:
+
+```bash
+npx skills add salitaba/lecture-skill --skill lecture-site-engine
+```
 
 Claude Code discovers:
 
