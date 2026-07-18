@@ -171,6 +171,26 @@ The collection landing page links to each lecture, provides previous/next naviga
 
 When working inside a cloned Lecture Site Engine repository, the same commands are available as `npm run ...` scripts.
 
+### Release from a laptop
+
+The repository includes a guarded release command. It runs the complete release check, bumps the version, creates a release commit and tag, and pushes them to `main`. The existing GitHub workflow then publishes the package to npm with provenance, so configure the repository's `NPM_TOKEN` secret before the first release.
+
+Preview a release without changing files or git history:
+
+```bash
+npm run release -- patch --dry-run
+```
+
+Release the next patch, minor, or major version:
+
+```bash
+npm run release -- patch
+npm run release -- minor
+npm run release -- major
+```
+
+An exact version is also accepted, for example `npm run release -- 0.1.3`.
+
 ## Learn more
 
 - [`SKILL.md`](SKILL.md): complete instructions for AI-assisted lecture authoring.

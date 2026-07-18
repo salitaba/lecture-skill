@@ -51,6 +51,7 @@
     "doctor": "node --import ./scripts/register-ts-loader.mjs scripts/doctor.ts",
     "review:source": "node --import ./scripts/register-ts-loader.mjs scripts/reviewSource.ts",
     "package:review": "node --import ./scripts/register-ts-loader.mjs scripts/packageReview.ts",
+    "release": "node scripts/release.mjs",
     "release:check": "npm run lint && npm run typecheck && npm run test && npm run build && npm run build:cli && npm pack --dry-run"
   },
   "dependencies": {
