@@ -136,10 +136,10 @@ function requireVersionAvailable(name, version, npmRegistry) {
 }
 
 function restoreBuildGeneratedFiles() {
-  const changedFiles = capture("git", ["status", "--porcelain"])
-    .split("\n")
+  const changedFiles = capture("git", ["status", "--porcelain=v1", "-z"])
+    .split("\0")
     .filter(Boolean)
-    .map((line) => line.slice(3));
+    .map((line) => line.slice(3).trim());
 
   if (changedFiles.length === 0) return;
 
