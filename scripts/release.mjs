@@ -8,10 +8,12 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
+const ciMode = args.includes("--ci");
 const versionInput = args.find((arg) => !arg.startsWith("--"));
+const supportedFlags = new Set(["--dry-run", "--ci"]);
 
-if (!versionInput || args.some((arg) => arg !== versionInput && arg !== "--dry-run")) {
-  fail("Usage: npm run release -- <patch|minor|major|x.y.z> [--dry-run]");
+if (!versionInput || args.some((arg) => arg !== versionInput && !supportedFlags.has(arg))) {
+  fail("Usage: npm run release -- <patch|minor|major|x.y.z> [--dry-run] [--ci]");
 }
 
 if (Number(process.versions.node.split(".")[0]) < 24) {
@@ -28,11 +30,17 @@ console.log(`Preparing ${packageJson.name}@${nextVersion}`);
 if (dryRun) {
   console.log("Dry run: no files, commits, tags, or pushes will be created.");
 }
+if (ciMode) {
+  console.log("CI mode: the tag will be pushed for GitHub Actions to publish.");
+} else if (!dryRun) {
+  console.log("Local mode: npm publish will run on this machine.");
+}
 
 requireCleanMainBranch();
-requireOrigin();
-requireTagAvailable(tag);
+if (ciMode) requireOrigin();
+requireTagAvailable(tag, { checkRemote: ciMode });
 requireVersionAvailable(packageJson.name, nextVersion, registry);
+if (!dryRun && !ciMode) requireNpmAuthentication(registry);
 
 console.log("Running release checks...");
 run(npmCommand, ["run", "release:check"]);
@@ -47,17 +55,21 @@ console.log(`Updating package version to ${nextVersion}...`);
 run(npmCommand, ["version", nextVersion, "--no-git-tag-version"]);
 run("git", ["diff", "--check"]);
 
-console.log("Creating release commit and tag...");
-run("git", ["add", "package.json", "package-lock.json"]);
-run("git", ["commit", "-m", `release: ${tag}`]);
-run("git", ["tag", "-a", tag, "-m", `Release ${tag}`]);
-
-console.log("Pushing release commit and tag...");
-run("git", ["push", "origin", "main"]);
-run("git", ["push", "origin", tag]);
-
-console.log(`Release ${tag} pushed.`);
-console.log("GitHub Actions will run the final npm publish with provenance.");
+if (ciMode) {
+  createReleaseCommitAndTag(tag);
+  console.log("Pushing release commit and tag...");
+  run("git", ["push", "origin", "main"]);
+  run("git", ["push", "origin", tag]);
+  console.log(`Release ${tag} pushed.`);
+  console.log("GitHub Actions will publish it with provenance.");
+} else {
+  console.log("Publishing to npm from this machine...");
+  run(npmCommand, ["publish", "--access", "public", "--registry", registry]);
+  createReleaseCommitAndTag(tag);
+  console.log(`Published ${packageJson.name}@${nextVersion} to npm.`);
+  console.log(`Created local commit and tag ${tag}. Push only main with: git push origin main`);
+  console.log(`Do not push ${tag}; the tag-based GitHub workflow would publish it again.`);
+}
 
 function resolveVersion(version, input) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
@@ -108,14 +120,35 @@ function requireOrigin() {
   capture("git", ["remote", "get-url", "origin"]);
 }
 
-function requireTagAvailable(releaseTag) {
+function requireTagAvailable(releaseTag, { checkRemote = false } = {}) {
   if (capture("git", ["tag", "--list", releaseTag]) === releaseTag) {
     fail(`${releaseTag} already exists locally.`);
   }
 
-  if (capture("git", ["ls-remote", "--tags", "origin", `refs/tags/${releaseTag}`])) {
+  if (checkRemote && capture("git", ["ls-remote", "--tags", "origin", `refs/tags/${releaseTag}`])) {
     fail(`${releaseTag} already exists on origin.`);
   }
+}
+
+function requireNpmAuthentication(npmRegistry) {
+  const result = spawnSync(npmCommand, ["whoami", "--registry", npmRegistry], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["inherit", "pipe", "pipe"],
+  });
+
+  if (result.status !== 0) {
+    fail(`npm is not authenticated. Run: npm login --registry=${npmRegistry}`);
+  }
+
+  console.log(`Authenticated to npm as ${(result.stdout ?? "").trim()}.`);
+}
+
+function createReleaseCommitAndTag(releaseTag) {
+  console.log("Creating release commit and local tag...");
+  run("git", ["add", "package.json", "package-lock.json"]);
+  run("git", ["commit", "-m", `release: ${releaseTag}`]);
+  run("git", ["tag", "-a", releaseTag, "-m", `Release ${releaseTag}`]);
 }
 
 function requireVersionAvailable(name, version, npmRegistry) {

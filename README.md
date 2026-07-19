@@ -173,7 +173,13 @@ When working inside a cloned Lecture Site Engine repository, the same commands a
 
 ### Release from a laptop
 
-The repository includes a guarded release command. It runs the complete release check, bumps the version, creates a release commit and tag, and pushes them to `main`. The existing GitHub workflow then publishes the package to npm with provenance, so configure the repository's `NPM_TOKEN` secret before the first release.
+The repository includes a guarded release command that publishes directly to npm from your laptop. It checks npm authentication, runs the complete release check, bumps the version, publishes the package, and creates a local release commit and tag.
+
+Authenticate once:
+
+```bash
+npm login --registry=https://registry.npmjs.org
+```
 
 Preview a release without changing files or git history:
 
@@ -190,6 +196,18 @@ npm run release -- major
 ```
 
 An exact version is also accepted, for example `npm run release -- 0.1.3`.
+
+After a local release, push the commit if desired:
+
+```bash
+git push origin main
+```
+
+Do not push the generated `v*.*.*` tag, because the tag-based GitHub workflow also publishes to npm. Use `--ci` only when you want the previous tag-driven GitHub release instead:
+
+```bash
+npm run release -- patch --ci
+```
 
 ## Learn more
 
