@@ -136,7 +136,7 @@ function requireVersionAvailable(name, version, npmRegistry) {
 }
 
 function restoreBuildGeneratedFiles() {
-  const changedFiles = capture("git", ["status", "--porcelain=v1", "-z"])
+  const changedFiles = capture("git", ["status", "--porcelain=v1", "-z"], { trim: false })
     .split("\0")
     .filter(Boolean)
     .map((line) => line.slice(3).trim());
@@ -151,7 +151,7 @@ function restoreBuildGeneratedFiles() {
   run("git", ["restore", "--", "next-env.d.ts"]);
 }
 
-function capture(command, commandArgs) {
+function capture(command, commandArgs, { trim = true } = {}) {
   const result = spawnSync(command, commandArgs, {
     cwd: repoRoot,
     encoding: "utf8",
@@ -162,7 +162,8 @@ function capture(command, commandArgs) {
     fail(`Command failed: ${command} ${commandArgs.join(" ")}\n${(result.stderr ?? "").trim()}`);
   }
 
-  return (result.stdout ?? "").trim();
+  const output = result.stdout ?? "";
+  return trim ? output.trim() : output;
 }
 
 function run(command, commandArgs) {
