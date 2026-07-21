@@ -17,6 +17,7 @@ export function CollectionReviewQueue({ registry }: { registry: readonly Collect
       titleId="course-review-queue-title"
       emptyStateHref={firstLecture ? `/lectures/${firstLecture.slug}` : undefined}
       emptyStateLabel={firstLecture ? "Start the first lecture" : undefined}
+      compactEmpty
       title="Review across the course"
       scopes={registry.map((entry) => ({
         id: entry.lectureId,

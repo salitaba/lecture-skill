@@ -22,6 +22,7 @@ export interface ReviewQueueProps {
   emptyStateHref?: string;
   emptyStateLabel?: string;
   scopes?: readonly ReviewQueueScope[];
+  compactEmpty?: boolean;
 }
 
 export interface ReviewQueueScope {
@@ -39,7 +40,7 @@ interface DueReviewQueueItem {
   item: { assessment: AssessmentSummary; responseLabel?: string; objectiveLabels: string[] };
 }
 
-export function ReviewQueue({ objectives, assessments, baseHref = "", title = "Review queue", id = "review-queue", titleId, now = new Date().toISOString(), records, loaded, storageAvailable, emptyStateHref, emptyStateLabel = "Continue learning", scopes }: ReviewQueueProps) {
+export function ReviewQueue({ objectives, assessments, baseHref = "", title = "Review queue", id = "review-queue", titleId, now = new Date().toISOString(), records, loaded, storageAvailable, emptyStateHref, emptyStateLabel = "Continue learning", scopes, compactEmpty = false }: ReviewQueueProps) {
   const review = useReviewOptional();
   const contextRecords = review?.records;
   const isLoaded = loaded ?? review?.loaded ?? false;
@@ -78,7 +79,7 @@ export function ReviewQueue({ objectives, assessments, baseHref = "", title = "R
   }, [due]);
 
   return (
-    <Card as="section" role="region" className="review-queue" id={id} titleId={resolvedTitleId} label="Local review" title={title}>
+    <Card as="section" role="region" className={`review-queue${compactEmpty && due.length === 0 ? " review-queue-compact-empty" : ""}`} id={id} titleId={resolvedTitleId} label="Local review" title={title}>
       <p className="review-queue-intro">Return to the authored activity when local review metadata says it is due.</p>
       {!isStorageAvailable ? <p className="review-storage-notice" role="status">Review choices are available for this session but cannot be saved on this device.</p> : null}
       {!isLoaded ? <p className="review-queue-empty" role="status" aria-live="polite">Checking saved review timing on this device…</p> : due.length === 0 ? (

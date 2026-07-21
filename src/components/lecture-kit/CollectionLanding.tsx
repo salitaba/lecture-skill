@@ -8,7 +8,6 @@ import { FactsList, Icon } from "@/components/component-kit";
 import { AssessmentIndexDisclosure } from "./AssessmentIndexDisclosure";
 import { CollectionGlossaryIndex } from "./CollectionGlossaryIndex";
 import { CollectionReviewStatus } from "./CollectionReviewStatus";
-import { CollectionProgressBar } from "./progress/CollectionProgressBar";
 import { CollectionPrimaryAction } from "./CollectionPrimaryAction";
 import { CollectionProgressProvider } from "./progress/CollectionProgressProvider";
 import { CollectionReviewProvider } from "./progress/CollectionReviewProvider";
@@ -48,39 +47,42 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
       <CollectionReviewProvider registry={reviewRegistry}>
       <section className="collection-landing" aria-labelledby="collection-title">
         <header className="collection-header">
-          <p className="eyebrow">Collection</p>
-          <h1 id="collection-title">{title}</h1>
-          <CourseDescription description={description} />
-          <FactsList
-            aria-label="Essential course facts"
-            className="collection-summary"
-            items={[
-              { label: "Lectures", value: `${validation.lectureCount} ${validation.lectureCount === 1 ? "lecture" : "lectures"}` },
-              { label: "Estimated study time", value: formatMinutes(totalMinutes) },
-              ...(readingMinutes > 0 ? [{ label: "Reading time", value: `~${readingMinutes} min read` }] : [])
-            ]}
-          />
-          {courseMetadata ? (
+          <div className="collection-hero-copy">
+            <p className="eyebrow">Course collection</p>
+            <h1 id="collection-title">{title}</h1>
+            <CourseDescription description={description} />
+            <div className="collection-header-actions">
+              <CollectionPrimaryAction lectures={progressLectures} />
+              <a href="#lecture-list" className="collection-view-all-lectures">
+                View all lectures <Icon name="arrow-next" />
+              </a>
+            </div>
+          </div>
+          <aside className="collection-course-facts" aria-label="Course at a glance">
+            <p className="section-kicker">At a glance</p>
             <FactsList
-              aria-label="Additional course details"
-              className="course-secondary-facts"
-              variant="compact"
+              aria-label="Essential course facts"
+              className="collection-summary"
               items={[
-                { label: "Audience", value: courseMetadata.audience ?? "" },
-                { label: "Level", value: courseMetadata.level ?? "" },
-                { label: "Authored duration", value: courseMetadata.duration ?? "" }
+                { label: "Lectures", value: `${validation.lectureCount}` },
+                { label: "Study time", value: formatMinutes(totalMinutes) },
+                ...(readingMinutes > 0 ? [{ label: "Reading", value: `~${readingMinutes} min` }] : [])
               ]}
             />
-          ) : null}
-          <div className="collection-header-actions">
-            <CollectionPrimaryAction lectures={progressLectures} />
-            <a href="#lecture-list" className="collection-view-all-lectures">
-              View all lectures <Icon name="arrow-next" />
-            </a>
-          </div>
+            {courseMetadata ? (
+              <FactsList
+                aria-label="Additional course details"
+                className="course-secondary-facts"
+                variant="compact"
+                items={[
+                  { label: "Level", value: courseMetadata.level ?? "" },
+                  { label: "Audience", value: courseMetadata.audience ?? "" },
+                  { label: "Authored duration", value: courseMetadata.duration ?? "" }
+                ]}
+              />
+            ) : null}
+          </aside>
         </header>
-
-        <CollectionProgressBar />
 
         <CollectionLearnerDashboardSummary registry={reviewRegistry} lectures={progressLectures} />
 

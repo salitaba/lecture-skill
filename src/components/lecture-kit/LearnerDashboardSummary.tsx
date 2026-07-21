@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Button, Card } from "@/components/component-kit";
+import { Button, Card, ProgressMeter } from "@/components/component-kit";
 import { adaptLearnerActivityEvidence } from "@/lib/lecture-template/learnerActivityEvidence";
 import { activityKeysForAssessment, buildObjectiveEvidence } from "@/lib/lecture-template/objectiveEvidence";
 import { dueReviewQueue, isDue } from "@/lib/lecture-template/reviewSchedule";
@@ -13,7 +13,6 @@ import { useCollectionProgress } from "./progress/CollectionProgressProvider";
 import { useCollectionReview } from "./progress/CollectionReviewProvider";
 import type { CollectionReviewRegistryEntry } from "@/lib/lecture-template/collection";
 import type { ProgressLecture } from "@/lib/lecture-template/progress";
-import { calculateResumeTarget } from "@/lib/lecture-template/resumeTarget";
 
 export interface LearnerDashboardSummaryProps {
   objectives: readonly LearningObjective[];
@@ -76,7 +75,7 @@ export function LearnerDashboardSummary({ objectives, assessments, firstActionHr
   );
 }
 
-export function CollectionLearnerDashboardSummary({ registry, lectures }: { registry: readonly CollectionReviewRegistryEntry[]; lectures: readonly ProgressLecture[] }) {
+export function CollectionLearnerDashboardSummary({ registry }: { registry: readonly CollectionReviewRegistryEntry[]; lectures: readonly ProgressLecture[] }) {
   const progress = useCollectionProgress();
   const review = useCollectionReview();
   const reviewSummary = useMemo(() => {
@@ -98,19 +97,41 @@ export function CollectionLearnerDashboardSummary({ registry, lectures }: { regi
     }, { dueCount: 0, reviewSuggestions: 0 });
   }, [registry, review]);
   const dueCount = reviewSummary.dueCount;
-  const target = calculateResumeTarget(progress.progress, lectures);
   const hydrated = progress.loaded && review.loaded;
   const reviewSuggestions = reviewSummary.reviewSuggestions;
+  const progressText = !hydrated
+    ? "Loading your course progress…"
+    : progress.totalSections > 0 && progress.percentComplete === 100
+      ? "Course complete"
+      : progress.completedSections === 0
+        ? "Ready when you are"
+        : `${progress.percentComplete}% complete`;
 
   return (
-    <Card as="section" role="region" className="learner-dashboard-summary collection-learner-dashboard" id="course-learner-dashboard" titleId="course-learner-dashboard-title" label="Learner dashboard" title="Your course learning loop">
+    <Card as="section" role="region" className="learner-dashboard-summary collection-learner-dashboard" id="course-learner-dashboard" titleId="course-learner-dashboard-title" label="Your learning" title="Continue learning">
       <div className="learner-dashboard-grid" data-dashboard-state={hydrated ? "ready" : "hydrating"}>
-        <div>
-          <p className="learner-dashboard-summary-copy" role="status" aria-live="polite">{hydrated ? (reviewSuggestions > 0 ? `${reviewSuggestions} review suggestion${reviewSuggestions === 1 ? "" : "s"} across the course.` : "Choose the next lecture and build your own review rhythm.") : "Checking saved progress on this device…"}</p>
-          <Button as="a" href={hydrated && dueCount > 0 ? "#course-review-queue" : target.href} size="compact">{hydrated && dueCount > 0 ? "Review due items" : hydrated ? target.label : "Start course"}</Button>
+        <div className="collection-learning-progress">
+          <div className="collection-learning-progress-heading">
+            <div>
+              <p className="section-kicker">Course progress</p>
+              <p className="collection-learning-progress-value" role="status" aria-live="polite">{progressText}</p>
+            </div>
+            <strong>{hydrated ? `${progress.completedSections}/${progress.totalSections}` : "—"}</strong>
+          </div>
+          <ProgressMeter value={hydrated ? progress.percentComplete : undefined} label="Course progress" />
+          <p className="learner-dashboard-summary-copy">
+            {hydrated
+              ? reviewSuggestions > 0
+                ? `${reviewSuggestions} review suggestion${reviewSuggestions === 1 ? "" : "s"} across the course.`
+                : progress.completedSections > 0
+                  ? "Your place is saved on this device. Resume from the course header when you’re ready."
+                  : "Start with the first lecture and work through the course at your own pace."
+              : "Checking saved progress on this device…"}
+          </p>
+          {hydrated && dueCount > 0 ? <Button as="a" href="#course-review-queue" size="compact">Review due items</Button> : null}
         </div>
         <div className="learner-dashboard-stats" role="group" aria-label="Course learning summary">
-          <div><strong>{hydrated ? `${progress.completedSections}/${progress.totalSections}` : "—"}</strong><span>sections read</span></div>
+          <div><strong>{hydrated ? progress.completedSections : "—"}</strong><span>sections read</span></div>
           <div><strong>{hydrated ? dueCount : "—"}</strong><span>reviews due</span></div>
           <div><strong>{hydrated ? reviewSuggestions : "—"}</strong><span>review suggestions</span></div>
         </div>

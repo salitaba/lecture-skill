@@ -1,3 +1,5 @@
+import { Icon } from "@/components/component-kit";
+
 const LONG_DESCRIPTION_CHARACTER_LIMIT = 180;
 const PREVIEW_WORD_LIMIT = 30;
 
@@ -13,7 +15,10 @@ export function CourseDescription({ description }: { description: string }) {
     <details className="course-description-disclosure">
       <summary>
         <span className="course-description-preview">{previewDescription(normalized)}</span>
-        <span className="course-description-label">About this course</span>
+        <span className="course-description-label">
+          About this course
+          <Icon name="chevron" className="course-description-chevron" />
+        </span>
       </summary>
       <p className="description course-description-full">{normalized}</p>
     </details>
