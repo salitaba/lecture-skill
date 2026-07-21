@@ -79,7 +79,7 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
         <LectureList results={validation.results} progressLectures={progressLectures} courseMetadata={courseMetadata} />
 
         <CollectionReviewStatus validation={validation} />
-        <AssessmentIndexDisclosure assessments={assessments} id="assessment-index" />
+        <AssessmentIndexDisclosure assessments={assessments} linkMode="collection" id="assessment-index" />
         <CollectionGlossaryIndex entries={glossaryEntries} />
       </section>
     </CollectionProgressProvider>

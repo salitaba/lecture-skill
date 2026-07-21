@@ -24,6 +24,7 @@ import {
 import type { CourseMetadata, CourseMetadataValidationResult, LectureMetadata, LectureTemplate } from "./types";
 import { validateTemplateSource } from "./validateTemplate";
 import { formatError } from "./validateCli";
+import { summarizeLectureAssessments, type AssessmentDiagnosticsSummary } from "./assessments";
 
 export type ReviewPackageMode = "single-lecture" | "collection";
 
@@ -65,6 +66,7 @@ export interface ReviewPackageLecture {
   renderedOutputPath: string;
   sectionCount: number;
   componentCounts: Record<string, number>;
+  assessmentSummary: AssessmentDiagnosticsSummary;
   resourceLinks: ReviewPackageResourceLinkSummary[];
   instructorNoteCount: number;
 }
@@ -377,9 +379,20 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
       `  Duration: ${lecture.duration}`,
       `  Sections: ${lecture.sectionCount}`,
       `  Component counts: ${formatComponentCounts(lecture.componentCounts)}`,
+      `  Assessments: ${lecture.assessmentSummary.total}`,
+      `  Assessment types: ${formatComponentCounts(lecture.assessmentSummary.byType)}`,
+      `  Assessment modes: ${formatComponentCounts(lecture.assessmentSummary.byEvaluationMode)}`,
+      `  Answer-key entries: ${lecture.assessmentSummary.answerKeyCount}`,
+      `  Learner state included: ${lecture.assessmentSummary.learnerStateIncluded ? "yes" : "no"}`,
       `  Resource links: ${lecture.resourceLinks.length}`,
       `  Instructor notes: ${lecture.instructorNoteCount}`
     );
+    for (const assessment of lecture.assessmentSummary.entries) {
+      lines.push(
+        `    - Assessment ${assessment.id}: ${assessment.type} / ${assessment.evaluationMode} / ${assessment.title}`,
+        ...(assessment.objectiveRefs ? [`      Objective refs: ${assessment.objectiveRefs.join(", ")}`] : [])
+      );
+    }
     for (const link of lecture.resourceLinks) {
       lines.push(`    - ${link.label}: ${link.url} (${link.kind}, ${link.status})`);
     }
@@ -762,6 +775,7 @@ function buildLectureRecord(
     renderedOutputPath,
     sectionCount: template.sections.length,
     componentCounts: collectComponentCounts(template),
+    assessmentSummary: summarizeLectureAssessments(template),
     resourceLinks,
     instructorNoteCount: countComponents(template, "instructor_note")
   };

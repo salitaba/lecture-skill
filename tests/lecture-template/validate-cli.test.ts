@@ -86,6 +86,20 @@ describe("validation CLI", () => {
     expect(json.errors[0].code).toBe("UNSUPPORTED_COMPONENT_TYPE");
   });
 
+  it("emits deterministic assessment diagnostics without learner state or answer text", async () => {
+    const result = await validateTemplateFileJson("examples/component-demo.template.md");
+    const json = JSON.parse(result.stdout);
+
+    expect(result.status).toBe(0);
+    expect(json.assessmentSummary).toMatchObject({
+      total: 5,
+      byType: { flashcard: 1, free_response: 1, practice_task: 1, question_set: 1, quiz: 1 },
+      answerKeyCount: 2,
+      learnerStateIncluded: false
+    });
+    expect(JSON.stringify(json.assessmentSummary)).not.toContain("npm run validate");
+  });
+
   it("emits assessment nested fields in JSON output", async () => {
     const result = await validateTemplateFileJson("examples/invalid/practice-task-field-errors.template.md");
     const json = JSON.parse(result.stdout);

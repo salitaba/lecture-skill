@@ -1,0 +1,404 @@
+Implementation Plan: Unified Interaction and Assessment Engine (spec/024-unified-interaction-assessment-engine.txt)
+
+## Summary
+
+Introduce a shared internal assessment contract and interaction runtime beneath
+the Lecture Site Engine's existing `quiz`, `question_set`, `free_response`,
+`practice_task`, and `flashcard` components. The feature will make the current
+components discoverable through one normalized registry, give them consistent
+identity and evaluation metadata, reuse a common learner-attempt lifecycle for
+objectively evaluated activities, and keep answer review, collection indexes,
+answer keys, validation, and review packages aligned.
+
+This plan implements the P0 foundation and the low-risk P1 authoring metadata
+from the spec. Ordering, matching, fill-in-the-blank, plugin renderers,
+mastery, code execution, analytics, xAPI/LTI, accounts, and cloud sync remain
+follow-on work.
+
+The implementation is additive. Existing authored templates and existing
+normalized test fixtures without explicit IDs remain valid. Existing anchors,
+answer storage, reveal behavior, static output, and local-first boundaries are
+preserved.
+
+## Product Decisions For This Plan
+
+- The internal registry is the source of truth for activity discovery and
+  capability metadata; specialized components remain the source of truth for
+  rendering their unique payloads.
+- `AssessmentSummary` gains capability metadata, but answer-key entries remain
+  restricted to activities that have authored answer/reference material.
+- `flashcard` is included in the activity index with `evaluationMode: "reveal"`
+  and is excluded from incorrect-answer review and the answer-key appendix in
+  this release. A later reference-material decision can add it without
+  changing objective-answer semantics.
+- Explicit authored `id` is optional. When absent, the normalized record uses
+  the existing stable component anchor as its ID. Existing anchors remain the
+  fragment and persistence identity for backward compatibility.
+- Optional authored `objective_refs` is normalized to `objectiveRefs` and is
+  carried in review/index data. This plan validates shape and uniqueness of
+  references but does not build collection-level objective resolution.
+- The shared runtime hook is initially for objective choice attempts because
+  those are the only activities with persisted right/wrong state. Free-response
+  drafts stay local to the component and practice/flashcard reveal state stays
+  local to the interaction.
+- The shared lifecycle is observable while an interaction is mounted, but only
+  objective choice attempts persist across reloads in this release. Non-choice
+  activities do not promise persisted `revealed`, `self_assessed`, or
+  `completed` state.
+- No new interaction types are added in this plan. The unified engine is proven
+  by migrating all current activity types onto shared contracts and shared
+  primitives.
+
+## Relevant Existing Files
+
+### Domain types, validation, normalization, and indexes
+
+- `src/lib/lecture-template/types.ts` - Current activity interfaces and
+  `LectureComponent` union. Add shared assessment metadata fields and a
+  normalized flashcard anchor without making existing hand-authored test
+  components fail type checking.
+- `src/lib/lecture-template/validateTemplate.ts` - Validates component payloads,
+  generates section-scoped anchors, and normalizes parsed data. Add optional
+  `id`/`objective_refs` validation, duplicate explicit-ID checks, and flashcard
+  anchor generation.
+- `src/lib/lecture-template/anchors.ts` - Existing `uniqueAnchors` helper is the
+  anchor-safe slug/duplicate suffix contract. Reuse it; do not change current
+  section-anchor output.
+- `src/lib/lecture-template/assessments.ts` - Current assessment collector and
+  answer-key extractor. Convert it into the normalized activity registry while
+  preserving current answer-key behavior.
+- `src/lib/lecture-template/collection.ts` - Collection validation aggregation.
+  Add a post-validation duplicate explicit-ID pass without changing the
+  collection result shape unless existing diagnostics require it.
+- `src/lib/lecture-template/progress.ts` - Current `AnswerAttempt` and storage
+  validators. Keep the stored `{ selected, correct }` shape readable and expose
+  a shared key/capability helper without adding another answer persistence key.
+
+### Runtime components
+
+- `src/components/lecture-kit/Quiz.tsx` - Current objective choice interaction
+  and answer persistence call site.
+- `src/components/lecture-kit/QuestionSet.tsx` - Current grouped objective
+  choice interaction and per-question answer persistence.
+- `src/components/lecture-kit/FreeResponse.tsx` - Local-only response draft and
+  guidance reveal.
+- `src/components/lecture-kit/PracticeTask.tsx` - Task, rubric, hint, solution,
+  and starter-code presentation.
+- `src/components/lecture-kit/Flashcard.tsx` - Reveal-only activity that needs a
+  normalized anchor when rendered from a validated template.
+- `src/components/lecture-kit/SectionRenderer.tsx` - Component dispatch and
+  exhaustive union switch.
+- `src/components/lecture-kit/AnswerReviewDisclosure.tsx` - Current personal
+  review for missed/unattempted quiz and question-set items.
+- `src/components/lecture-kit/LecturePage.tsx` - Current lecture page composition;
+  add the per-lecture assessment index with local-fragment links.
+- `src/components/lecture-kit/AnswerKeyAppendix.tsx` - Reviewer/instructor
+  reference surface.
+- `src/components/lecture-kit/AssessmentIndexDisclosure.tsx` - Collection
+  activity index and type labels. Add an explicit link mode so a single-lecture
+  index never generates `/lectures/undefined` links.
+- `src/components/component-kit/Card.tsx`, `Button.tsx`, `Disclosure.tsx`,
+  `LabeledSection.tsx`, and `RadioOptionGroup.tsx` - Shared primitives to use
+  for any new assessment wrapper or hook output.
+
+### Tests, fixtures, and docs
+
+- `tests/lecture-template/validateTemplate.test.ts` - Component validation and
+  normalized render-model assertions.
+- `tests/lecture-template/render-model.test.ts` - Stable section/render-model
+  contracts.
+- `tests/lecture-template/collection.test.ts` - Assessment collection and
+  answer-key aggregation.
+- `tests/lecture-template/assessment-interaction.test.tsx` - Question-set,
+  free-response, and practice interaction behavior.
+- `tests/lecture-template/advanced-components-interaction.test.tsx` - Flashcard
+  and other advanced component behavior.
+- `tests/lecture-template/assessment-hierarchy.test.tsx` - Assessment index,
+  hierarchy, and practice-language checks.
+- `tests/lecture-template/validate-cli.test.ts` and
+  `tests/lecture-template/validate-collection-cli.test.ts` - Human and JSON
+  diagnostics.
+- `tests/lecture-template/progress-model.test.ts` and
+  `tests/lecture-template/progress-provider.test.tsx` - Local state contracts.
+- `tests/lecture-template/review-package.test.ts` - Portable review output.
+- `examples/component-demo.template.md` - Supported component gallery.
+- `README.md` and `SKILL.md` - Authoring and product guidance.
+
+## Proposed Implementation Steps
+
+### Step 1: Add shared assessment metadata and normalized capability types
+
+- Add a reusable assessment metadata shape to `types.ts` with optional
+  normalized `id` and `objectiveRefs` fields.
+- Add optional authored-compatible fields to the five current activity
+  interfaces without requiring them in existing programmatic fixtures.
+- Add an optional normalized `anchor` to `FlashcardComponent`; validated
+  templates will always provide it, while direct component tests may omit it.
+- Add `AssessmentKind`, `AssessmentEvaluationMode`, and `AssessmentCapability`
+  types in `assessments.ts` or a nearby domain module.
+- Keep `LectureComponent` exhaustive and preserve all current component names.
+
+### Step 2: Validate metadata and normalize flashcard identity
+
+- Extend the assessment anchor candidate list in `buildAssessmentAnchors` to
+  include `flashcard`.
+- Keep generated anchors as the fragment and persistence identity. An explicit
+  `id` is a stable registry identity only; it must not silently rename an
+  existing fragment or invalidate saved answer state. When no explicit `id` is
+  authored, the normalized record uses the generated anchor as its ID.
+- Validate optional assessment `id` fields as non-empty anchor-safe strings. Use
+  a dedicated `isAnchorSafeAssessmentId` predicate with documented rules (lower
+  case ASCII segments separated by single hyphens) and report
+  `INVALID_COMPONENT_FIELD` with the component, section, and `id` field. Do not
+  use slugification as silent validation.
+- Validate optional `objective_refs` as a non-empty list of non-empty strings.
+- Detect duplicate explicit IDs within a lecture and report the later source
+  location without rejecting unrelated generated-anchor duplicates.
+- Add a collection-level duplicate-ID pass in `collection.ts` after individual
+  lecture validation. Attach the later duplicate to its lecture errors and
+  include the first declaration's template path/line in the message or hint so
+  both source locations are actionable. Set `allPassed` false for this case.
+- Reject explicit-versus-derived registry ID collisions as well. The registry
+  identity rule is `registryId = component.id ?? component.anchor`; the
+  generated `anchor` remains separate and unchanged.
+- Normalize strings, IDs, and objective references into camelCase render-model
+  properties while preserving authored order.
+- Generate a stable flashcard anchor so collection links can target every
+  indexed activity.
+- Preserve all existing validation semantics and current anchors when no new
+  metadata is authored.
+
+### Step 3: Build the normalized activity registry
+
+- Extend the collector domain in `assessments.ts` to include flashcards.
+- Add a capability mapping:
+  - quiz/question_set → `choice`, answer review, answer key
+  - free_response → `self_assess`, no objective answer review, answer key
+  - practice_task → `rubric`, no objective answer review, answer key
+  - flashcard → `reveal`, no objective answer review, reference/index entry
+- Define one canonical `AssessmentKind` union including the five current
+  activity types. Keep the existing `AssessmentSummary.type` property for
+  compatibility, but make it an `AssessmentKind` and derive all capability and
+  labels from one exhaustive map.
+- Add response metadata that contains only stable attempt keys and learner-safe
+  labels, for example `responseItems: [{ key, label }]`. This lets answer review
+  consume the registry without reading answer text from answer-key records.
+- Keep summaries free of answer text and learner attempt state.
+- Preserve `collectLectureAnswerKey` output compatibility for the four current
+  answer-key types. Flashcard entries remain index-only in this release.
+- Export pure helpers for activity capability lookup so UI and tests do not
+  duplicate type switches.
+
+### Step 4: Introduce shared interaction primitives and choice-attempt hook
+
+- Add a focused `src/components/lecture-kit/assessment/` module containing:
+  - `AssessmentShell.tsx` for shared card identity, label/title treatment, and
+    real no-JavaScript fallback content for reveal-capable activities;
+  - `AssessmentFeedback.tsx` for consistent neutral/correct/incorrect status
+    markup and live-region semantics;
+  - `useChoiceAssessmentAttempt.ts` for selected value, persisted restoration,
+    reveal state, correctness, and answer recording.
+- Add a small shared local lifecycle hook for non-choice modes:
+  - `self_assess`: `Mark as understood` / `Needs review`;
+  - `reveal`: reveal plus optional neutral `Mark for review` state;
+  - `rubric`: local `Needs review` / `Mark as understood` state.
+- Keep non-choice state local to the mounted component; only choice attempts
+  persist.
+- Keep these abstractions small and compositional. They must not erase the
+  differences between grouped questions, free responses, tasks, and cards.
+- Refactor `Quiz` and `QuestionSet` to use the shared choice-attempt hook while
+  preserving current labels, answer keys, storage keys, shuffle behavior, and
+  existing tests.
+- Refactor `FreeResponse`, `PracticeTask`, and `Flashcard` to use
+  `AssessmentShell` where this does not alter direct-render test semantics.
+- Keep non-choice lifecycle state local to the mounted component. Do not add
+  persistence for free-response drafts, practice-task drafts/rubric state, or
+  flashcard reveal state in this plan.
+- Document and test the existing retry distinction: quiz options are disabled
+  after reveal, while question-set options retain their current behavior unless
+  a shared hook can preserve it exactly.
+- Use the normalized flashcard anchor when present and omit the `id` attribute
+  only for direct programmatic fixtures that do not provide one.
+
+### Step 5: Align answer review, index, and collection behavior
+
+- Update `AnswerReviewDisclosure` to filter by `supportsAnswerReview` rather
+  rather than hard-coded component names, while preserving the current missed
+  and unattempted wording. Derive question-set item keys/labels from registry
+  `responseItems`, not answer-key payloads. Once `answersLoaded` is true, render
+  unattempted objective items even when the answer map is empty; keep the
+  surface absent before load or without a provider.
+- Update `AssessmentIndexDisclosure` labels and grouping to include flashcards
+  as `Flashcard` or `Recall card`, with stable links to the normalized anchor.
+- Add an explicit `linkMode: "single" | "collection"` or equivalent prop to
+  `AssessmentIndexDisclosure`; single mode uses `#anchor`, collection mode uses
+  `/lectures/${slug}#anchor`.
+- Render a per-lecture assessment index in `LecturePage` using single-lecture
+  fragment links. Keep the existing collection index on `CollectionLanding`.
+- Keep answer-key rendering restricted to answer-key-capable entries. Flashcards
+  remain activity-index entries only in this release and must not appear in the
+  incorrect-answer review or be described as graded.
+- Ensure single-lecture and collection assessment summaries use the same
+  registry and ignore invalid lecture results.
+- Add objective-reference metadata to review/index markup only where it helps
+  reviewers; do not create a learner score or mastery UI.
+
+### Step 6: Preserve progress compatibility and harden storage behavior
+
+- Keep `singleLectureAnswersKey` and the existing `{ selected, correct }`
+  persisted shape readable.
+- Pass registry-derived objective answer definitions into `ProgressProvider`.
+  On load, discard unknown keys and selections not present in current options,
+  recompute `correct` from the current authored answer, and preserve the
+  anchor-based key shape.
+- Add pure capability/status helpers in `progress.ts` only if needed by the
+  shared hook; do not create a second answer key namespace.
+- Ensure stale answer keys for removed or renamed activities are ignored by
+  the registry-driven answer review. If a pure `validateAnswerAttempts` helper
+  gains an allowed-key argument, keep the argument optional for existing callers
+  and add tests for removed/renamed activities.
+- Ensure localStorage read/write failures continue to degrade to in-memory
+  behavior without blocking the lecture.
+- Add migration/compatibility tests for current stored answer fixtures.
+
+### Step 7: Update examples, diagnostics, review package, and guidance
+
+- Add optional `id` and `objective_refs` examples to
+  `examples/component-demo.template.md` without making all existing examples
+  require metadata.
+- Add invalid fixtures or inline validation sources for malformed IDs,
+  duplicate IDs, invalid objective references, and invalid flashcard metadata.
+- Include capability metadata and activity counts in JSON validation or review
+  package output only through explicit additive fields. `validateCollectionJson`
+  should add per-lecture `assessmentSummary` entries containing counts by type
+  and evaluation mode, and `package:review` should add the same summary to
+  `ReviewPackageLecture`/manifest records. Do not include answer text or local
+  learner attempts in these summaries.
+- Modify `reviewPackage.ts` explicitly to include deterministic per-lecture
+  assessment counts, activity index entries, objective references, answer-key
+  coverage, and `learnerStateIncluded: false` in the manifest/lecture records.
+- Update `README.md` and `SKILL.md` with the unified activity model, evaluation
+  modes, practice-first language, ID guidance, objective references, and the
+  fact that hidden answers are not secure.
+
+### Step 8: Complete verification and quality review
+
+- Run focused validation, registry, interaction, progress, collection, and
+  review-package tests.
+- Run `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`,
+  `npm run build:cli`, and `npm run validate`.
+- Manually inspect the component gallery, collection assessment index, answer
+  review, flashcard fragment links, and print behavior if the environment
+  permits.
+- Review the final diff for schema compatibility and absence of raw-source
+  changes.
+
+## Data Model And API Changes
+
+### Authored optional fields
+
+The following fields are additive and use the existing YAML naming convention:
+
+```yaml
+type: quiz
+id: identify-domain-boundary
+objective_refs:
+  - explain-layer-boundaries
+```
+
+They are optional for all current activity types. The existing component
+payloads remain valid without them.
+
+### Normalized activity metadata
+
+```ts
+interface AssessmentCapability {
+  evaluationMode: "choice" | "self_assess" | "reveal" | "rubric";
+  supportsAnswerReview: boolean;
+  supportsAnswerKey: boolean;
+}
+
+interface AssessmentResponseItem {
+  key: string;
+  label: string;
+}
+
+interface AssessmentSummary extends AssessmentCapability {
+  id: string;
+  anchor: string;
+  type: AssessmentType;
+  title: string;
+  sectionTitle: string;
+  sectionAnchor: string;
+  objectiveRefs?: string[];
+  responseItems: AssessmentResponseItem[];
+}
+```
+
+The exact placement of these types may follow local naming conventions, but
+the public behavior must match this contract.
+
+### Compatibility
+
+- Current `AnswerAttempt` JSON remains valid.
+- Current section and assessment fragments remain stable when no explicit ID is
+  present.
+- Current direct component fixtures may omit normalized flashcard anchors.
+- No new server API, database, network call, or runtime dependency is needed.
+
+## Test Plan
+
+- `validateTemplate.test.ts`: optional metadata, invalid IDs, invalid objective
+  references, duplicate IDs, flashcard anchors, and backward compatibility.
+- `render-model.test.ts`: normalized metadata and generated anchors.
+- `anchors.test.ts`: unchanged section anchors and explicit/derived assessment
+  anchor behavior.
+- `collection.test.ts`: flashcard activity indexing, capability metadata, and
+  valid-lecture filtering.
+- `assessment-interaction.test.tsx`: shared quiz/question-set hook behavior,
+  independent state, restoration, and existing shuffle behavior.
+- `advanced-components-interaction.test.tsx`: flashcard shell/anchor behavior.
+- `assessment-hierarchy.test.tsx`: capability-based labels, index ordering,
+  neutral flashcard treatment, and no grading language.
+- `progress-model.test.ts` and `progress-provider.test.tsx`: existing answer
+  storage compatibility and unavailable/corrupt storage handling.
+- `validate-cli.test.ts` and `validate-collection-cli.test.ts`: author-locatable
+  metadata diagnostics and additive JSON fields.
+- `review-package.test.ts`: normalized index metadata and fragment preservation.
+- Full regression: all current component, collection, navigation, validation,
+  and static-package tests.
+
+## Risks, Assumptions, And Open Questions
+
+1. **The current code already implements much of the earlier assessment
+   roadmap.** Tasks should refactor and generalize existing behavior rather
+   than recreate `question_set`, `free_response`, or `practice_task`.
+2. **Direct component fixtures omit normalized metadata.** Make new metadata
+   optional on component props and test validated templates separately.
+3. **Adding flashcards to collection counts changes existing expectations.**
+   Update the component-demo/collection assertions intentionally and document
+   the new activity count.
+4. **Explicit IDs could destabilize links if they replace anchors.** Keep
+   explicit IDs separate from generated fragment/persistence anchors, and add
+   compatibility tests proving that adding an ID does not change existing
+   fragments or answer lookup.
+5. **The shared hook could become too specific to radio quizzes.** Keep it
+   limited to objective choice persistence; future interaction types should
+   add their own evaluator adapter behind the registry.
+6. **Objective references do not yet resolve to a course graph.** Validate and
+   carry them as metadata only; do not build prerequisite or mastery behavior.
+
+## Verification Commands
+
+```bash
+npm run test -- tests/lecture-template/validateTemplate.test.ts tests/lecture-template/collection.test.ts
+npm run test -- tests/lecture-template/assessment-interaction.test.tsx tests/lecture-template/advanced-components-interaction.test.tsx
+npm run test -- tests/lecture-template/assessment-hierarchy.test.tsx tests/lecture-template/progress-model.test.ts tests/lecture-template/progress-provider.test.tsx
+npm run test -- tests/lecture-template/validate-cli.test.ts tests/lecture-template/validate-collection-cli.test.ts tests/lecture-template/review-package.test.ts
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+npm run build:cli
+npm run validate
+```

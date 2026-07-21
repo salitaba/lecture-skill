@@ -1,5 +1,6 @@
 import { AnswerKeyAppendix } from "@/components/lecture-kit/AnswerKeyAppendix";
 import { AnswerReviewDisclosure } from "@/components/lecture-kit/AnswerReviewDisclosure";
+import { AssessmentIndexDisclosure } from "@/components/lecture-kit/AssessmentIndexDisclosure";
 import { AnnotationsIndexDisclosure } from "@/components/lecture-kit/AnnotationsIndexDisclosure";
 import { GlossaryIndex } from "@/components/lecture-kit/GlossaryIndex";
 import { LectureHeader } from "@/components/lecture-kit/LectureHeader";
@@ -8,6 +9,7 @@ import { PageShell } from "@/components/lecture-kit/PageShell";
 import { RenderBlocks, SectionRenderer } from "@/components/lecture-kit/SectionRenderer";
 import { SectionNavigation } from "@/components/lecture-kit/SectionNavigation";
 import { collectLectureGlossary } from "@/lib/lecture-template/glossaryIndex";
+import { collectLectureAnswerDefinitions, collectLectureAssessments } from "@/lib/lecture-template/assessments";
 import { lectureNavigationTargets } from "@/lib/lecture-template/navigationTargets";
 import { progressIdFromTemplatePath, singleLectureProgressKey } from "@/lib/lecture-template/progress";
 import { lectureReadingMinutes } from "@/lib/lecture-template/readingTime";
@@ -42,6 +44,8 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
   const progressSections = lecture.sections.map((section) => ({ anchor: section.anchor, title: section.title }));
   const readingMinutes = lectureReadingMinutes(lecture);
   const glossaryEntries = collectLectureGlossary(lecture);
+  const assessments = collectLectureAssessments(lecture);
+  const answerDefinitions = collectLectureAnswerDefinitions(lecture);
 
   return (
     <PageShell>
@@ -51,6 +55,7 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
         collectionStorageKey={collectionContext?.collectionStorageKey}
         collectionLectures={collectionContext?.collectionLectures}
         lectureId={lectureId}
+        answerDefinitions={answerDefinitions}
       >
         <AnnotationsProvider lectureId={lectureId}>
           <LectureHeader
@@ -65,6 +70,7 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
           <div className="lecture-layout">
             <SectionNavigation sections={lecture.sections} />
             <article className="lecture-content">
+              <AssessmentIndexDisclosure assessments={assessments} linkMode="single" id="lecture-assessment-index" />
               <section className="overview-section lecture-panel quiet-reading-surface" aria-labelledby={lectureNavigationTargets.overview.id}>
                 <p className="section-kicker">Start Here</p>
                 <h2 id={lectureNavigationTargets.overview.id}>{lectureNavigationTargets.overview.label}</h2>

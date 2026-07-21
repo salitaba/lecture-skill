@@ -44,6 +44,52 @@ describe("validateTemplateSource", () => {
     expect(validateTemplateSource(fixture("examples/component-demo.template.md")).valid).toBe(true);
   });
 
+  it("normalizes assessment metadata without changing generated anchors", () => {
+    const result = validateTemplateSource(assessmentMetadataTemplate("recall-check", ["objective-1"]));
+
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const component = result.template.sections[0]?.blocks.find((block) => block.kind === "component");
+      expect(component?.kind === "component" ? component.component : undefined).toMatchObject({
+        type: "quiz",
+        id: "recall-check",
+        objectiveRefs: ["objective-1"]
+      });
+      const anchor = component?.kind === "component" && "anchor" in component.component ? component.component.anchor : "";
+      expect(anchor).toBe("practice-quiz-check-the-model");
+    }
+  });
+
+  it("rejects unsafe metadata and duplicate registry ids", () => {
+    const result = validateTemplateSource(assessmentMetadataTemplate("Recall Check", ["", 2 as unknown as string]).replace("## Key Takeaways", `
+
+\`\`\`lecture-component
+type: quiz
+id: Recall Check
+question: "A second check"
+options: ["Yes", "No"]
+answer: "Yes"
+\`\`\`
+
+## Key Takeaways`));
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.map((error) => error.code)).toEqual(expect.arrayContaining(["INVALID_COMPONENT_FIELD", "DUPLICATE_ASSESSMENT_ID"]));
+      expect(result.errors.some((error) => error.field === "objective_refs")).toBe(true);
+      expect(result.errors.some((error) => error.field === "id")).toBe(true);
+    }
+  });
+
+  it("rejects duplicate objective references", () => {
+    const result = validateTemplateSource(assessmentMetadataTemplate("recall-check", ["objective-1", "objective-1"]));
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors).toEqual(expect.arrayContaining([expect.objectContaining({ field: "objective_refs", code: "INVALID_COMPONENT_FIELD" })]));
+    }
+  });
+
   it("keeps the component demo as an exact all-components gallery", () => {
     const result = validateTemplateSource(fixture("examples/component-demo.template.md"));
 
@@ -550,6 +596,41 @@ Section content.
     }
   });
 });
+
+function assessmentMetadataTemplate(id: string, objectiveRefs: string[]): string {
+  return `---
+title: "Metadata"
+description: "Assessment metadata"
+audience: "Learners"
+duration: "10 minutes"
+level: "beginner"
+---
+
+## Overview
+
+This lecture tests assessment metadata.
+
+## Learning Objectives
+
+- Explain the model.
+
+## Section: Practice
+
+\`\`\`lecture-component
+type: quiz
+id: "${id}"
+objective_refs:
+${objectiveRefs.map((ref) => `  - ${typeof ref === "string" ? JSON.stringify(ref) : ref}`).join("\n")}
+question: "Check the model"
+options: ["Yes", "No"]
+answer: "Yes"
+\`\`\`
+
+## Key Takeaways
+
+- Metadata stays separate from the existing anchor.
+`;
+}
 
 function validLearningComponentsTemplate(): string {
   return `---

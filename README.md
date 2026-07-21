@@ -155,6 +155,14 @@ lectures/
 
 The collection landing page links to each lecture, provides previous/next navigation, and tracks browser-local learner progress. `course.yaml` can define the title, description, audience, level, and duration.
 
+### Unified interaction and assessment engine
+
+The five assessment components (`quiz`, `question_set`, `free_response`, `practice_task`, and `flashcard`) share one internal registry and capability model. Every assessment can optionally declare a stable lowercase `id` and syntax-validated `objective_refs` metadata. Registry IDs are deterministic and do not replace existing page anchors, so authored links remain stable.
+
+The runtime provides a common accessible shell, feedback/status announcements, keyboard-friendly reveal controls, and useful static/print fallbacks. Choice attempts for quizzes and question sets may persist locally and are revalidated against the current authored options; written-response, rubric, and flashcard lifecycle state remains local to the mounted activity. The collection and lecture indexes expose all five types, while answer review and answer-key exports remain limited to objective choice activities.
+
+Validation JSON and static review-package records include deterministic assessment summaries by type and evaluation mode, objective references, answer-key coverage, and an explicit `learnerStateIncluded: false` marker. They never include answer text or learner attempts.
+
 `lectures/raw-course.txt` is optional evidence for a real course source spanning multiple lectures. Review tooling reads it when present, but an agent loads it into context only for an explicitly requested shared-source split, cross-lecture reconciliation, or full-course review; its presence alone is not authorization. Per-lecture sources are the default context. Do not paste generated lecture output into any raw-source file. The system can preserve and classify files but cannot cryptographically determine whether user-supplied text was AI-generated.
 
 ## Useful commands

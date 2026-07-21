@@ -2,10 +2,12 @@ import type { AssessmentSummary } from "@/lib/lecture-template/assessments";
 
 export function AssessmentIndexDisclosure({
   assessments,
-  id = "assessment-index"
+  id = "assessment-index",
+  linkMode = "collection"
 }: {
   assessments: AssessmentSummary[];
   id?: string;
+  linkMode?: "single" | "collection";
 }) {
   const count = assessments.length;
   const unit = count === 1 ? "assessment" : "assessments";
@@ -24,7 +26,7 @@ export function AssessmentIndexDisclosure({
               <ol className="assessment-group-items">
                 {items.map((assessment) => (
                   <li key={`${assessment.lectureSlug}-${assessment.anchor}`}>
-                    <a href={`/lectures/${assessment.lectureSlug}#${assessment.anchor}`} title={assessment.title}>
+                    <a href={assessmentHref(assessment, linkMode)} title={assessment.title}>
                       {truncateTitle(assessment.title)}
                     </a>
                     <span className="assessment-group-meta">{labelForAssessment(assessment.type)}</span>
@@ -45,7 +47,13 @@ function labelForAssessment(type: string): string {
   if (type === "quiz") return "Quiz";
   if (type === "question_set") return "Question set";
   if (type === "free_response") return "Free response";
-  return "Practice task";
+  if (type === "practice_task") return "Practice task";
+  return "Flashcard";
+}
+
+function assessmentHref(assessment: AssessmentSummary, linkMode: "single" | "collection"): string {
+  if (linkMode === "single" || !assessment.lectureSlug) return `#${assessment.anchor}`;
+  return `/lectures/${assessment.lectureSlug}#${assessment.anchor}`;
 }
 
 function truncateTitle(title: string): string {

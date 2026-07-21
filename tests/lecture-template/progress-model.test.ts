@@ -68,6 +68,21 @@ describe("progress model helpers", () => {
     });
   });
 
+  it("filters stale selections and recomputes correctness from authored definitions", () => {
+    expect(
+      validateAnswerAttempts(
+        {
+          known: { selected: "B", correct: true },
+          stale: { selected: "C", correct: true },
+          unknown: { selected: "A", correct: false }
+        },
+        {
+          known: { options: ["A", "B"], answer: "A" }
+        }
+      )
+    ).toEqual({ known: { selected: "B", correct: false } });
+  });
+
   it("validates collection progress by known slugs and section anchors", () => {
     const progress = validateCollectionProgress(
       {

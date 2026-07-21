@@ -33,6 +33,7 @@ export interface AnswerAttempt {
 }
 
 export type AnswerAttempts = Record<string, AnswerAttempt>;
+export type AnswerDefinitions = Record<string, { options: string[]; answer: string }>;
 
 export interface Highlight {
   id: string;
@@ -103,7 +104,7 @@ export function validateLectureProgress(value: unknown, allowedAnchors: Iterable
   return normalized;
 }
 
-export function validateAnswerAttempts(value: unknown): AnswerAttempts {
+export function validateAnswerAttempts(value: unknown, definitions?: AnswerDefinitions): AnswerAttempts {
   if (!isPlainRecord(value)) return {};
 
   const normalized: AnswerAttempts = {};
@@ -111,7 +112,13 @@ export function validateAnswerAttempts(value: unknown): AnswerAttempts {
   for (const [key, attempt] of Object.entries(value)) {
     if (!isPlainRecord(attempt)) continue;
     if (typeof attempt.selected !== "string" || typeof attempt.correct !== "boolean") continue;
-    normalized[key] = { selected: attempt.selected, correct: attempt.correct };
+    const definition = definitions?.[key];
+    if (definitions && !definition) continue;
+    if (definition && !definition.options.includes(attempt.selected)) continue;
+    normalized[key] = {
+      selected: attempt.selected,
+      correct: definition ? attempt.selected === definition.answer : attempt.correct
+    };
   }
 
   return normalized;

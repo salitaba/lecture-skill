@@ -115,6 +115,37 @@ describe("collection scanning", () => {
     expect(validation.results[1].errors.map((error) => error.code)).toContain("INVALID_LEVEL");
   });
 
+  it("rejects duplicate explicit assessment ids across lectures", async () => {
+    writeText("lectures/01-one/lecture.template.md", explicitAssessmentTemplate("shared-check"));
+    writeText("lectures/02-two/lecture.template.md", explicitAssessmentTemplate("shared-check"));
+
+    const validation = await validateCollection();
+
+    expect(validation.allPassed).toBe(false);
+    expect(validation.results[0].valid).toBe(true);
+    expect(validation.results[1]).toMatchObject({ valid: false });
+    expect(validation.results[1].errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "DUPLICATE_ASSESSMENT_ID",
+          message: expect.stringContaining("lectures/01-one/lecture.template.md:19")
+        })
+      ])
+    );
+  });
+
+  it("rejects an explicit id that collides with another lecture's generated registry id", async () => {
+    writeText("lectures/01-one/lecture.template.md", explicitAssessmentTemplate("practice-quiz-ready"));
+    writeText("lectures/02-two/lecture.template.md", explicitAssessmentTemplate());
+
+    const validation = await validateCollection();
+
+    expect(validation.allPassed).toBe(false);
+    expect(validation.results[1].errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "DUPLICATE_ASSESSMENT_ID", locator: expect.objectContaining({ line: expect.any(Number) }) })])
+    );
+  });
+
   it("parses valid course metadata and ignores unknown fields", () => {
     const result = parseCourseMetadata(
       [
@@ -226,7 +257,7 @@ describe("collection scanning", () => {
     const summaries = collectLectureAssessments(result.template, "01-demo");
     const answerKey = collectLectureAnswerKey(result.template, "01-demo");
 
-    expect(summaries.map((summary) => summary.type)).toEqual(["quiz", "question_set", "free_response", "practice_task"]);
+    expect(summaries.map((summary) => summary.type)).toEqual(["quiz", "question_set", "free_response", "practice_task", "flashcard"]);
     expect(summaries[1]).toMatchObject({
       lectureSlug: "01-demo",
       sectionTitle: "Check Understanding Components",
@@ -257,7 +288,7 @@ describe("collection scanning", () => {
       ]
     });
 
-    expect(summaries).toHaveLength(4);
+    expect(summaries).toHaveLength(5);
     expect(new Set(summaries.map((summary) => summary.lectureSlug))).toEqual(new Set(["01-demo"]));
   });
 
@@ -297,4 +328,37 @@ function writeText(destinationPath: string, contents: string) {
   const absolutePath = path.join(tempRoot, destinationPath);
   mkdirSync(path.dirname(absolutePath), { recursive: true });
   writeFileSync(absolutePath, contents, "utf8");
+}
+
+function explicitAssessmentTemplate(id?: string): string {
+  const idField = id ? `id: "${id}"\n` : "";
+  return `---
+title: "Lecture"
+description: "A lecture"
+audience: "Learners"
+duration: "10 minutes"
+level: "beginner"
+---
+
+## Overview
+
+Overview.
+
+## Learning Objectives
+
+- Understand checks.
+
+## Section: Practice
+
+\`\`\`lecture-component
+type: quiz
+${idField}question: "Ready?"
+options: ["Yes", "No"]
+answer: "Yes"
+\`\`\`
+
+## Key Takeaways
+
+- Checks are explicit.
+`;
 }

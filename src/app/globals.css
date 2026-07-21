@@ -1732,6 +1732,27 @@ details[open] > summary .learning-path-chevron {
   color: var(--muted);
 }
 
+.assessment-lifecycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+
+.assessment-feedback {
+  margin: 10px 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.assessment-feedback-positive {
+  color: var(--success-text);
+}
+
+.assessment-feedback-negative {
+  color: var(--warning-text);
+}
+
 .labeled-section {
   min-width: 0;
   padding: 14px 0;

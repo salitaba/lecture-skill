@@ -3,6 +3,7 @@ import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
 import { validateCollection } from "./collection";
 import type { CollectionValidationResult, CourseMetadataValidationResult, ValidationError, ValidationResult } from "./types";
 import { validateTemplateSource } from "./validateTemplate";
+import { summarizeLectureAssessments } from "./assessments";
 
 export interface CliValidationOutput {
   status: number;
@@ -192,6 +193,7 @@ function buildCollectionJsonOutput(collection: CollectionValidationResult) {
       slug: result.slug,
       templatePath: result.templatePath,
       valid: result.valid,
+      ...(result.valid && result.template ? { assessmentSummary: summarizeLectureAssessments(result.template) } : {}),
       errors: result.errors.map(serializeError)
     })),
     errors: [
@@ -207,6 +209,7 @@ function buildSingleJsonOutput(templatePath: string, result: ValidationResult) {
     mode: "single-lecture",
     templatePath,
     valid: result.valid,
+    ...(result.valid && result.template ? { assessmentSummary: summarizeLectureAssessments(result.template) } : {}),
     errors: result.valid ? [] : result.errors.map(serializeError)
   };
 }

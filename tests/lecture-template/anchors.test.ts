@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { slugifySectionTitle, uniqueAnchors, uniqueSectionAnchors } from "../../src/lib/lecture-template/anchors";
+import { isAnchorSafeAssessmentId, slugifySectionTitle, uniqueAnchors, uniqueSectionAnchors } from "../../src/lib/lecture-template/anchors";
 
 describe("section anchors", () => {
   it("slugifies section titles", () => {
@@ -17,5 +17,11 @@ describe("section anchors", () => {
 
   it("keeps duplicate generic anchors unique and ordered", () => {
     expect(uniqueAnchors(["Practice", "Practice", "Check"], "assessment")).toEqual(["practice", "practice-2", "check"]);
+  });
+
+  it("recognizes stable authored assessment ids without slugifying them", () => {
+    expect(isAnchorSafeAssessmentId("choice-check-1")).toBe(true);
+    expect(isAnchorSafeAssessmentId("Choice Check")).toBe(false);
+    expect(isAnchorSafeAssessmentId("choice_check")).toBe(false);
   });
 });

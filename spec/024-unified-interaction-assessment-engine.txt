@@ -1,0 +1,473 @@
+Feature: Unified Interaction and Assessment Engine
+
+## Product Summary
+
+The Lecture Site Engine already supports several learning interactions: `quiz`,
+`question_set`, `free_response`, `practice_task`, and `flashcard`. Each
+component is useful on its own, but the product currently treats them as
+separate rendering and state-management problems. This makes answer review,
+progress persistence, accessibility behavior, assessment indexing, and future
+interaction types harder to extend consistently.
+
+This feature introduces a shared assessment domain model and interaction
+lifecycle underneath the existing components. It does not replace the current
+authoring syntax or force every activity into one visual component. Existing
+components remain specialized renderers, while the engine supplies shared
+identity, normalization, state, evaluation, feedback, persistence, review,
+validation, and accessibility contracts.
+
+The primary product outcome is: an educator can author different kinds of
+learning activities using the existing template format, and learners
+experience a consistent practice flow — attempt, submit or reveal, receive
+feedback, retry or review — across a lecture and collection. Non-choice
+interaction state is local to the current interaction in this release; only
+objective choice attempts use the existing persisted answer state.
+
+The first release is local-first and practice-first. It may remember a
+learner's last attempt and whether an objectively evaluated answer was correct,
+but it must not imply grades, certification, mastery, ranking, or instructor
+reporting.
+
+## Product Outcome
+
+After this feature:
+
+- Every supported learning activity has a stable identity and normalized
+  assessment record.
+- Existing assessment components share a predictable interaction lifecycle.
+- Answer review and assessment indexes are generated from one registry rather
+  than component-specific lists.
+- Persisted learner state is validated, namespaced, backward-compatible, and
+  resilient to unavailable or corrupted browser storage.
+- Adding a future interaction type does not require duplicating persistence,
+  feedback, accessibility, answer-review, and collection-index logic.
+- Static export and no-JavaScript output remain useful and truthful.
+
+## Users And Jobs
+
+Primary users:
+
+- Technical educators authoring lecture templates with an AI coding agent.
+- Learners working through local or statically published lecture collections.
+- Reviewers checking that activities are present, understandable, and aligned
+  with the lecture content.
+
+Jobs to be done:
+
+- As an educator, I want every activity to use a clear, validated contract so
+  I can author and revise assessments without memorizing unrelated payload
+  conventions.
+- As a learner, I want every activity to explain what I should do next and
+  what my response means.
+- As a returning learner, I want my latest quiz attempts and practice state to
+  remain available after reload when local storage is available.
+- As a learner, I want to find unanswered or incorrect objective assessments
+  without scanning the entire lecture again.
+- As a reviewer, I want one assessment index and one answer-key pipeline that
+  includes all applicable activities.
+- As a developer, I want to add a new interaction renderer without rewriting
+  storage, validation, navigation, and review behavior.
+
+## Current Product Context
+
+The current template model defines separate component interfaces for
+`QuizComponent`, `QuestionSetComponent`, `FreeResponseComponent`,
+`PracticeTaskComponent`, and `FlashcardComponent` in
+`src/lib/lecture-template/types.ts`. The current assessment helpers collect
+the first four types in `src/lib/lecture-template/assessments.ts`; flashcards
+are not currently part of the assessment index because they do not have an
+objective right/wrong result.
+
+The progress model already stores section completion and last answer state in
+`src/lib/lecture-template/progress.ts`. The existing `Quiz` and `QuestionSet`
+components use that state for answer restoration and feedback. The new engine
+must extend these foundations rather than introduce a parallel storage system.
+
+Relevant existing contracts include:
+
+- `src/lib/lecture-template/types.ts`
+- `src/lib/lecture-template/assessments.ts`
+- `src/lib/lecture-template/progress.ts`
+- `src/components/lecture-kit/Quiz.tsx`
+- `src/components/lecture-kit/QuestionSet.tsx`
+- `src/components/lecture-kit/FreeResponse.tsx`
+- `src/components/lecture-kit/PracticeTask.tsx`
+- `src/components/lecture-kit/Flashcard.tsx`
+- `src/components/lecture-kit/AnswerReviewDisclosure.tsx`
+- `src/components/lecture-kit/AnswerKeyAppendix.tsx`
+- `src/components/lecture-kit/AssessmentIndexDisclosure.tsx`
+- `src/components/lecture-kit/SectionRenderer.tsx`
+- `src/components/lecture-kit/progress/ProgressProvider.tsx`
+
+## Goals
+
+### P0: Shared Assessment Foundation
+
+- Define a normalized internal assessment model separate from authored
+  component payloads.
+- Add stable assessment identity. Existing anchors remain valid; explicit IDs
+  may be introduced as an additive authoring field, with deterministic anchor
+  fallback for existing templates.
+- Normalize the current supported activity types into one registry:
+  `quiz`, `question_set`, `free_response`, `practice_task`, and `flashcard`.
+- Define a shared interaction lifecycle:
+  `unattempted`, `active`, `submitted`, `revealed`, `correct`, `incorrect`,
+  `self_assessed`, and `completed` as applicable to each evaluation mode.
+  Non-choice states are local to the mounted interaction in this release;
+  objective choice attempts are the only states persisted across reloads.
+- Define evaluation modes:
+  - `choice`: objectively compares a response with an authored answer.
+  - `self_assess`: lets a learner mark understanding without a right/wrong
+    claim.
+  - `reveal`: reveals an authored answer without grading.
+  - `rubric`: presents criteria for learner self-review without automatic
+    grading.
+- Move assessment collection, assessment summaries, and applicable answer-key
+  extraction onto the normalized registry.
+- Preserve existing valid templates and current component visuals while the
+  shared model is introduced.
+
+### P0: Shared Learner Behavior
+
+- Provide shared interaction primitives for assessment surfaces, feedback,
+  status, submission/reveal controls, hints, retry, and accessible live
+  announcements.
+- Keep quiz and question-set answer persistence compatible with the current
+  `AnswerAttempt` storage shape or provide a documented additive migration.
+- Persist only the minimum necessary local state by default. Do not persist
+  free-response text or practice-task draft text in this feature.
+- Generate a single per-lecture assessment index from the normalized registry.
+- Generate a personal answer-review surface for objectively evaluated
+  activities, while keeping the complete author-facing answer key separate.
+- Render an assessment index on both lecture pages and collection landing pages;
+  single-lecture links must use local fragments and collection links must use
+  lecture routes plus fragments.
+- Include flashcards in the activity index with a reveal/self-assessment label,
+  but do not treat them as objectively correct or incorrect.
+
+### P1: Authoring and Quality Improvements
+
+- Support optional `id` and `objective_refs` fields for assessment components.
+- Validate IDs for uniqueness within a lecture and collection.
+- Reject explicit-versus-derived registry ID collisions while keeping generated
+  anchors unchanged.
+- Validate objective references when objectives are represented in the
+  collection metadata contract.
+- Standardize authored feedback fields where the current component can
+  support them without breaking existing payloads.
+- Add machine-readable assessment summaries to validation and review-package
+  output.
+- Add a small set of new normalized interaction types only after the P0
+  registry is stable: ordering, matching, and fill-in-the-blank.
+
+### P2: Future Extensions
+
+- Add a pluggable renderer/evaluator registry for custom interactions.
+- Add internal assessment events such as viewed, started, submitted, revealed,
+  retried, and completed without transmitting them anywhere.
+- Add optional mastery or spaced-repetition features as a separate product
+  decision.
+- Add code-execution exercises as a separate sandbox-focused feature.
+- Add xAPI, LTI, grading, instructor dashboards, accounts, and cloud sync only
+  as separate follow-on features.
+
+## Non-Goals
+
+- No grades, certificates, leaderboards, streaks, or percentage scores.
+- No mastery model or automated course completion requirements.
+- No instructor reporting, analytics dashboard, accounts, or server-side
+  learner state.
+- No runtime AI feedback or runtime remote content fetching.
+- No replacement of the Markdown plus `lecture-component` authoring format.
+- No breaking change to existing valid templates or existing component names.
+- No rich-text response editor or server-side submission storage.
+- No code execution, browser sandbox, simulation engine, or external evaluator
+  in this feature.
+- No large new collection of one-off components before the shared registry and
+  lifecycle are proven.
+
+## Product Decisions
+
+- The normalized assessment model is an internal engine contract first. The
+  existing authored component payloads remain supported and are adapted into
+  the model.
+- An assessment is broader than an objectively graded question. Flashcards,
+  practice tasks, and free responses are learning activities with different
+  evaluation modes.
+- Correctness is practice feedback, not a grade. The UI must use language such
+  as `Correct`, `Try again`, `Review`, or `Mark as understood`, and must not
+  display a course score.
+- Existing anchors are the compatibility identity. An explicit authored `id`
+  is preferred for new content, but the engine derives a deterministic ID when
+  it is absent.
+- Assessment state is local and best-effort, following the current progress
+  provider behavior. Invalid or stale state is discarded without blocking the
+  lecture.
+- When persisted objective-answer state is loaded, unknown activity keys and
+  selections not present in the current authored options are discarded, and
+  correctness is recomputed from the current authored answer.
+- Answer review shows the learner's latest local state for objectively
+  evaluated activities. The answer key remains a complete, learner-independent
+  reference for instructors and reviewers.
+- Once answer state has loaded, answer review may show unattempted objective
+  activities even when no answer has yet been recorded. It remains absent when
+  no progress provider is present or state has not loaded.
+- The static and no-JavaScript representation must expose the prompt,
+  authored answer or solution where the existing review/print contract allows
+  it, and the purpose of any interactive control. JavaScript adds convenience;
+  it must not be the only way to understand the content.
+- New interaction renderers compose shared component-kit primitives such as
+  `Card`, `Button`, `Disclosure`, `RadioOptionGroup`, and `LabeledSection`.
+
+## Normalized Domain Model
+
+The implementation should introduce types similar to the following, using
+repository naming conventions rather than copying this sketch literally:
+
+```ts
+type AssessmentKind =
+  | "quiz"
+  | "question_set"
+  | "free_response"
+  | "practice_task"
+  | "flashcard"
+  | "ordering"
+  | "matching"
+  | "fill_blank";
+
+type AssessmentEvaluationMode =
+  | "choice"
+  | "self_assess"
+  | "reveal"
+  | "rubric";
+
+interface AssessmentRecord {
+  id: string;
+  anchor: string;
+  kind: AssessmentKind;
+  evaluationMode: AssessmentEvaluationMode;
+  title: string;
+  sectionTitle: string;
+  objectiveRefs?: string[];
+  supportsAnswerReview: boolean;
+  supportsAnswerKey: boolean;
+}
+```
+
+The record should reference or safely derive the component-specific payload;
+it must not duplicate sensitive answer data into learner-facing summaries.
+Answer-key extraction may continue to expose answers only in the existing
+reviewer/instructor surfaces.
+
+The learner attempt model should remain additive to the current progress
+state. It should distinguish at least:
+
+- no attempt
+- selected or drafted locally but not submitted
+- submitted and correct
+- submitted and incorrect
+- revealed without correctness
+- self-assessed as understood or needs review
+- completed when the activity's own completion rule is satisfied
+
+## Authoring Contract
+
+Existing payloads remain valid. New optional fields should follow the existing
+snake_case YAML convention:
+
+```yaml
+type: quiz
+id: identify-domain-boundary
+question: Which layer owns business rules?
+options:
+  - Domain
+  - Infrastructure
+  - Presentation
+answer: Domain
+explanation: The domain layer owns business rules independently of frameworks.
+objective_refs:
+  - explain-layer-boundaries
+```
+
+The first implementation may support only the fields required by each current
+component. Unsupported optional fields must produce clear validation errors or
+be explicitly documented as ignored; they must never silently change the
+meaning of an existing activity.
+
+The unified metadata contract in this feature is limited to `id` and
+`objective_refs`. Existing component-specific fields such as question-set
+feedback, practice hints, and quiz explanations retain their current payload
+contracts; a future shared feedback contract requires a separate migration.
+
+## Interaction Requirements
+
+### Shared behavior
+
+- Every interactive surface has a visible name, clear current state, and one
+  obvious next action.
+- Submission, reveal, retry, hint, and self-assessment controls use consistent
+  labels and keyboard behavior.
+- Feedback is associated with the control that triggered it and announced via
+  an appropriate live region without excessive repetition.
+- Focus remains predictable after submission, reveal, retry, and validation
+  errors.
+- Disabled controls explain why they are disabled, especially after an answer
+  is revealed.
+- Reduced-motion preferences continue to be respected.
+- Components remain usable at phone widths, 200% zoom, and keyboard-only input.
+
+### Evaluation modes
+
+- `choice` activities show whether the submitted response matches the authored
+  answer and may show an explanation.
+- `self_assess` activities expose `Mark as understood` and `Needs review` or
+  equivalent neutral actions. They do not calculate correctness.
+- `reveal` activities expose the authored answer through a disclosure and may
+  let the learner mark the card for review.
+- `rubric` activities expose criteria, hints, starter material, and solution
+  through deliberate disclosures. They do not claim that the learner passed.
+
+### Static and review output
+
+- The assessment index is present in static output.
+- The answer key includes objective answers and practice guidance in the
+  existing reviewer/instructor surface.
+- Learner-specific attempt state is never embedded into the static package.
+- Print output keeps prompts and useful reference answers readable and avoids
+  printing hidden interactive controls as unexplained empty regions.
+
+## Validation Requirements
+
+Validation must continue to report author-locatable errors with line,
+section, component, and field context.
+
+P0 validation requirements:
+
+- Existing component payload validation remains unchanged for valid and invalid
+  cases.
+- Normalization rejects an unsupported or internally inconsistent evaluation
+  mode.
+- Derived assessment IDs are deterministic.
+- Explicit IDs cannot collide within a lecture.
+- Assessment index entries have valid anchors and section references.
+- A component cannot claim an objectively evaluated mode without an answer or
+  evaluator-supported payload.
+- A self-assessment or reveal activity is not reported as correct or incorrect.
+
+P1 validation requirements:
+
+- Explicit `id` values follow the repository's anchor-safe identifier rules.
+- `objective_refs` are non-empty strings when present.
+- Duplicate IDs are reported across a collection with both source locations.
+- Machine-readable validation output includes normalized assessment summaries
+  and errors.
+
+## Review Package Requirements
+
+`package:review` should include:
+
+- assessment counts by kind and evaluation mode
+- per-lecture assessment index
+- objective references when present
+- answer-key coverage
+- validation failures related to assessment identity or payloads
+- a statement that learner-local attempt state is not included
+
+## Compatibility Requirements
+
+- Single-lecture mode remains unchanged for existing users.
+- Collection mode continues to aggregate assessments across valid lectures.
+- Existing anchors and links remain stable.
+- Existing local progress and answer data is readable after the change.
+- Corrupted, missing, or stale assessment state degrades to an empty state.
+- No new runtime network dependency is introduced.
+- The review package remains portable and deterministic.
+- The engine remains compatible with static export and no-JavaScript reading.
+
+## Test Plan
+
+Add or update focused tests for:
+
+- normalization of every current assessment component
+- flashcard inclusion in the activity index without correctness reporting
+- deterministic fallback IDs and explicit ID validation
+- duplicate IDs and invalid objective references
+- evaluation-mode capabilities
+- backward-compatible progress and answer-state migration
+- corrupted, stale, and unavailable local storage
+- shared assessment lifecycle behavior
+- answer review filtering for missed and unattempted objective items
+- self-assessment and reveal activities not appearing as graded
+- keyboard, focus, live-region, and reduced-motion contracts
+- static rendering and print/review-package output
+- collection aggregation and single-lecture backward compatibility
+- existing fixtures for all previous assessment components
+
+Focused verification should use the repository's normal checks:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run build:cli
+npm run validate
+```
+
+## Success Metrics / Quality Gates
+
+- All existing valid lecture templates pass without authoring changes.
+- Every current learning activity appears in the normalized assessment index.
+- A new renderer can reuse shared state and feedback primitives without adding
+  a new persistence scheme.
+- A learner can complete, reveal, retry, or self-assess every current activity
+  using keyboard and screen reader semantics.
+- Reloading preserves supported local attempt state without exposing a course
+  grade.
+- Review output clearly separates learner answer review from the complete
+  answer key.
+- Static and print output remain useful when JavaScript is unavailable.
+- The full verification suite passes with no new runtime network dependency.
+
+## Risks And Mitigations
+
+### Risk: the normalized model becomes a lowest-common-denominator abstraction
+
+Mitigation: keep specialized component payloads and renderers; normalize shared
+identity, lifecycle, evaluation capability, and indexing only.
+
+### Risk: local answer persistence becomes a de facto grading system
+
+Mitigation: use practice language, show latest attempt review only, avoid total
+scores, and keep mastery and reporting out of this feature.
+
+### Risk: stable IDs break existing anchors or saved progress
+
+Mitigation: preserve authored anchors, derive IDs deterministically, and add
+compatibility tests before changing storage reads.
+
+### Risk: a large interaction framework delays useful improvements
+
+Mitigation: P0 migrates existing components first and adds no new interaction
+types. Ordering, matching, and fill-in-the-blank are explicitly later.
+
+### Risk: answer data leaks into learner-facing or static artifacts
+
+Mitigation: separate normalized summaries from answer-key records and test
+reviewer-only answer exposure.
+
+## Open Questions
+
+- Should explicit assessment IDs be authored as `id` or `assessment_id`? The
+  recommended choice is `id` for consistency with common content identifiers.
+- Should question-set sub-items receive explicit IDs in a future extension, or
+  should deterministic item indexes remain sufficient? Start with deterministic
+  indexes for backward compatibility.
+- Should flashcard review state be included in the same answer-review surface,
+  or receive a separate `Cards to revisit` surface? The recommended choice is a
+  separate neutral review group, not the incorrect-answer list.
+- Objective references are syntax-only metadata in this release: non-empty,
+  unique strings are accepted and carried through the registry, but they are
+  not claimed to resolve against the free-text `objectives` list. Resolution
+  against a collection-level objective catalog belongs to a later course-graph
+  feature.

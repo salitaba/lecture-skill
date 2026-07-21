@@ -27,6 +27,11 @@ export type LectureComponentType =
   | "resource_links"
   | "instructor_note";
 
+export interface AssessmentMetadata {
+  id?: string;
+  objectiveRefs?: string[];
+}
+
 export interface SourceLocator {
   line?: number;
   column?: number;
@@ -240,7 +245,7 @@ export interface QuoteComponent {
   context?: string;
 }
 
-export interface QuizComponent {
+export interface QuizComponent extends AssessmentMetadata {
   type: "quiz";
   anchor: string;
   question: string;
@@ -256,7 +261,7 @@ export interface QuestionSetQuestion {
   feedback?: string;
 }
 
-export interface QuestionSetComponent {
+export interface QuestionSetComponent extends AssessmentMetadata {
   type: "question_set";
   anchor: string;
   title: string;
@@ -265,7 +270,7 @@ export interface QuestionSetComponent {
   shuffle_options?: boolean;
 }
 
-export interface FreeResponseComponent {
+export interface FreeResponseComponent extends AssessmentMetadata {
   type: "free_response";
   anchor: string;
   title: string;
@@ -284,7 +289,7 @@ export interface PracticeRubricItem {
   expected: string;
 }
 
-export interface PracticeTaskComponent {
+export interface PracticeTaskComponent extends AssessmentMetadata {
   type: "practice_task";
   anchor: string;
   title: string;
@@ -359,8 +364,9 @@ export interface ChecklistComponent {
   reset_label?: string;
 }
 
-export interface FlashcardComponent {
+export interface FlashcardComponent extends AssessmentMetadata {
   type: "flashcard";
+  anchor?: string;
   prompt: string;
   answer: string;
   hint?: string;

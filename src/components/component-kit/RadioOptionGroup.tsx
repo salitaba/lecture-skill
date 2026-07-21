@@ -9,6 +9,7 @@ export interface RadioOptionGroupProps {
   optionClassName: string;
   groupClassName: string;
   groupLabelledBy?: string;
+  groupDescribedBy?: string;
   idPrefix?: string;
   optionExtraClassName?: (option: string) => string | undefined;
   /** Rendered before the options, inside the `role="radiogroup"` wrapper (e.g. a hidden accessible-name span). */
@@ -24,12 +25,13 @@ export function RadioOptionGroup({
   optionClassName,
   groupClassName,
   groupLabelledBy,
+  groupDescribedBy,
   idPrefix,
   optionExtraClassName,
   children
 }: RadioOptionGroupProps) {
   return (
-    <div className={groupClassName} role="radiogroup" aria-labelledby={groupLabelledBy}>
+    <div className={groupClassName} role="radiogroup" aria-labelledby={groupLabelledBy} aria-describedby={groupDescribedBy}>
       {children}
       {options.map((option, index) => (
         <label key={`${option}-${index}`} className={[optionClassName, optionExtraClassName?.(option)].filter(Boolean).join(" ")}>

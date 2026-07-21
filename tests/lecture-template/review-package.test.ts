@@ -194,6 +194,7 @@ describe("review package helpers", () => {
     expect(lecture.componentCounts.glossary_term).toBe(1);
     expect(lecture.componentCounts.tabs).toBe(1);
     expect(lecture.componentCounts.resource_links).toBe(1);
+    expect(lecture.assessmentSummary).toMatchObject({ total: 5, answerKeyCount: 2, learnerStateIncluded: false });
     expect(lecture.instructorNoteCount).toBe(1);
     expect(lecture.resourceLinks).toEqual(
       expect.arrayContaining([

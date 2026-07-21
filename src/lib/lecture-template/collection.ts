@@ -4,6 +4,7 @@ import { LECTURES_DIR as SHARED_LECTURES_DIR, readLectureEntry as readLectureTem
 import { readCourseMetadata } from "./courseMetadata";
 import { parseLectureTemplate } from "./parseTemplate";
 import { validateTemplateSource } from "./validateTemplate";
+import { collectLectureAssessments } from "./assessments";
 import type {
   CollectionValidationResult,
   LectureCollection,
@@ -58,12 +59,38 @@ export async function validateCollection(options: ScanLectureCollectionOptions =
     });
   }
 
+  const firstAssessmentById = new Map<string, { slug: string; templatePath: string; locator?: { line?: number } }>();
+  for (const result of results) {
+    if (!result.valid || !result.template) continue;
+    for (const assessment of collectLectureAssessments(result.template, result.slug)) {
+      const previous = firstAssessmentById.get(assessment.id);
+      if (previous) {
+        result.valid = false;
+        result.errors.push({
+          code: "DUPLICATE_ASSESSMENT_ID",
+          message: `Assessment registry id "${assessment.id}" is declared by ${previous.templatePath}${formatLine(previous.locator?.line)} and ${result.templatePath}${formatLine(assessment.sourceLocator?.line)}.`,
+          locator: assessment.sourceLocator,
+          field: "id",
+          sectionTitle: assessment.sectionTitle,
+          componentType: assessment.type,
+          hint: "Use a unique id across the collection, or change the generated assessment title/section so registry ids do not collide."
+        });
+      } else {
+        firstAssessmentById.set(assessment.id, { slug: result.slug, templatePath: result.templatePath, locator: assessment.sourceLocator });
+      }
+    }
+  }
+
   return {
     lectureCount: results.length,
     results,
     courseMetadata: collection.courseMetadata,
     allPassed: results.every((result) => result.valid) && collection.courseMetadata.status !== "invalid"
   };
+}
+
+function formatLine(line: number | undefined): string {
+  return line === undefined ? "" : `:${line}`;
 }
 
 async function collectLectureEntries(logSkippedDirectories: boolean): Promise<LectureCollectionEntry[]> {

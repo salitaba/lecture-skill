@@ -23,3 +23,7 @@ export function uniqueAnchors(labels: string[], fallbackBase: string): string[] 
     return count === 0 ? base : `${base}-${count + 1}`;
   });
 }
+
+export function isAnchorSafeAssessmentId(value: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+}

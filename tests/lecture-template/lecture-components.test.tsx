@@ -272,11 +272,10 @@ describe("lecture component UX contracts", () => {
     const answerLabelId = html.match(new RegExp(`id="${answerRegionId}" class="quiz-answer"[^>]+aria-labelledby="([^"]+)"`))?.[1];
     expect(answerLabelId).toBeTruthy();
     expect(html).toContain(`id="${answerLabelId}"`);
-    expect(html).toContain(`id="${answerRegionId}" class="quiz-answer" hidden="" aria-labelledby="${answerLabelId}"`);
+    expect(html).toContain(`id="${answerRegionId}" class="quiz-answer" aria-labelledby="${answerLabelId}"`);
     expect(html).toContain(`<p id="${answerLabelId}" class="quiz-answer-label">Answer</p>`);
-    expect(html).toContain('<noscript class="quiz-noscript">');
-    expect(html).toContain(".quiz-reveal-button { display: none !important; }");
-    expect(html).toContain("Interactive answer reveal requires JavaScript.");
+    expect(html).toContain('<noscript class="assessment-noscript">');
+    expect(html).toContain("Answer: npm run validate");
     expect(html).toContain('<p class="quiz-answer-value">npm run validate</p>');
     expect(html).toContain("Validation checks the template.");
   });
@@ -700,7 +699,7 @@ describe("lecture component UX contracts", () => {
       />
     );
 
-    expect(html).toContain("Show 4 assessments");
+    expect(html).toContain("Show 5 assessments");
     expect(html).toContain("Course progress");
     expect(html).toContain("Loading progress");
     expect(html).toContain("Author/reviewer note");

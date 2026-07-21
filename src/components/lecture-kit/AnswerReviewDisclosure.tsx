@@ -1,6 +1,6 @@
 "use client";
 
-import { collectLectureAnswerKey } from "@/lib/lecture-template/assessments";
+import { collectLectureAssessments } from "@/lib/lecture-template/assessments";
 import type { LectureTemplate } from "@/lib/lecture-template/types";
 import { useProgressOptional } from "./progress/ProgressProvider";
 
@@ -13,34 +13,21 @@ interface ReviewItem {
 
 export function AnswerReviewDisclosure({ lecture }: { lecture: LectureTemplate }) {
   const progressContext = useProgressOptional();
-  const answers = progressContext?.answers ?? {};
+  if (!progressContext?.answersLoaded) return null;
 
-  if (Object.keys(answers).length === 0) return null;
-
-  const entries = collectLectureAnswerKey(lecture).filter((entry) => entry.type === "quiz" || entry.type === "question_set");
+  const answers = progressContext.answers;
+  const entries = collectLectureAssessments(lecture).filter((entry) => entry.supportsAnswerReview);
   const items: ReviewItem[] = [];
 
   for (const entry of entries) {
-    if (entry.type === "quiz") {
-      const attempt = answers[entry.anchor];
+    for (const responseItem of entry.responseItems) {
+      const attempt = answers[responseItem.key];
       if (!attempt) {
-        items.push({ key: entry.anchor, href: `#${entry.anchor}`, label: entry.title, status: "unattempted" });
+        items.push({ key: responseItem.key, href: `#${entry.anchor}`, label: responseItem.label, status: "unattempted" });
       } else if (!attempt.correct) {
-        items.push({ key: entry.anchor, href: `#${entry.anchor}`, label: entry.title, status: "missed" });
+        items.push({ key: responseItem.key, href: `#${entry.anchor}`, label: responseItem.label, status: "missed" });
       }
-      continue;
     }
-
-    entry.questions?.forEach((question, index) => {
-      const itemKey = `${entry.anchor}:${index}`;
-      const attempt = answers[itemKey];
-      const label = `${question.question} (${entry.title})`;
-      if (!attempt) {
-        items.push({ key: itemKey, href: `#${entry.anchor}`, label, status: "unattempted" });
-      } else if (!attempt.correct) {
-        items.push({ key: itemKey, href: `#${entry.anchor}`, label, status: "missed" });
-      }
-    });
   }
 
   if (items.length === 0) return null;

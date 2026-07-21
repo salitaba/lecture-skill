@@ -268,7 +268,7 @@ explanation: "Validation checks the active template or collection."
 ```
 ````
 
-Rendered label: `Quiz: Knowledge check`. Use `quiz` for lightweight knowledge checks with feedback revealed on demand. The schema is unchanged: `question`, `options`, `answer`, and optional `explanation`; the `answer` must exactly match one option after trimming whitespace. Interactive pages initially show the question, options, and a `Show answer` button, then toggle to `Hide answer` after reveal. Printed output includes the answer and explanation by default. If JavaScript is unavailable, the rendered quiz shows a `<noscript>` message explaining that interactive reveal requires JavaScript and that printed output includes the answer and explanation. Quiz reveal is a pacing aid, not secure assessment, grading, learner tracking, answer encryption, anti-cheating, learner accounts, analytics, or source-code secrecy.
+Rendered label: `Quiz: Knowledge check`. Use `quiz` for lightweight knowledge checks with feedback revealed on demand. The required fields remain `question`, `options`, and `answer`; `explanation`, `id`, and `objective_refs` are optional. The `answer` must exactly match one option after trimming whitespace. Interactive pages initially show the question, options, and a `Show answer` button, then toggle to `Hide answer` after reveal. Printed output includes the answer and explanation by default. Without JavaScript, the answer is present in the static fallback. Quiz reveal is a pacing aid, not secure assessment, grading, learner tracking, answer encryption, anti-cheating, learner accounts, analytics, or source-code secrecy.
 
 ````markdown
 ```lecture-component
@@ -303,7 +303,7 @@ guidance: "Committing to an answer first makes the comparison more useful."
 ```
 ````
 
-Rendered label: `Assessment: Free response`. Use `free_response` for written reasoning, predictions, reflections, or design explanations. It requires non-empty `title` and `prompt`; `guidance` and `placeholder` are optional. Learner input is local-only browser state and is not saved, submitted, graded, tracked, or packaged as learner state.
+Rendered label: `Assessment: Free response`. Use `free_response` for written reasoning, predictions, reflections, or design explanations. It requires non-empty `title` and `prompt`; `guidance`, `placeholder`, `id`, and `objective_refs` are optional. The learner can mark the activity as understood or needing review; that state is local to the mounted component and is not saved, submitted, graded, tracked, or packaged.
 
 ````markdown
 ```lecture-component
@@ -326,7 +326,17 @@ rubric:
 ```
 ````
 
-Rendered label: `Practice task`. Use `practice_task` for applied work: coding, debugging, architecture, process, or self-evaluation tasks. It requires non-empty `title` and `task`; optional fields are `scenario`, `steps`, `hints`, `starter_code`, `solution`, and `rubric`. Rubrics are visible by default. Hints and solutions use reveal controls on screen and are visible in print.
+Rendered label: `Practice task`. Use `practice_task` for applied work: coding, debugging, architecture, process, or self-evaluation tasks. It requires non-empty `title` and `task`; optional fields are `scenario`, `steps`, `hints`, `starter_code`, `solution`, `rubric`, `id`, and `objective_refs`. Rubrics are visible by default. Hints and solutions use reveal controls on screen and are visible in print; the learner can mark the task as understood or needing review using local component state.
+
+All five assessment types share optional registry metadata:
+
+```yaml
+id: "stable-assessment-id"
+objective_refs:
+  - "objective-1"
+```
+
+`id` must be a unique lowercase ASCII identifier with hyphen-separated segments. It is registry identity only and never changes the generated page anchor. `objective_refs` is preserved as syntax-validated metadata; it is not resolved against free-text objectives yet. The assessment index includes flashcards, while answer review and authored answer keys include only objective choice activities (`quiz` and `question_set`). Choice attempts are the only assessment state persisted across reloads; stale selections and answers are discarded when authored options change. Other lifecycle state is local to the mounted component. All assessment answer, guidance, hint, and solution content remains available in static output and print.
 
 For all assessment components, hidden answers, guidance, hints, and solutions are pacing aids only. They remain present in source templates, static HTML, print output, and review packages. Do not promise secure exams, runtime grading, learner analytics, persistence, uploads, AI feedback at runtime, or unsupported component types.
 
@@ -417,11 +427,14 @@ items:
 ````markdown
 ```lecture-component
 type: flashcard
+id: "command-recall"
 prompt: "Which command validates templates?"
 hint: "It runs before preview."
 answer: "npm run validate"
 ```
 ````
+
+Rendered label: `Flashcard`. Use `flashcard` for lightweight prompt-and-reveal recall. Optional `category`, `hint`, `id`, and `objective_refs` add presentation or registry metadata. Flashcards appear in assessment indexes but are not treated as graded answer-key entries.
 
 ````markdown
 ```lecture-component

@@ -6,6 +6,7 @@ import {
   calculateLectureProgress,
   singleLectureAnswersKey,
   type AnswerAttempts,
+  type AnswerDefinitions,
   type LectureProgress,
   type ProgressLecture,
   type ProgressSection,
@@ -45,6 +46,8 @@ export interface ProgressProviderProps {
   collectionLectures?: ProgressLecture[];
   /** Enables answer-attempt persistence (a sibling `localStorage` key derived from this id). Optional so tests can render `ProgressProvider` without it. */
   lectureId?: string;
+  /** Current authored choice definitions used to discard stale or invalid persisted attempts. */
+  answerDefinitions?: AnswerDefinitions;
 }
 
 const ProgressContext = createContext<ProgressContextValue | undefined>(undefined);
@@ -52,7 +55,7 @@ const writeDelayMs = 300;
 const toastDelayMs = 1500;
 const milestoneToastDelayMs = 3200;
 
-export function ProgressProvider({ storageKey, sections, children, collectionStorageKey, collectionLectures, lectureId }: ProgressProviderProps) {
+export function ProgressProvider({ storageKey, sections, children, collectionStorageKey, collectionLectures, lectureId, answerDefinitions }: ProgressProviderProps) {
   const [progress, setProgress] = useState<LectureProgress>({});
   const [loaded, setLoaded] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
@@ -62,7 +65,7 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
   const [currentSectionAnchor, setCurrentSectionAnchor] = useState<string | undefined>(sections[0]?.anchor);
   const [resumeDismissed, setResumeDismissed] = useState(false);
   const [answers, setAnswers] = useState<AnswerAttempts>({});
-  const [answersLoaded, setAnswersLoaded] = useState(false);
+  const [answersLoaded, setAnswersLoaded] = useState(() => !lectureId);
   const storageAvailableRef = useRef(true);
   const skipNextWriteRef = useRef(false);
   const writeTimerRef = useRef<number | undefined>(undefined);
@@ -149,7 +152,7 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
       const stored = window.localStorage.getItem(answersKey);
       if (stored) {
         try {
-          nextAnswers = validateAnswerAttempts(JSON.parse(stored));
+          nextAnswers = validateAnswerAttempts(JSON.parse(stored), answerDefinitions);
         } catch (error) {
           console.warn(`Ignoring corrupted answer attempts for ${answersKey}.`, error);
         }
@@ -167,7 +170,7 @@ export function ProgressProvider({ storageKey, sections, children, collectionSto
     return () => {
       cancelled = true;
     };
-  }, [answersKey]);
+  }, [answerDefinitions, answersKey]);
 
   useEffect(() => {
     if (!answersKey || !answersLoaded || !storageAvailable) return undefined;

@@ -1,5 +1,5 @@
 import { parseLectureTemplate } from "./parseTemplate";
-import { uniqueAnchors } from "./anchors";
+import { isAnchorSafeAssessmentId, uniqueAnchors } from "./anchors";
 import type {
   DiagramDirection,
   DiagramTheme,
@@ -61,6 +61,7 @@ export function validateParsedTemplate(parsed: ParsedLectureTemplate): Validatio
   validateFrontmatter(parsed, errors);
   validateHeadingStructure(parsed, errors);
   validateBody(parsed, errors);
+  validateAssessmentMetadata(parsed, errors);
 
   if (errors.length > 0) {
     return { valid: false, errors };
@@ -240,6 +241,62 @@ function validateBody(parsed: ParsedLectureTemplate, errors: ValidationError[]) 
       });
     }
   }
+}
+
+function validateAssessmentMetadata(parsed: ParsedLectureTemplate, errors: ValidationError[]) {
+  const seen = new Map<string, { locator: ParsedComponentBlock["locator"]; sectionTitle: string; type: string }>();
+
+  for (const section of parsed.sections) {
+    const anchors = buildAssessmentAnchors(section.blocks, section.anchor);
+    for (const block of section.blocks) {
+      if (block.kind !== "component" || !isRecord(block.data) || !isAssessmentType(block.data.type)) continue;
+      const type = String(block.data.type);
+      const id = block.data.id;
+
+      if (id !== undefined && (typeof id !== "string" || !isAnchorSafeAssessmentId(id.trim()))) {
+        errors.push(
+          componentFieldError(
+            block,
+            section.title,
+            "id",
+            `${type}.id must be a stable lowercase ASCII identifier using hyphen-separated segments.`
+          )
+        );
+      }
+
+      if (block.data.objective_refs !== undefined) {
+        const refs = block.data.objective_refs;
+        if (!Array.isArray(refs) || !refs.every((ref) => typeof ref === "string" && ref.trim() !== "")) {
+          errors.push(
+            componentFieldError(block, section.title, "objective_refs", `${type}.objective_refs must be a YAML list of non-empty strings.`)
+          );
+        } else if (new Set(refs.map((ref) => ref.trim())).size !== refs.length) {
+          errors.push(componentFieldError(block, section.title, "objective_refs", `${type}.objective_refs must not contain duplicate references.`));
+        }
+      }
+
+      const anchor = anchors.get(block) ?? `${section.anchor}-assessment`;
+      const registryId = typeof id === "string" && id.trim() !== "" ? id.trim() : anchor;
+      const previous = seen.get(registryId);
+      if (previous) {
+        errors.push({
+          code: "DUPLICATE_ASSESSMENT_ID",
+          message: `Assessment registry id "${registryId}" is used more than once in this lecture.`,
+          locator: block.locator,
+          field: "id",
+          sectionTitle: section.title,
+          componentType: type,
+          hint: `The first declaration is in section "${previous.sectionTitle}". Give each assessment a unique id, or remove the explicit id to use its generated registry id.`
+        });
+      } else {
+        seen.set(registryId, { locator: block.locator, sectionTitle: section.title, type });
+      }
+    }
+  }
+}
+
+function isAssessmentType(value: unknown): boolean {
+  return ["quiz", "question_set", "free_response", "practice_task", "flashcard"].includes(String(value));
 }
 
 function validateComponent(block: ParsedComponentBlock, errors: ValidationError[], sectionTitle: string) {
@@ -924,7 +981,7 @@ function normalizeBlocks(blocks: MarkdownBlock[], sectionAnchor?: string): Rende
 function buildAssessmentAnchors(blocks: MarkdownBlock[], sectionAnchor: string): Map<ParsedComponentBlock, string> {
   const assessmentBlocks = blocks.filter((block): block is ParsedComponentBlock => {
     if (block.kind !== "component" || !isRecord(block.data)) return false;
-    return ["quiz", "question_set", "free_response", "practice_task"].includes(String(block.data.type));
+    return ["quiz", "question_set", "free_response", "practice_task", "flashcard"].includes(String(block.data.type));
   });
   const labels = assessmentBlocks.map((block) => {
     if (!isRecord(block.data)) return sectionAnchor;
@@ -995,6 +1052,8 @@ function normalizeComponent(block: ParsedComponentBlock, anchor?: string): Lectu
       question: stringValue(data.question),
       options: Array.isArray(data.options) ? data.options.map(stringValue) : [],
       answer: stringValue(data.answer),
+      ...(typeof data.id === "string" && data.id.trim() ? { id: data.id.trim() } : {}),
+      ...(Array.isArray(data.objective_refs) ? { objectiveRefs: data.objective_refs.map(stringValue) } : {}),
       ...(explanation ? { explanation } : {})
     };
   }
@@ -1004,6 +1063,8 @@ function normalizeComponent(block: ParsedComponentBlock, anchor?: string): Lectu
       type: "question_set",
       anchor: anchor ?? "question-set",
       title: stringValue(data.title),
+      ...(typeof data.id === "string" && data.id.trim() ? { id: data.id.trim() } : {}),
+      ...(Array.isArray(data.objective_refs) ? { objectiveRefs: data.objective_refs.map(stringValue) } : {}),
       ...(instructions ? { instructions } : {}),
       questions: Array.isArray(data.questions)
         ? data.questions.filter(isRecord).map((question) => {
@@ -1027,6 +1088,8 @@ function normalizeComponent(block: ParsedComponentBlock, anchor?: string): Lectu
       anchor: anchor ?? "free-response",
       title: stringValue(data.title),
       prompt: stringValue(data.prompt),
+      ...(typeof data.id === "string" && data.id.trim() ? { id: data.id.trim() } : {}),
+      ...(Array.isArray(data.objective_refs) ? { objectiveRefs: data.objective_refs.map(stringValue) } : {}),
       ...(guidance ? { guidance } : {}),
       ...(placeholder ? { placeholder } : {})
     };
@@ -1041,6 +1104,8 @@ function normalizeComponent(block: ParsedComponentBlock, anchor?: string): Lectu
       type: "practice_task",
       anchor: anchor ?? "practice-task",
       title: stringValue(data.title),
+      ...(typeof data.id === "string" && data.id.trim() ? { id: data.id.trim() } : {}),
+      ...(Array.isArray(data.objective_refs) ? { objectiveRefs: data.objective_refs.map(stringValue) } : {}),
       ...(scenario ? { scenario } : {}),
       task: stringValue(data.task),
       ...(Array.isArray(data.steps) ? { steps: data.steps.map(stringValue) } : {}),
@@ -1138,8 +1203,11 @@ function normalizeComponent(block: ParsedComponentBlock, anchor?: string): Lectu
     const category = stringValue(data.category);
     return {
       type: "flashcard",
+      ...(anchor ? { anchor } : {}),
       prompt: stringValue(data.prompt),
       answer: stringValue(data.answer),
+      ...(typeof data.id === "string" && data.id.trim() ? { id: data.id.trim() } : {}),
+      ...(Array.isArray(data.objective_refs) ? { objectiveRefs: data.objective_refs.map(stringValue) } : {}),
       ...(hint ? { hint } : {}),
       ...(category ? { category } : {})
     };
