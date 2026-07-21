@@ -19,7 +19,12 @@ import { AnnotationsProvider } from "./progress/AnnotationsProvider";
 import { LectureProgressBar } from "./progress/LectureProgressBar";
 import { ProgressLiveRegion } from "./progress/ProgressLiveRegion";
 import { ProgressProvider } from "./progress/ProgressProvider";
+import { ReviewProvider } from "./progress/ReviewProvider";
 import { ResumePrompt } from "./progress/ResumePrompt";
+import { LearnerDashboardSummary } from "./LearnerDashboardSummary";
+import { ObjectiveEvidenceMap } from "./ObjectiveEvidenceMap";
+import { ReviewQueue } from "./ReviewQueue";
+import { FragmentFocusTarget } from "./progress/FragmentFocusTarget";
 
 export interface CollectionNavigationContext {
   previous?: NavTarget;
@@ -46,9 +51,11 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
   const glossaryEntries = collectLectureGlossary(lecture);
   const assessments = collectLectureAssessments(lecture);
   const answerDefinitions = collectLectureAnswerDefinitions(lecture);
+  const reviewActivityKeys = assessments.flatMap((assessment) => assessment.type === "question_set" ? assessment.responseItems.map((_, index) => `${assessment.id}:${index}`) : [assessment.id]);
 
   return (
     <PageShell>
+      <FragmentFocusTarget />
       <ProgressProvider
         storageKey={storageKey}
         sections={progressSections}
@@ -57,7 +64,8 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
         lectureId={lectureId}
         answerDefinitions={answerDefinitions}
       >
-        <AnnotationsProvider lectureId={lectureId}>
+        <ReviewProvider lectureId={lectureId} activityKeys={reviewActivityKeys}>
+          <AnnotationsProvider lectureId={lectureId}>
           <LectureHeader
             metadata={lecture.metadata}
             sectionCount={lecture.sections.length}
@@ -71,6 +79,13 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
             <SectionNavigation sections={lecture.sections} />
             <article className="lecture-content">
               <AssessmentIndexDisclosure assessments={assessments} linkMode="single" id="lecture-assessment-index" />
+              <LearnerDashboardSummary objectives={lecture.objectives} assessments={assessments} firstActionHref={`#${lecture.sections[0]?.anchor ?? lectureNavigationTargets.overview.id}`} />
+              <ReviewQueue
+                objectives={lecture.objectives}
+                assessments={assessments}
+                emptyStateHref="#learning-path"
+                emptyStateLabel="Browse learning path"
+              />
               <section className="overview-section lecture-panel quiet-reading-surface" aria-labelledby={lectureNavigationTargets.overview.id}>
                 <p className="section-kicker">Start Here</p>
                 <h2 id={lectureNavigationTargets.overview.id}>{lectureNavigationTargets.overview.label}</h2>
@@ -84,8 +99,8 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
                 <h2 id={lectureNavigationTargets.objectives.id}>{lectureNavigationTargets.objectives.label}</h2>
                 <div className="lecture-prose">
                   <ul>
-                    {lecture.objectives.map((objective, index) => (
-                      <li key={index}>{objective}</li>
+                    {lecture.objectives.map((objective) => (
+                      <li key={objective.id}>{objective.text}</li>
                     ))}
                   </ul>
                 </div>
@@ -94,6 +109,8 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
               {lecture.sections.map((section, index) => (
                 <SectionRenderer key={section.anchor} section={section} index={index} lectureId={lectureId} />
               ))}
+
+              <ObjectiveEvidenceMap objectives={lecture.objectives} assessments={assessments} />
 
               <section className="takeaways-section lecture-panel surface-emphasis" aria-labelledby={lectureNavigationTargets.takeaways.id}>
                 <p className="section-kicker">Review</p>
@@ -125,7 +142,8 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
             />
           ) : null}
           <ProgressLiveRegion />
-        </AnnotationsProvider>
+          </AnnotationsProvider>
+        </ReviewProvider>
       </ProgressProvider>
     </PageShell>
   );

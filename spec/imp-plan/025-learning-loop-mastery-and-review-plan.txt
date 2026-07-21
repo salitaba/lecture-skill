@@ -1,0 +1,487 @@
+# Implementation Plan: Learning Loop — Dashboard, Objective Evidence, and Spaced Review
+
+## Brief Summary
+
+Implement `spec/025-learning-loop-mastery-and-review.txt` as a local-first
+learning loop on top of the existing Lecture Site Engine. The change adds
+stable objective records, objective-to-assessment validation and evidence,
+learner dashboard summaries, a deterministic local spaced-review scheduler, and
+review-queue controls. It must preserve existing lecture rendering, answer
+attempts, section progress, annotations, static export, print output, and
+no-JavaScript behavior.
+
+This plan does not implement accounts, sync, analytics, grading, search, AI
+tutoring, social features, or a new authored assessment component.
+
+## Relevant Existing Architecture
+
+- `src/lib/lecture-template/types.ts` owns parsed and normalized lecture,
+  assessment, objective, validation, and collection contracts.
+- `src/lib/lecture-template/parseTemplate.ts` parses Markdown headings and list
+  blocks, including the `## Learning Objectives` list.
+- `src/lib/lecture-template/validateTemplate.ts` normalizes objectives and
+  validates assessment `id` and `objective_refs` fields.
+- `src/lib/lecture-template/assessments.ts` creates deterministic assessment
+  summaries, collection assessment indexes, answer definitions, and diagnostics.
+- `src/lib/lecture-template/progress.ts` owns local progress, answer attempts,
+  annotations, storage keys, and corrupted-state validation.
+- `src/components/lecture-kit/progress/ProgressProvider.tsx` persists lecture
+  progress and objective-choice answer attempts in browser `localStorage`.
+- `src/components/lecture-kit/progress/CollectionProgressProvider.tsx` owns
+  collection-level progress aggregation and resume state.
+- `src/components/lecture-kit/CollectionLanding.tsx` renders course facts,
+  primary resume action, progress, lecture list, assessment index, glossary,
+  and reviewer status.
+- `src/components/lecture-kit/LecturePage.tsx` composes lecture progress,
+  annotations, assessment index, objectives, sections, glossary, answer review,
+  and navigation.
+- `src/components/lecture-kit/assessment/AssessmentShell.tsx` provides shared
+  choice and local self-assessment lifecycle behavior.
+- `src/components/lecture-kit/Quiz.tsx`, `QuestionSet.tsx`,
+  `Flashcard.tsx`, `FreeResponse.tsx`, and `PracticeTask.tsx` are the existing
+  assessment interaction surfaces to extend with review controls.
+- `src/lib/lecture-template/reviewPackage.ts`, `doctor.ts`, and
+  `validateCli.ts` define reviewer-facing and machine-readable diagnostics.
+- Existing tests under `tests/lecture-template/` use Vitest, Testing Library,
+  local fixtures, and focused provider/component assertions.
+
+## Proposed Data And API Changes
+
+### 1. Normalize learning objectives
+
+Update `src/lib/lecture-template/types.ts` with a `LearningObjective` model
+containing `id`, `text`, `isExplicit`, `idLocator`, and `textLocator`. Change
+`LectureTemplate.objectives` from `string[]` to the structured representation
+while keeping rendering backward-compatible through a text field.
+
+Update `parseTemplate.ts` and `validateTemplate.ts` so Markdown objective list
+items support:
+
+```text
+- [build-timeline] Build an incident timeline that separates evidence from conclusions.
+```
+
+The parser must retain per-item list-line locators rather than only the
+`bullet_list` block locator. Use the anchored grammar
+`^\[([a-z0-9]+(?:-[a-z0-9]+)*)\]\s+(.+?)\s*$` and reuse
+`isAnchorSafeAssessmentId()` from `src/lib/lecture-template/anchors.ts`.
+Reject malformed bracket-prefixed items, invalid IDs, empty IDs, and markers
+with no text. Preserve ordinary unmarked items as legacy objectives. Generate
+collision-safe, ordered, display-only IDs for legacy items, mark them
+`isExplicit: false`, and never resolve `objective_refs` to them. Duplicate
+explicit IDs and explicit/generated collisions must produce author-locatable
+diagnostics. Add tests for invalid markers, duplicate text, reordered legacy
+items, and explicit/generated collisions.
+
+Update all objective rendering and test fixtures that currently assume a
+`string[]`. Do not modify raw-source evidence files.
+
+### 2. Add pure evidence and review models
+
+Create focused pure modules, preferably:
+
+- `src/lib/lecture-template/objectiveEvidence.ts`
+- `src/lib/lecture-template/reviewSchedule.ts`
+
+The exact filenames may follow existing naming conventions, but the modules
+must not import React or browser APIs.
+
+`objectiveEvidence.ts` should:
+
+- accept normalized objectives, assessment summaries, and a normalized
+  `LearnerActivityEvidence` adapter containing assessment key, response key,
+  attempted/revealed state, objective outcome, self-assessment, review record,
+  and due state;
+- resolve linked assessments by objective ID;
+- derive `not_started`, `practicing`, `review_recommended`, `demonstrated`, and
+  `not_assessed` statuses;
+- use exact precedence: any incorrect/needs-review/due activity means
+  `review_recommended`; otherwise any unattempted or incomplete activity means
+  `practicing`; only all-positive completed activities are `demonstrated`;
+- treat an objective with no linked activity as `not_assessed`;
+- return links to the source lecture, section anchor, and assessment anchor;
+- avoid percentages, grades, and hidden answer text.
+
+For `question_set`, keep one authored assessment summary but create one
+schedulable activity per question, keyed as `${assessmentId}:${questionIndex}`.
+Mixed question outcomes use the same precedence rules. A due item counts as
+`review_recommended` even when its previous rating was positive.
+
+`reviewSchedule.ts` should:
+
+- define review ratings and persisted review state. Persist `status` as
+  `learning` when repetitions are zero and `review` otherwise; derive due state
+  from `dueAt` rather than persisting a second, drift-prone due flag;
+- implement the bounded default interval sequence `0, 1, 3, 7, 14, 30` days;
+- calculate the next state deterministically for `again`, `hard`, `good`, and
+  `easy` ratings using an injected valid ISO `now` value;
+- use `again => 0`, `hard => ceil(previous * 1.5)` with a minimum of one,
+  `good => next sequence interval`, and `easy => one additional sequence step`,
+  with a 30-day cap;
+- reject invalid `now` inputs, discard invalid persisted dates before calling
+  the scheduler, and clamp clock-rollback transitions to the later of `now`
+  and `lastReviewedAt`;
+- expose due-state and queue-order helpers;
+- contain no storage or UI code.
+
+Add a transition-table test for new and existing records, all ratings, zero-
+interval behavior, the 30-day cap, exact ISO arithmetic, invalid `now`, and
+clock rollback.
+
+The transition contract is:
+
+| Existing state | Rating | Repetitions | Interval | Status |
+| --- | --- | ---: | ---: | --- |
+| none | again | 0 | 0 | learning |
+| none | hard/good | 1 | 1 | review |
+| none | easy | 1 | 3 | review |
+| any | again | 0 | 0 | learning |
+| any | hard | max(1, previous) | max(1, ceil(previous × 1.5)) | review |
+| any | good | previous + 1 | next `[1, 3, 7, 14, 30]` interval | review |
+| any | easy | previous + 1 | one additional sequence step, capped at 30 | review |
+
+The scheduler receives an injected valid ISO `now`; invalid `now` throws a
+documented `RangeError`. Persisted invalid records are pruned before this
+function runs. Clock rollback uses the later of `now` and `lastReviewedAt` for
+the next transition, while `isDue(record, now)` remains false until `now`
+reaches `dueAt`.
+
+### 3. Extend validated collection summaries
+
+Extend `src/lib/lecture-template/assessments.ts` or a neighboring pure module
+to expose objective-aware assessment summaries without copying answer text into
+learner-facing records. Add collection helpers that preserve lecture slug,
+section anchor, objective references, and stable assessment IDs.
+
+Extend validation and review-package models to report objective coverage:
+
+- total objectives;
+- explicit-ID count;
+- assessments with unresolved references;
+- objectives with no linked assessment;
+- assessment counts by evaluation mode;
+- `learnerStateIncluded: false`.
+
+Define a serializable `ObjectiveDiagnostics` contract and propagate it through
+single-lecture validation JSON, collection validation JSON, the review-package
+lecture record, `MANIFEST.md`, `manifest.json`, and reviewer disclosures. Keep
+learner attempts, review records, due dates, and answer text excluded. Coverage
+diagnostics belong in author/reviewer surfaces, not the learner dashboard.
+
+Keep answer-key behavior unchanged.
+
+### 4. Persist review state locally
+
+Extend the learner-state boundary without merging unrelated data structures:
+
+- add a namespaced review key derived from `lectureId`, such as
+  `lecture-progress:{lectureId}:reviews`;
+- add validation and stale-record pruning in `progress.ts` or a focused review
+  state module;
+- add a client provider/hook for reading and writing review state, preferably
+  separate from the existing section-progress provider unless composition is
+  demonstrably simpler;
+- make writes debounced and best-effort like existing progress and annotation
+  persistence;
+- expose a loaded/storage-available state so server render and hydration never
+  claim that an item is due before local data is loaded;
+- keep unknown assessment IDs and malformed records out of runtime state.
+
+When localStorage is unavailable, keep review actions in memory for the current
+session and expose an explicit non-persistence state. Review loading and
+storage availability are independent from existing answer loading. The existing
+section `resetProgress()` does not clear answers, annotations, or reviews; add a
+separate review reset action.
+
+Existing answer-attempt keys and section-progress keys must remain readable.
+The implementation must retain `singleLectureAnswersKey()`,
+`AnswerReviewDisclosure`, and `AnswerKeyAppendix` behavior from specs 019 and
+024. Only scheduler metadata for non-choice activities is persisted; no
+free-response text, drafts, or full mounted lifecycle state is stored.
+
+### 5. Add learner surfaces
+
+Create focused components, reusing existing `Card`, `Button`, `Disclosure`,
+`ProgressMeter`, and assessment primitives:
+
+- `src/components/lecture-kit/LearnerDashboardSummary.tsx`
+- `src/components/lecture-kit/ObjectiveEvidenceMap.tsx`
+- `src/components/lecture-kit/ReviewQueue.tsx`
+- `src/components/lecture-kit/AssessmentReviewControls.tsx`
+
+Integrate them into:
+
+- `CollectionLanding.tsx` for collection-level continue/review/objective
+  summaries;
+- `LecturePage.tsx` for lecture-level objective and review summaries;
+- `AssessmentShell.tsx` and the existing assessment components for review
+  ratings and retry behavior.
+
+The queue should link to the authored source assessment anchor rather than
+duplicating answer-bearing assessment markup. Collection queues may group by
+lecture but must preserve authored order within a lecture.
+
+Add a collection review registry containing `{ slug, lectureId, order,
+objectives, assessments }`. Derive `lectureId` from each valid template path
+using the existing progress ID helper. Read each lecture's review key in the
+collection provider or a composed review snapshot aggregator. Namespace
+objective evidence by lecture ID so identical objective IDs in two lectures do
+not merge. Exclude invalid lectures and preserve authored order in queue links.
+
+Refresh due state on mount, `visibilitychange`, window focus, and a bounded
+interval while a queue is mounted. The pure due predicate remains injectable
+and deterministic in tests.
+
+Choice retry must be explicit. Thread both stable `assessmentId` and DOM
+`anchor` through `RenderBlocks`, `Quiz`, `QuestionSet`, and
+`AssessmentShell`. Add a `retry()` contract that clears only the mounted choice
+lock; the next check replaces the existing answer attempt under the current
+answer key. Retry alone does not create history or mutate the review schedule.
+After checking, the learner rates the item; abandoning a retry keeps the prior
+schedule.
+
+Use the existing no-JavaScript fallback pattern. Without hydrated learner state,
+render the authored page and a neutral state rather than an invented queue.
+
+### 6. Update authoring and reviewer documentation
+
+Update only authored examples and documentation, never raw-source evidence:
+
+- `README.md` — document objective IDs, objective references, local review
+  state, and the non-grading posture.
+- `SKILL.md` and `.codex/skills/lecture-site-engine/SKILL.md` — teach agents to
+  add explicit objective IDs and assessment references when source supports
+  them, without fabricating learning objectives.
+- `content/lecture.template.md` and non-raw example templates — add a small
+  source-grounded example of objective IDs and `objective_refs`.
+- `docs/mvp-review-checklist.md` — add objective-ID and assessment-coverage
+  review checks if this remains the project launch checklist.
+
+## Implementation Steps
+
+### Step 1 — Add fixtures and lock the contracts
+
+- Add valid and invalid objective-ID fixtures, using new non-raw fixture paths.
+- Add a collection fixture containing explicit objective IDs, linked and
+  unlinked assessments, a missing reference, and a legacy unmarked objective.
+- Add review-state test data for each scheduler rating, stale IDs, malformed
+  dates, and corrupted JSON.
+- Confirm fixture additions do not touch any raw-source file.
+
+Protected paths are `content/raw-lecture.txt`, `lectures/*/raw-lecture.txt`,
+`lectures/raw-course.txt`, and raw-source fixtures under `examples/`. Do not
+modify existing authored lecture templates unless a separate content migration
+is explicitly approved.
+
+Verification: focused parser, validator, assessment-summary, and fixture tests.
+
+### Step 2 — Implement structured objectives and validation
+
+- Add the objective type and normalization helpers.
+- Parse optional `[objective-id]` prefixes while preserving existing visible
+  objective text.
+- Validate explicit IDs, duplicate IDs, and objective reference resolution.
+- Run reference resolution after objective normalization. Unresolved explicit
+  `objective_refs[index]` values are blocking validation errors with component,
+  section, field, and source-line context. Objectives with no linked assessment
+  remain advisory diagnostics.
+- Update rendered objective lists and all compile-time consumers.
+- Preserve backward compatibility for unmarked objectives.
+
+Verification: objective parser/validator tests, existing template tests, and
+`npm run typecheck`.
+
+### Step 3 — Implement objective evidence
+
+- Build the pure evidence model from normalized assessment summaries and
+  validated learner state.
+- Define deterministic precedence when an objective has multiple activities:
+  `review_recommended` takes priority, then `demonstrated`, then `practicing`,
+  then `not_started`; use `not_assessed` when no activity is linked.
+- Return source anchors for navigation.
+
+Verification: pure unit tests covering all statuses, mixed activity modes,
+unknown references, a correct plus unattempted item, incorrect plus correct
+items, due-but-previously-good items, no-answer self-assessment behavior, and
+objectives with no linked assessment.
+
+### Step 4 — Implement the pure review scheduler
+
+- Add review state types, transition helpers, due predicates, and queue-order
+  helpers with no browser or React imports.
+- Add the full scheduler transition table and injected-clock tests before adding
+  storage or UI.
+
+Verification: scheduler unit tests for every rating, interval, date, cap,
+invalid-clock, and rollback rule.
+
+### Step 5 — Implement review storage and activity adapters
+
+- Add review key derivation and validation/pruning.
+- Add a client review provider/hook with debounced local persistence and
+  hydration-safe loading.
+- Add a `LearnerActivityEvidence` adapter. Persist scheduler metadata for
+  non-choice activities only; do not persist free-response text, drafts, or the
+  full mounted lifecycle state.
+- Define one schedulable activity per question-set question, while retaining
+  component-level assessment summaries and answer-review behavior.
+- Specify reset, blocked-storage, stale-ID, and corrupted-JSON behavior.
+
+Verification: scheduler unit tests, persistence/provider tests, corrupted-state
+recovery tests, activity-adapter tests, and reset/storage-failure tests.
+
+### Step 6 — Add assessment retry and review controls
+
+- Thread both `assessmentId` and `anchor` through `RenderBlocks`, `Quiz`,
+  `QuestionSet`, and `AssessmentShell`.
+- Add explicit retry behavior for restored choice attempts while preserving the
+  current answer-attempt key/schema and latest-attempt semantics.
+- Implement event order: retry, check, then rating. Test correct, incorrect,
+  abandoned, and no-history cases.
+- Preserve `AnswerReviewDisclosure`, `AnswerKeyAppendix`, and the existing
+  `singleLectureAnswersKey()` contract.
+
+Verification: `quiz-interaction.test.tsx`, `assessment-interaction.test.tsx`,
+`answer-review-disclosure.test.tsx`, question-set tests, and progress-provider
+regressions.
+
+### Step 7 — Build single-lecture learner UX
+
+- Add dashboard summary, objective evidence map, queue, empty states, and
+  review controls.
+- Integrate the lecture scope without changing authored navigation.
+- Preserve one primary CTA and existing quiet-reading hierarchy.
+- Add live-region announcements, focus management, keyboard operation, reduced
+  motion, mobile wrapping, and accessible status text.
+
+Verification: `lecture-components.test.tsx`, assessment interaction tests, and
+focused dashboard/objective/queue tests for new, returning, due, empty,
+hydrating, keyboard, reduced-motion, and unavailable-storage states.
+
+### Step 8 — Add collection aggregation UX
+
+- Add the collection review registry and per-lecture storage reads.
+- Aggregate due items and objective evidence by lecture ID, not only objective
+  ID or text.
+- Preserve invalid-lecture exclusion, authored lecture order, and route-specific
+  anchor links.
+- Add clock refresh behavior while the collection queue is mounted.
+
+Verification: `collection-progress-integration.test.tsx`, collection landing
+tests, collection assessment-index tests, and new same-objective/different-
+lecture and invalid-lecture cases.
+
+### Step 9 — Add diagnostics and reviewer protections
+
+- Add objective coverage to validation JSON and review-package records.
+- Keep learner review state excluded from review packages and answer-key data.
+- Update doctor/readiness wording if needed to describe local review support,
+  without implying runtime learner state can be inspected by the CLI.
+- Add executable assertions that authored objectives remain visible before
+  hydration, dashboard counts are neutral before local state loads, learner
+  state is absent from package output, and review controls/queues do not create
+  unexplained print regions.
+
+Verification: `validate --json`, `validate-cli.test.ts`,
+`review-package.test.ts`, `doctor.test.ts`, `lecture-components.test.tsx`, and
+the existing static/export and print assertions.
+
+### Step 10 — Update docs and examples
+
+- Update README, authoring skills, examples, and review checklist.
+- Preserve raw-source ownership and explicitly describe legacy objective
+  compatibility.
+- Include the non-grading and local-only boundaries in the handoff text.
+
+Verification: example validation, `agent-guidance.test.ts`, source-review tests,
+and a protected-path check confirming raw-source files are unchanged.
+
+### Step 11 — Full verification and accessibility pass
+
+- Run lint, typecheck, full Vitest suite, production build, and CLI build.
+- Run `npm run validate`, `npm run doctor`, and `npm run review:source`.
+- Exercise single-lecture and multi-lecture flows with empty, partial, due,
+  completed, corrupted, and localStorage-unavailable states.
+- Verify 375px, desktop, keyboard-only navigation, 200% zoom, dark mode,
+  reduced motion, static export, and print output.
+
+## Test Plan
+
+### Pure model tests
+
+- Objective marker parsing and deterministic legacy IDs.
+- Duplicate and malformed objective IDs.
+- Assessment reference resolution and unresolved-reference diagnostics.
+- Objective evidence status precedence and source-link generation.
+- Review scheduler interval and due-date calculations for all ratings.
+- Invalid dates, clock changes, stale assessment IDs, and corrupted state.
+
+### Component and provider tests
+
+- Dashboard new learner, returning learner, due review, and no-storage states.
+- Objective evidence map labels, links, and non-grade language.
+- Review queue ordering, grouping, empty state, and navigation to authored
+  anchors.
+- Review controls and retry behavior for choice, reveal, self-assess, and rubric
+  activities, with scheduler metadata only for non-choice activities.
+- Persistence across remount/reload and safe reset behavior.
+- Keyboard focus, live announcements, and reduced-motion-safe state changes.
+- Future due-state refresh after visibility/focus/timer updates.
+
+### Regression tests
+
+- Existing parser, validation, collection, progress, answer-review,
+  annotation, navigation, static-export, print, and backward-compatibility
+  tests.
+- `validate --json` and review-package snapshots/records continue to exclude
+  learner state and answer leakage.
+- Existing `answer-review-disclosure.test.tsx`, `quiz-interaction.test.tsx`,
+  and progress-provider tests continue to pass.
+
+## Risks, Assumptions, And Mitigations
+
+- **Objective syntax migration risk:** changing `string[]` to structured
+  objectives can affect many consumers. Use a compatibility normalization layer,
+  a list-item-specific locator model, update tests together, and preserve visible
+  output for unmarked bullets.
+- **False mastery risk:** a correct answer is not proof of durable learning.
+  Use evidence language, avoid scores, and document status semantics.
+- **Scheduler complexity risk:** overfitting a learning algorithm would expand
+  scope. Keep the schedule pure, bounded, explainable, and user-controlled.
+- **Storage drift risk:** authored IDs and assessment IDs may change. Validate
+  state against the current normalized registry and discard stale entries.
+- **Hydration risk:** due counts must not flash incorrectly before local state is
+  loaded. Render a neutral loading/unknown state until the provider is ready.
+- **Provider complexity risk:** do not turn `ProgressProvider` into an
+  untestable god component. Prefer a composable review provider or pure hooks.
+- **Privacy risk:** learner state is local-only and must not enter validation,
+  static export, review packages, or logs beyond existing safe warnings.
+- **Content-quality risk:** objective coverage diagnostics must be advisory
+  unless an explicit reference is malformed or unresolved.
+- **Raw-source risk:** examples and authored templates may change; raw lecture
+  evidence must never be created, edited, summarized, or overwritten. Protected
+  paths are `content/raw-lecture.txt`, `lectures/*/raw-lecture.txt`,
+  `lectures/raw-course.txt`, and raw-source fixtures under `examples/`.
+- **Current-content migration risk:** existing derived lecture templates use
+  unmarked objectives. The launch metric applies to new or deliberately
+  migrated fixtures; do not silently rewrite every existing lecture.
+
+## Planned Task Breakdown
+
+After this plan is reviewed, create small implementation tasks under
+`spec/imp-plan/tasks/`:
+
+1. `025-learning-loop-mastery-and-review-01-fixtures.md`
+2. `025-learning-loop-mastery-and-review-02-objectives.md`
+3. `025-learning-loop-mastery-and-review-03-objective-evidence.md`
+4. `025-learning-loop-mastery-and-review-04-review-scheduler.md`
+5. `025-learning-loop-mastery-and-review-05-review-state-adapters.md`
+6. `025-learning-loop-mastery-and-review-06-assessment-retry.md`
+7. `025-learning-loop-mastery-and-review-07-single-lecture-ux.md`
+8. `025-learning-loop-mastery-and-review-08-collection-ux.md`
+9. `025-learning-loop-mastery-and-review-09-diagnostics-package.md`
+10. `025-learning-loop-mastery-and-review-10-docs.md`
+11. `025-learning-loop-mastery-and-review-11-final-verification.md`
+
+Task files must not modify production or test code when they are generated;
+they describe the implementation work for a later implementation pass.

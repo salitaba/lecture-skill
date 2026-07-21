@@ -4,8 +4,9 @@ import { useEffect, useId, useMemo, useState } from "react";
 import type { QuestionSetComponent } from "@/lib/lecture-template/types";
 import { DisclosureTrigger, LabeledSection, RadioOptionGroup } from "@/components/component-kit";
 import { AssessmentShell, useChoiceAssessmentAttempt, useHydrated } from "./assessment/AssessmentShell";
+import { AssessmentReviewControls } from "./AssessmentReviewControls";
 
-export function QuestionSet({ component, enableShuffle = true }: { component: QuestionSetComponent; enableShuffle?: boolean }) {
+export function QuestionSet({ component, enableShuffle = true, assessmentId = component.id ?? component.anchor }: { component: QuestionSetComponent; enableShuffle?: boolean; assessmentId?: string }) {
   const [previewShuffleEnabled, setPreviewShuffleEnabled] = useState(false);
   const shuffledOptions = useMemo(() => component.questions.map((question) => shuffleOptions(question.options)), [component.questions]);
   const optionsByQuestion = previewShuffleEnabled && component.shuffle_options ? shuffledOptions : component.questions.map((question) => question.options);
@@ -35,6 +36,7 @@ export function QuestionSet({ component, enableShuffle = true }: { component: Qu
             question={question}
             options={optionsByQuestion[questionIndex] ?? question.options}
             itemKey={`${component.anchor}:${questionIndex}`}
+            activityKey={`${assessmentId}:${questionIndex}`}
           />
         ))}
       </div>
@@ -42,16 +44,17 @@ export function QuestionSet({ component, enableShuffle = true }: { component: Qu
   );
 }
 
-function QuestionSetItem({ question, options, itemKey }: { question: QuestionSetComponent["questions"][number]; options: string[]; itemKey: string }) {
+function QuestionSetItem({ question, options, itemKey, activityKey }: { question: QuestionSetComponent["questions"][number]; options: string[]; itemKey: string; activityKey: string }) {
   const baseId = useId();
   const answerRegionId = `${baseId}-answer`;
   const answerLabelId = `${answerRegionId}-label`;
   const questionHeadingId = `${answerRegionId}-heading`;
   const hydrated = useHydrated();
-  const { selected, setSelected, revealed, toggleReveal, isCorrect } = useChoiceAssessmentAttempt({
+  const { selected, setSelected, revealed, toggleReveal, isCorrect, retry } = useChoiceAssessmentAttempt({
     key: itemKey,
     answer: question.answer,
-    lockAfterReveal: false
+    lockAfterReveal: false,
+    activityKey
   });
 
   const select = (value: string) => {
@@ -79,6 +82,7 @@ function QuestionSetItem({ question, options, itemKey }: { question: QuestionSet
         {selected ? <p className="assessment-feedback" role="status">{isCorrect ? "Correct." : "Not quite."}</p> : null}
         {question.feedback ? <p>{question.feedback}</p> : null}
       </div>
+      <AssessmentReviewControls activityKey={activityKey} evaluated={revealed && Boolean(selected)} canRetry={revealed} onRetry={retry} mode="choice" />
     </LabeledSection>
   );
 }

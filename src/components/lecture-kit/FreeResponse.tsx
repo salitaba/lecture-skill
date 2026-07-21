@@ -4,8 +4,11 @@ import { useId, useState } from "react";
 import type { FreeResponseComponent } from "@/lib/lecture-template/types";
 import { Button, DisclosureTrigger, useDisclosure } from "@/components/component-kit";
 import { AssessmentFeedback, AssessmentShell, useHydrated, useLocalAssessmentLifecycle } from "./assessment/AssessmentShell";
+import { AssessmentReviewControls } from "./AssessmentReviewControls";
+import { useReviewOptional } from "./progress/ReviewProvider";
 
-export function FreeResponse({ component }: { component: FreeResponseComponent }) {
+export function FreeResponse({ component, assessmentId = component.id ?? component.anchor }: { component: FreeResponseComponent; assessmentId?: string }) {
+  const review = useReviewOptional();
   const [response, setResponse] = useState("");
   const { open: revealed, toggle, regionId: guidanceRegionId } = useDisclosure("guidance");
   const { status, markUnderstood, markNeedsReview } = useLocalAssessmentLifecycle();
@@ -13,6 +16,15 @@ export function FreeResponse({ component }: { component: FreeResponseComponent }
   const baseId = useId();
   const textareaId = `${baseId}-response`;
   const guidanceLabelId = `${guidanceRegionId}-label`;
+  const understood = () => {
+    markUnderstood();
+    review?.recordActivity(assessmentId, { revealed: true, selfAssessment: "understood" });
+  };
+  const needsReview = () => {
+    markNeedsReview();
+    review?.recordActivity(assessmentId, { revealed: true, selfAssessment: "needs_review" });
+    review?.markReviewRecommended(assessmentId);
+  };
 
   return (
     <AssessmentShell
@@ -33,8 +45,8 @@ export function FreeResponse({ component }: { component: FreeResponseComponent }
       />
       <p className="assessment-helper">Your response is local to this browser tab and is not saved or submitted.</p>
       <div className="assessment-lifecycle-actions" aria-label="Self-assessment">
-        <Button size="compact" onClick={markUnderstood}>Mark as understood</Button>
-        <Button variant="ghost" size="compact" onClick={markNeedsReview}>Needs review</Button>
+        <Button size="compact" onClick={understood}>Mark as understood</Button>
+        <Button variant="ghost" size="compact" onClick={needsReview}>Needs review</Button>
       </div>
       {status !== "unattempted" ? <AssessmentFeedback>{status === "needs_review" ? "Marked for review." : "Marked as understood."}</AssessmentFeedback> : null}
       {component.guidance ? (
@@ -48,6 +60,7 @@ export function FreeResponse({ component }: { component: FreeResponseComponent }
           </div>
         </>
       ) : null}
+      <AssessmentReviewControls activityKey={assessmentId} evaluated={status !== "unattempted"} mode="self_assess" />
     </AssessmentShell>
   );
 }

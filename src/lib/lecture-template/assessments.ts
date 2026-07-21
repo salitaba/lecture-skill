@@ -81,6 +81,16 @@ export interface AssessmentDiagnosticsSummary {
   }>;
   answerKeyCount: number;
   learnerStateIncluded: false;
+  objectiveDiagnostics: ObjectiveDiagnostics;
+}
+
+export interface ObjectiveDiagnostics {
+  totalObjectives: number;
+  explicitIdCount: number;
+  unresolvedReferences: string[];
+  objectivesWithoutLinkedAssessments: string[];
+  assessmentCountsByEvaluationMode: Record<AssessmentEvaluationMode, number>;
+  learnerStateIncluded: false;
 }
 
 export function collectLectureAssessments(lecture: LectureTemplate, lectureSlug?: string): AssessmentSummary[] {
@@ -158,6 +168,29 @@ export function summarizeLectureAssessments(lecture: LectureTemplate): Assessmen
       ...(entry.objectiveRefs ? { objectiveRefs: entry.objectiveRefs } : {})
     })),
     answerKeyCount: entries.filter((entry) => entry.supportsAnswerKey).length,
+    learnerStateIncluded: false,
+    objectiveDiagnostics: buildObjectiveDiagnostics(lecture, entries, byEvaluationMode)
+  };
+}
+
+export function buildObjectiveDiagnostics(
+  lecture: LectureTemplate,
+  entries = collectLectureAssessments(lecture),
+  byEvaluationMode?: Record<AssessmentEvaluationMode, number>
+): ObjectiveDiagnostics {
+  const counts = byEvaluationMode ?? entries.reduce((result, entry) => {
+    result[entry.evaluationMode] = (result[entry.evaluationMode] ?? 0) + 1;
+    return result;
+  }, {} as Record<AssessmentEvaluationMode, number>);
+  const linkedIds = new Set(entries.flatMap((entry) => entry.objectiveRefs ?? []));
+  const explicitIds = new Set(lecture.objectives.filter((objective) => objective.isExplicit).map((objective) => objective.id));
+  const unresolvedReferences = [...new Set(entries.flatMap((entry) => (entry.objectiveRefs ?? []).filter((reference) => !explicitIds.has(reference))))].sort();
+  return {
+    totalObjectives: lecture.objectives.length,
+    explicitIdCount: lecture.objectives.filter((objective) => objective.isExplicit).length,
+    unresolvedReferences,
+    objectivesWithoutLinkedAssessments: lecture.objectives.filter((objective) => !linkedIds.has(objective.id)).map((objective) => objective.id),
+    assessmentCountsByEvaluationMode: sortRecord(counts),
     learnerStateIncluded: false
   };
 }

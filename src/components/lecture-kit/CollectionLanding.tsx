@@ -11,8 +11,12 @@ import { CollectionReviewStatus } from "./CollectionReviewStatus";
 import { CollectionProgressBar } from "./progress/CollectionProgressBar";
 import { CollectionPrimaryAction } from "./CollectionPrimaryAction";
 import { CollectionProgressProvider } from "./progress/CollectionProgressProvider";
+import { CollectionReviewProvider } from "./progress/CollectionReviewProvider";
 import { CourseDescription } from "./CourseDescription";
 import { LectureList } from "./LectureList";
+import { buildCollectionReviewRegistry } from "@/lib/lecture-template/collection";
+import { CollectionLearnerDashboardSummary } from "./LearnerDashboardSummary";
+import { CollectionReviewQueue } from "./CollectionReviewQueue";
 
 export interface CollectionLandingProps {
   validation: CollectionValidationResult;
@@ -37,9 +41,11 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
     }));
   const collectionId = progressIdFromCollectionBase(LECTURES_DIR, courseMetadata?.title);
   const storageKey = collectionProgressKey(collectionId);
+  const reviewRegistry = buildCollectionReviewRegistry(validation);
 
   return (
     <CollectionProgressProvider storageKey={storageKey} lectures={progressLectures}>
+      <CollectionReviewProvider registry={reviewRegistry}>
       <section className="collection-landing" aria-labelledby="collection-title">
         <header className="collection-header">
           <p className="eyebrow">Collection</p>
@@ -76,12 +82,17 @@ export function CollectionLanding({ validation }: CollectionLandingProps) {
 
         <CollectionProgressBar />
 
+        <CollectionLearnerDashboardSummary registry={reviewRegistry} lectures={progressLectures} />
+
+        {reviewRegistry.length > 0 ? <CollectionReviewQueue registry={reviewRegistry} /> : null}
+
         <LectureList results={validation.results} progressLectures={progressLectures} courseMetadata={courseMetadata} />
 
         <CollectionReviewStatus validation={validation} />
         <AssessmentIndexDisclosure assessments={assessments} linkMode="collection" id="assessment-index" />
         <CollectionGlossaryIndex entries={glossaryEntries} />
       </section>
+      </CollectionReviewProvider>
     </CollectionProgressProvider>
   );
 }

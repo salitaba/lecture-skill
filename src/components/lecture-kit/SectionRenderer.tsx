@@ -90,13 +90,13 @@ export function RenderBlocks({
           case "quote":
             return <Quote key={index} component={component} />;
           case "quiz":
-            return <Quiz key={index} component={component} />;
+            return <Quiz key={index} component={component} assessmentId={component.id ?? component.anchor} />;
           case "question_set":
-            return <QuestionSet key={index} component={component} />;
+            return <QuestionSet key={index} component={component} assessmentId={component.id ?? component.anchor} />;
           case "free_response":
-            return <FreeResponse key={index} component={component} />;
+            return <FreeResponse key={index} component={component} assessmentId={component.id ?? component.anchor} />;
           case "practice_task":
-            return <PracticeTask key={index} component={component} />;
+            return <PracticeTask key={index} component={component} assessmentId={component.id ?? component.anchor} />;
           case "diagram":
             return <Diagram key={index} component={component} />;
           case "glossary_term":
@@ -116,7 +116,7 @@ export function RenderBlocks({
               />
             );
           case "flashcard":
-            return <Flashcard key={index} component={component} />;
+            return <Flashcard key={index} component={component} assessmentId={component.id ?? component.anchor ?? `flashcard-${index}`} />;
           case "worked_example":
             return <WorkedExample key={index} component={component} />;
           case "mistake_correction":

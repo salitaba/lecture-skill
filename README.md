@@ -163,6 +163,12 @@ The runtime provides a common accessible shell, feedback/status announcements, k
 
 Validation JSON and static review-package records include deterministic assessment summaries by type and evaluation mode, objective references, answer-key coverage, and an explicit `learnerStateIncluded: false` marker. They never include answer text or learner attempts.
 
+### Learning objectives and local review
+
+Learning objectives may use the optional stable form `- [objective-id] Learner-facing objective text`. Assessment components can point to those explicit IDs with `objective_refs`; references to legacy unmarked objectives are rejected because those generated IDs are display-only. Existing unmarked objectives remain valid and visible.
+
+The learner dashboard connects objectives to local evidence and a small authored-order review queue. Review records live only in the browser under `lecture-progress:<lecture-id>:reviews`; untouched activities are not auto-scheduled. Learners choose ratings such as Again, Hard, Good, or Easy. “Demonstrated recently” describes recent positive evidence, not a grade, certificate, or permanent mastery claim. There are no accounts, sync, or learner-state exports in this feature.
+
 `lectures/raw-course.txt` is optional evidence for a real course source spanning multiple lectures. Review tooling reads it when present, but an agent loads it into context only for an explicitly requested shared-source split, cross-lecture reconciliation, or full-course review; its presence alone is not authorization. Per-lecture sources are the default context. Do not paste generated lecture output into any raw-source file. The system can preserve and classify files but cannot cryptographically determine whether user-supplied text was AI-generated.
 
 ## Useful commands

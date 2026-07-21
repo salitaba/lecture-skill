@@ -83,4 +83,14 @@ describe("raw-source agent guidance contract", () => {
     expect(existsSync(path.join(tempRoot, "CLAUDE.md"))).toBe(false);
     expect(readFileSync(path.join(tempRoot, "SKILL.md"), "utf8")).toContain("Raw source files are human/user/educator evidence");
   });
+
+  it("documents explicit objective IDs and non-grading local review boundaries", () => {
+    for (const relativePath of ["README.md", "SKILL.md", ".claude/skills/lecture-site-engine/SKILL.md", ".codex/skills/lecture-site-engine/SKILL.md"]) {
+      const contents = readFileSync(path.join(repoRoot, relativePath), "utf8");
+      expect(contents).toContain("objective_refs");
+      expect(contents).toMatch(/legacy.{0,80}display-only/i);
+      expect(contents).toMatch(/local review|learner evidence/i);
+      expect(contents).toMatch(/non-grading|not a grade/i);
+    }
+  });
 });

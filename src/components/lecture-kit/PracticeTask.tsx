@@ -3,15 +3,27 @@
 import type { PracticeTaskComponent } from "@/lib/lecture-template/types";
 import { Button, DisclosureTrigger, LabeledSection, useDisclosure } from "@/components/component-kit";
 import { AssessmentFeedback, AssessmentShell, useHydrated, useLocalAssessmentLifecycle } from "./assessment/AssessmentShell";
+import { AssessmentReviewControls } from "./AssessmentReviewControls";
+import { useReviewOptional } from "./progress/ReviewProvider";
 import { CodeBlock } from "./CodeBlock";
 
-export function PracticeTask({ component }: { component: PracticeTaskComponent }) {
+export function PracticeTask({ component, assessmentId = component.id ?? component.anchor }: { component: PracticeTaskComponent; assessmentId?: string }) {
+  const review = useReviewOptional();
   const { open: hintsRevealed, toggle: toggleHints, regionId: hintsRegionId } = useDisclosure("hints");
   const { open: solutionRevealed, toggle: toggleSolution, regionId: solutionRegionId } = useDisclosure("solution");
   const { status, markUnderstood, markNeedsReview } = useLocalAssessmentLifecycle();
   const hydrated = useHydrated();
   const hintsLabelId = `${hintsRegionId}-label`;
   const solutionLabelId = `${solutionRegionId}-label`;
+  const understood = () => {
+    markUnderstood();
+    review?.recordActivity(assessmentId, { revealed: true, selfAssessment: "understood" });
+  };
+  const needsReview = () => {
+    markNeedsReview();
+    review?.recordActivity(assessmentId, { revealed: true, selfAssessment: "needs_review" });
+    review?.markReviewRecommended(assessmentId);
+  };
 
   return (
     <AssessmentShell
@@ -40,8 +52,8 @@ export function PracticeTask({ component }: { component: PracticeTaskComponent }
         </LabeledSection>
       ) : null}
       <div className="assessment-lifecycle-actions" aria-label="Self-assessment">
-        <Button size="compact" onClick={markUnderstood}>Mark as understood</Button>
-        <Button variant="ghost" size="compact" onClick={markNeedsReview}>Needs review</Button>
+        <Button size="compact" onClick={understood}>Mark as understood</Button>
+        <Button variant="ghost" size="compact" onClick={needsReview}>Needs review</Button>
       </div>
       {status !== "unattempted" ? <AssessmentFeedback>{status === "needs_review" ? "Marked for review." : "Marked as understood."}</AssessmentFeedback> : null}
       {component.hints ? (
@@ -66,6 +78,7 @@ export function PracticeTask({ component }: { component: PracticeTaskComponent }
           </div>
         </>
       ) : null}
+      <AssessmentReviewControls activityKey={assessmentId} evaluated={status !== "unattempted"} mode="rubric" />
     </AssessmentShell>
   );
 }

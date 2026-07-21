@@ -11,7 +11,7 @@ import {
 } from "./sourceReview";
 import { collectionRawSourcePath, readRawSourceEvidence, type RawSourceEvidenceStatus } from "./rawSourceEvidence";
 import { ACTIVE_TEMPLATE_PATH, repositoryPath } from "./readTemplate";
-import { collectionProgressKey, singleLectureProgressKey } from "./progress";
+import { collectionProgressKey, singleLectureProgressKey, singleLectureReviewsKey } from "./progress";
 import { validateTemplateSource } from "./validateTemplate";
 import type { CourseMetadataValidationResult } from "./types";
 
@@ -46,6 +46,7 @@ export interface DoctorReport {
     runtimeInspection: "browser-only";
     singleLectureKeyPrefix: string;
     collectionKeyPrefix: string;
+    reviewKeyPrefix: string;
   };
   warnings: string[];
 }
@@ -183,7 +184,8 @@ export function renderDoctorReport(report: DoctorReport): string {
     `- storage model: ${report.progressTracking.storageModel}`,
     `- runtime inspection: ${report.progressTracking.runtimeInspection}; CLI cannot read a learner's browser localStorage`,
     `- single lecture key prefix: ${report.progressTracking.singleLectureKeyPrefix}`,
-    `- collection key prefix: ${report.progressTracking.collectionKeyPrefix}`
+    `- collection key prefix: ${report.progressTracking.collectionKeyPrefix}`,
+    `- review key prefix: ${report.progressTracking.reviewKeyPrefix}`
   );
 
   if (report.warnings.length > 0) {
@@ -199,7 +201,8 @@ function createProgressTrackingReport(): DoctorReport["progressTracking"] {
     storageModel: "browser localStorage",
     runtimeInspection: "browser-only",
     singleLectureKeyPrefix: singleLectureProgressKey("<lecture-id>"),
-    collectionKeyPrefix: collectionProgressKey("<collection-id>")
+    collectionKeyPrefix: collectionProgressKey("<collection-id>"),
+    reviewKeyPrefix: singleLectureReviewsKey("<lecture-id>")
   };
 }
 

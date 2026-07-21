@@ -47,6 +47,7 @@ export interface TemplateProblem {
   sectionTitle?: string;
   componentType?: string;
   hint?: string;
+  relatedLocator?: SourceLocator;
 }
 
 export type ParseError = TemplateProblem;
@@ -68,6 +69,7 @@ export type MarkdownBlock =
       kind: "bullet_list" | "numbered_list";
       items: string[];
       locator: SourceLocator;
+      itemLocators?: SourceLocator[];
     }
   | {
       kind: "code_fence";
@@ -138,6 +140,14 @@ export interface LectureMetadata {
   audience: string;
   duration: string;
   level: LectureLevel;
+}
+
+export interface LearningObjective {
+  id: string;
+  text: string;
+  isExplicit: boolean;
+  idLocator?: SourceLocator;
+  textLocator: SourceLocator;
 }
 
 export interface CourseMetadata {
@@ -456,7 +466,7 @@ export interface LectureSection {
 export interface LectureTemplate {
   metadata: LectureMetadata;
   overview: RenderBlock[];
-  objectives: string[];
+  objectives: LearningObjective[];
   sections: LectureSection[];
   takeaways: string[];
 }

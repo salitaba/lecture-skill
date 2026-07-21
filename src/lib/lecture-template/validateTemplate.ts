@@ -11,6 +11,7 @@ import type {
   ParsedComponentBlock,
   ParsedLectureTemplate,
   RenderBlock,
+  LearningObjective,
   ValidationError,
   ValidationResult
 } from "./types";
@@ -61,7 +62,8 @@ export function validateParsedTemplate(parsed: ParsedLectureTemplate): Validatio
   validateFrontmatter(parsed, errors);
   validateHeadingStructure(parsed, errors);
   validateBody(parsed, errors);
-  validateAssessmentMetadata(parsed, errors);
+  const objectives = normalizeObjectives(parsed, errors);
+  validateAssessmentMetadata(parsed, errors, objectives);
 
   if (errors.length > 0) {
     return { valid: false, errors };
@@ -81,7 +83,7 @@ export function validateParsedTemplate(parsed: ParsedLectureTemplate): Validatio
     template: {
       metadata,
       overview: normalizeBlocks(parsed.overview?.blocks ?? []),
-      objectives: collectBulletItems(parsed.objectives?.blocks ?? []),
+      objectives,
       sections: parsed.sections.map((section) => ({
         title: section.title.trim(),
         anchor: section.anchor,
@@ -243,8 +245,9 @@ function validateBody(parsed: ParsedLectureTemplate, errors: ValidationError[]) 
   }
 }
 
-function validateAssessmentMetadata(parsed: ParsedLectureTemplate, errors: ValidationError[]) {
+function validateAssessmentMetadata(parsed: ParsedLectureTemplate, errors: ValidationError[], objectives: LearningObjective[]) {
   const seen = new Map<string, { locator: ParsedComponentBlock["locator"]; sectionTitle: string; type: string }>();
+  const explicitObjectiveIds = new Map(objectives.filter((objective) => objective.isExplicit).map((objective) => [objective.id, objective]));
 
   for (const section of parsed.sections) {
     const anchors = buildAssessmentAnchors(section.blocks, section.anchor);
@@ -272,6 +275,20 @@ function validateAssessmentMetadata(parsed: ParsedLectureTemplate, errors: Valid
           );
         } else if (new Set(refs.map((ref) => ref.trim())).size !== refs.length) {
           errors.push(componentFieldError(block, section.title, "objective_refs", `${type}.objective_refs must not contain duplicate references.`));
+        } else {
+          refs.forEach((ref, index) => {
+            const normalizedRef = ref.trim();
+            if (explicitObjectiveIds.has(normalizedRef)) return;
+            errors.push({
+              code: "UNRESOLVED_OBJECTIVE_REFERENCE",
+              message: `${type}.objective_refs[${index}] references unknown explicit objective "${normalizedRef}".`,
+              locator: block.locator,
+              sectionTitle: section.title,
+              componentType: type,
+              field: `objective_refs[${index}]`,
+              hint: "Use an explicit [objective-id] declared under ## Learning Objectives. Legacy objectives are not referenceable."
+            });
+          });
         }
       }
 
@@ -293,6 +310,131 @@ function validateAssessmentMetadata(parsed: ParsedLectureTemplate, errors: Valid
       }
     }
   }
+}
+
+const objectiveMarkerPattern = /^\[([a-z0-9]+(?:-[a-z0-9]+)*)\]\s+(.+?)\s*$/;
+const objectiveBracketPattern = /^\[([^\]]*)\](.*)$/;
+
+function normalizeObjectives(parsed: ParsedLectureTemplate, errors: ValidationError[]): LearningObjective[] {
+  const items = parsed.objectives?.blocks.flatMap((block) => {
+    if (block.kind !== "bullet_list") return [];
+    return block.items.map((text, index) => ({ text, locator: block.itemLocators?.[index] ?? block.locator }));
+  }) ?? [];
+  const explicitIds = new Map<string, LearningObjective>();
+  const reservedExplicitIds = new Set(
+    items.flatMap((item) => {
+      const match = item.text.trim().match(objectiveMarkerPattern);
+      return match?.[1] ? [match[1]] : [];
+    })
+  );
+  const explicitLocators = new Map(
+    items.flatMap((item) => {
+      const match = item.text.trim().match(objectiveMarkerPattern);
+      return match?.[1] ? [[match[1], item.locator] as const] : [];
+    })
+  );
+  const normalized: LearningObjective[] = [];
+
+  for (const item of items) {
+    const raw = item.text.trim();
+    const explicitMarker = raw.startsWith("[") ? raw.match(objectiveBracketPattern) : undefined;
+    const marker = raw.match(objectiveMarkerPattern);
+
+    if (marker) {
+      const id = marker[1]?.trim() ?? "";
+      const text = marker[2]?.trim() ?? "";
+      const idLocator = { ...item.locator, context: `[${id}]` };
+      const objective: LearningObjective = {
+        id,
+        text,
+        isExplicit: true,
+        idLocator,
+        textLocator: { ...item.locator, context: text }
+      };
+      const previous = explicitIds.get(id);
+      if (previous) {
+        errors.push({
+          code: "DUPLICATE_OBJECTIVE_ID",
+          message: `Objective ID "${id}" is declared more than once.`,
+          locator: idLocator,
+          field: "objective_id",
+          hint: `The earlier objective is at line ${previous.idLocator?.line ?? "unknown"}. Use a unique explicit ID for each objective.`,
+          relatedLocator: previous.idLocator
+        });
+      } else {
+        explicitIds.set(id, objective);
+      }
+      normalized.push(objective);
+      continue;
+    }
+
+    if (raw.startsWith("[") || raw.startsWith("]")) {
+      const candidate = explicitMarker?.[1]?.trim() ?? "";
+      const hasClosingBracket = Boolean(explicitMarker);
+      const idLocator = { ...item.locator, context: hasClosingBracket ? `[${candidate}]` : raw.slice(0, 32) };
+      const textAfterMarker = explicitMarker?.[2]?.trim() ?? "";
+      let code = "INVALID_OBJECTIVE_MARKER";
+      let message = "Objective marker must use [objective-id] followed by objective text.";
+      let field = "objective_id";
+      if (hasClosingBracket && candidate === "") {
+        code = "EMPTY_OBJECTIVE_ID";
+        message = "Objective ID must not be empty.";
+      } else if (hasClosingBracket && !isAnchorSafeAssessmentId(candidate)) {
+        code = "INVALID_OBJECTIVE_ID";
+        message = `Objective ID "${candidate}" is not a valid lowercase ASCII identifier.`;
+      } else if (hasClosingBracket && textAfterMarker === "") {
+        code = "EMPTY_OBJECTIVE_TEXT";
+        message = "Objective marker must be followed by non-empty objective text.";
+        field = "objective_text";
+      }
+      errors.push({
+        code,
+        message,
+        locator: idLocator,
+        field,
+        hint: "Use the form: - [build-timeline] Build a timeline from the supplied events."
+      });
+      continue;
+    }
+
+    const legacyId = legacyObjectiveId(raw, normalized, reservedExplicitIds);
+    if (legacyId.collidedId) {
+      errors.push({
+        code: "OBJECTIVE_ID_COLLISION",
+        message: `Generated legacy objective ID "${legacyId.collidedId}" would collide with an explicit objective ID.`,
+        locator: item.locator,
+        field: "objective_id",
+        hint: "Choose an explicit ID that does not use the generated legacy objective namespace.",
+        relatedLocator: explicitLocators.get(legacyId.collidedId)
+      });
+    }
+    normalized.push({
+      id: legacyId.id,
+      text: raw,
+      isExplicit: false,
+      textLocator: { ...item.locator, context: raw }
+    });
+  }
+
+  return normalized;
+}
+
+function legacyObjectiveId(text: string, objectives: LearningObjective[], explicitIds: Set<string>): { id: string; collidedId?: string } {
+  const stem = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 36) || "objective";
+  let occurrence = 1;
+  let candidate = `legacy-${stem}-${occurrence}`;
+  const preferred = candidate;
+  const used = new Set([...explicitIds, ...objectives.map((objective) => objective.id)]);
+  while (used.has(candidate)) {
+    occurrence += 1;
+    candidate = `legacy-${stem}-${occurrence}`;
+  }
+  return { id: candidate, ...(candidate !== preferred && explicitIds.has(preferred) ? { collidedId: preferred } : {}) };
 }
 
 function isAssessmentType(value: unknown): boolean {

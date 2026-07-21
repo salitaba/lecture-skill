@@ -61,6 +61,10 @@ export function singleLectureAnswersKey(lectureId: string): string {
   return `lecture-progress:${lectureId}:answers`;
 }
 
+export function singleLectureReviewsKey(lectureId: string): string {
+  return `lecture-progress:${lectureId}:reviews`;
+}
+
 export function singleLectureAnnotationsKey(lectureId: string): string {
   return `lecture-progress:${lectureId}:annotations`;
 }

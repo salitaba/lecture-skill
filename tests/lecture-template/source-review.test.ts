@@ -223,6 +223,7 @@ describe("source fidelity review worksheet", () => {
     expect(markdown).toContain("Generated lecture template: content/lecture.template.md");
     expect(markdown).toContain("Rendered route: /");
     expect(markdown).toContain("Package path: review-packages/2026-07-04-0130-lecture-site");
+    expect(markdown).not.toContain("lecture-progress:");
     expect(markdown).toContain("Reviewer name:");
     expect(markdown).toContain("[ ] Pass / [ ] Fail / [ ] Needs revision - Every major claim");
     expect(markdown).toContain("Overall result: [ ] Pass / [ ] Fail / [ ] Needs revision");

@@ -80,5 +80,13 @@ Section content.
     expect(takeawayList).toMatchObject({
       items: ["Remember that wrapped takeaway text remains complete."]
     });
+    expect((objectiveList as { itemLocators?: Array<{ line?: number }> } | undefined)?.itemLocators?.[0]?.line).toBe(15);
+  });
+
+  it("retains item locators for explicit objective markers", () => {
+    const parsed = parseLectureTemplate(fixture("tests/fixtures/learning-loop/objectives-explicit.template.md"));
+    const objectiveList = parsed.objectives?.blocks.find((block) => block.kind === "bullet_list");
+
+    expect((objectiveList as { itemLocators?: Array<{ line?: number }> } | undefined)?.itemLocators).toMatchObject([{ line: 15 }, { line: 16 }]);
   });
 });

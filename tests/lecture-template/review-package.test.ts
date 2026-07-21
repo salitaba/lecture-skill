@@ -163,7 +163,8 @@ describe("review package helpers", () => {
       syncedOrExported: false,
       singleLectureKeyPrefix: "lecture-progress:<lecture-id>",
       collectionKeyPrefix: "lecture-progress:collection:<collection-id>",
-      reviewerVerification: "Toggle a section in the browser and inspect localStorage for the expected key prefix."
+      reviewKeyPrefix: "lecture-progress:<lecture-id>:reviews",
+      reviewerVerification: "Toggle a section or local review rating in the browser; the CLI cannot inspect learner browser state."
     });
     expect(JSON.stringify(manifest)).not.toContain("You are about to use Codex");
 

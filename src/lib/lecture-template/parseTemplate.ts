@@ -125,8 +125,11 @@ export function parseLectureTemplate(source: string): ParsedLectureTemplate {
     if (/^\s*[-*+]\s+/.test(line)) {
       const start = index;
       const items: string[] = [];
+      const itemLocators: SourceLocator[] = [];
       while (index < bodyLines.length && /^\s*[-*+]\s+/.test(bodyLines[index] ?? "")) {
+        const itemLine = bodyStartLine + index;
         items.push((bodyLines[index] ?? "").replace(/^\s*[-*+]\s+/, "").trim());
+        itemLocators.push({ line: itemLine, context: (bodyLines[index] ?? "").trim() });
         index += 1;
         while (
           index < bodyLines.length &&
@@ -138,15 +141,18 @@ export function parseLectureTemplate(source: string): ParsedLectureTemplate {
           index += 1;
         }
       }
-      pushBlock({ kind: "bullet_list", items, locator: { line: bodyStartLine + start } });
+      pushBlock({ kind: "bullet_list", items, itemLocators, locator: { line: bodyStartLine + start } });
       continue;
     }
 
     if (/^\s*\d+\.\s+/.test(line)) {
       const start = index;
       const items: string[] = [];
+      const itemLocators: SourceLocator[] = [];
       while (index < bodyLines.length && /^\s*\d+\.\s+/.test(bodyLines[index] ?? "")) {
+        const itemLine = bodyStartLine + index;
         items.push((bodyLines[index] ?? "").replace(/^\s*\d+\.\s+/, "").trim());
+        itemLocators.push({ line: itemLine, context: (bodyLines[index] ?? "").trim() });
         index += 1;
         while (
           index < bodyLines.length &&
@@ -158,7 +164,7 @@ export function parseLectureTemplate(source: string): ParsedLectureTemplate {
           index += 1;
         }
       }
-      pushBlock({ kind: "numbered_list", items, locator: { line: bodyStartLine + start } });
+      pushBlock({ kind: "numbered_list", items, itemLocators, locator: { line: bodyStartLine + start } });
       continue;
     }
 

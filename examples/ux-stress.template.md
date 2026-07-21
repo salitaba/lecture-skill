@@ -12,10 +12,10 @@ This fixture intentionally combines realistic teaching content with layout stres
 
 ## Learning Objectives
 
-- Explain how the lecture template supports review-friendly structure.
-- Check duplicate section titles without breaking anchor navigation.
-- Inspect long metadata, long headings, tables, and code without page-level overflow.
-- Compare every supported component type in one valid fixture.
+- [explain-structure] Explain how the lecture template supports review-friendly structure.
+- [check-anchors] Check duplicate section titles without breaking anchor navigation.
+- [inspect-layout] Inspect long metadata, long headings, tables, and code without page-level overflow.
+- [compare-components] Compare every supported component type in one valid fixture.
 
 ## Section: Orientation
 

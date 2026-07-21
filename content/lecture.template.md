@@ -12,9 +12,9 @@ By the end of this lecture, learners will understand how to approach production 
 
 ## Learning Objectives
 
-- Describe production symptoms in observable, measurable terms.
-- Build an incident timeline that separates candidates from conclusions.
-- Compare failing and successful requests using logs and metrics.
+- [describe-symptoms] Describe production symptoms in observable, measurable terms.
+- [build-timeline] Build an incident timeline that separates candidates from conclusions.
+- [compare-evidence] Compare failing and successful requests using logs and metrics.
 - Form falsifiable debugging hypotheses and test them safely.
 - Distinguish mitigation evidence from proof of root cause.
 

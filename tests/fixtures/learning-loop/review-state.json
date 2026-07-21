@@ -1,0 +1,51 @@
+{
+  "quiz:known": {
+    "status": "review",
+    "repetitions": 2,
+    "intervalDays": 3,
+    "dueAt": "2026-07-24T12:00:00.000Z",
+    "lastReviewedAt": "2026-07-21T12:00:00.000Z"
+  },
+  "quiz:again": {
+    "status": "learning",
+    "repetitions": 0,
+    "intervalDays": 0,
+    "dueAt": "2026-07-21T12:00:00.000Z",
+    "lastReviewedAt": "2026-07-21T12:00:00.000Z"
+  },
+  "quiz:hard": {
+    "status": "review",
+    "repetitions": 1,
+    "intervalDays": 2,
+    "dueAt": "2026-07-23T12:00:00.000Z",
+    "lastReviewedAt": "2026-07-21T12:00:00.000Z"
+  },
+  "quiz:good": {
+    "status": "review",
+    "repetitions": 3,
+    "intervalDays": 7,
+    "dueAt": "2026-07-28T12:00:00.000Z",
+    "lastReviewedAt": "2026-07-21T12:00:00.000Z"
+  },
+  "quiz:easy": {
+    "status": "review",
+    "repetitions": 4,
+    "intervalDays": 14,
+    "dueAt": "2026-08-04T12:00:00.000Z",
+    "lastReviewedAt": "2026-07-21T12:00:00.000Z"
+  },
+  "stale-assessment": {
+    "status": "review",
+    "repetitions": 4,
+    "intervalDays": 14,
+    "dueAt": "2026-08-04T12:00:00.000Z",
+    "lastReviewedAt": "2026-07-21T12:00:00.000Z"
+  },
+  "malformed-date": {
+    "status": "review",
+    "repetitions": 1,
+    "intervalDays": 1,
+    "dueAt": "not-a-date",
+    "lastReviewedAt": "2026-07-21T12:00:00.000Z"
+  }
+}

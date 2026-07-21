@@ -25,3 +25,5 @@ For a server request, run `npm run dev` in this repository or `npx lecture-site-
 The Claude Code discovery path contains the same skill at `.claude/skills/lecture-site-engine/SKILL.md`. Keep both agent entry points aligned when the skill changes.
 
 The workflow can preserve and classify files, but it cannot cryptographically determine whether user-supplied source text was AI-generated.
+
+When source-grounded outcomes support stable identifiers, use the optional `- [objective-id] Learner-facing objective` syntax and connect supported assessments with `objective_refs`. Do not invent objectives or references. Legacy unmarked objectives stay valid but their generated IDs are display-only. Learner evidence and local review records are browser-local, non-grading signals; never write them into source files, validation output, or review packages.

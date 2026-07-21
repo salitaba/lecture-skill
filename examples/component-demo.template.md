@@ -12,8 +12,8 @@ This visual gallery shows how each supported lecture component appears in the re
 
 ## Learning Objectives
 
-- Identify every supported lecture component by its rendered role label.
-- Apply the exact fenced YAML syntax for supported components.
+- [identify-components] Identify every supported lecture component by its rendered role label.
+- [apply-component-syntax] Apply the exact fenced YAML syntax for supported components.
 - Preview wrapping, quiz selection and feedback behavior, and internal code scrolling in the local Next.js app.
 
 ## Section: Highlight Components
@@ -118,6 +118,9 @@ Use Quiz components for lightweight knowledge checks with feedback revealed on d
 
 ```lecture-component
 type: quiz
+id: validate-command
+objective_refs:
+  - identify-components
 question: "Quiz: Which command validates the active lecture or collection before previewing the component gallery at narrow, tablet, and desktop viewport widths?"
 options:
   - "npm run validate"

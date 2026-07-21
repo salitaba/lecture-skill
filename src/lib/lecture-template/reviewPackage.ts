@@ -24,7 +24,7 @@ import {
 import type { CourseMetadata, CourseMetadataValidationResult, LectureMetadata, LectureTemplate } from "./types";
 import { validateTemplateSource } from "./validateTemplate";
 import { formatError } from "./validateCli";
-import { summarizeLectureAssessments, type AssessmentDiagnosticsSummary } from "./assessments";
+import { summarizeLectureAssessments, type AssessmentDiagnosticsSummary, type ObjectiveDiagnostics } from "./assessments";
 
 export type ReviewPackageMode = "single-lecture" | "collection";
 
@@ -67,6 +67,7 @@ export interface ReviewPackageLecture {
   sectionCount: number;
   componentCounts: Record<string, number>;
   assessmentSummary: AssessmentDiagnosticsSummary;
+  objectiveDiagnostics: ObjectiveDiagnostics;
   resourceLinks: ReviewPackageResourceLinkSummary[];
   instructorNoteCount: number;
 }
@@ -155,6 +156,7 @@ export interface ReviewPackageProgressTracking {
   syncedOrExported: false;
   singleLectureKeyPrefix: string;
   collectionKeyPrefix: string;
+  reviewKeyPrefix: string;
   reviewerVerification: string;
 }
 
@@ -359,6 +361,7 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
     `- Synced or exported: ${manifest.progressTracking.syncedOrExported ? "yes" : "no"}`,
     `- Single lecture key prefix: ${manifest.progressTracking.singleLectureKeyPrefix}`,
     `- Collection key prefix: ${manifest.progressTracking.collectionKeyPrefix}`,
+    `- Review key prefix: ${manifest.progressTracking.reviewKeyPrefix}`,
     `- Reviewer verification: ${manifest.progressTracking.reviewerVerification}`,
     "",
     "## Advanced Component Review",
@@ -384,6 +387,9 @@ export function renderReviewPackageManifestMarkdown(manifest: ReviewPackageManif
       `  Assessment modes: ${formatComponentCounts(lecture.assessmentSummary.byEvaluationMode)}`,
       `  Answer-key entries: ${lecture.assessmentSummary.answerKeyCount}`,
       `  Learner state included: ${lecture.assessmentSummary.learnerStateIncluded ? "yes" : "no"}`,
+      `  Objectives: ${lecture.objectiveDiagnostics.totalObjectives} (${lecture.objectiveDiagnostics.explicitIdCount} explicit IDs)`,
+      `  Objectives without linked assessments: ${lecture.objectiveDiagnostics.objectivesWithoutLinkedAssessments.join(", ") || "none"}`,
+      `  Learner state included in objective diagnostics: ${lecture.objectiveDiagnostics.learnerStateIncluded ? "yes" : "no"}`,
       `  Resource links: ${lecture.resourceLinks.length}`,
       `  Instructor notes: ${lecture.instructorNoteCount}`
     );
@@ -450,6 +456,7 @@ export function renderReviewPackageReadme(manifest: ReviewPackageManifest): stri
     "",
     `Expected single-lecture key prefix: \`${manifest.progressTracking.singleLectureKeyPrefix}\``,
     `Expected collection key prefix: \`${manifest.progressTracking.collectionKeyPrefix}\``,
+    `Expected review key prefix: \`${manifest.progressTracking.reviewKeyPrefix}\``,
     "",
     "To verify it, open a rendered page in a browser, mark a section complete, and inspect localStorage for the expected key prefix.",
     "",
@@ -468,7 +475,8 @@ function createReviewPackageProgressTracking(): ReviewPackageProgressTracking {
     syncedOrExported: false,
     singleLectureKeyPrefix: singleLectureProgressKey("<lecture-id>"),
     collectionKeyPrefix: collectionProgressKey("<collection-id>"),
-    reviewerVerification: "Toggle a section in the browser and inspect localStorage for the expected key prefix."
+    reviewKeyPrefix: "lecture-progress:<lecture-id>:reviews",
+    reviewerVerification: "Toggle a section or local review rating in the browser; the CLI cannot inspect learner browser state."
   };
 }
 
@@ -763,6 +771,7 @@ function buildLectureRecord(
   renderedOutputPath: string
 ): ReviewPackageLecture {
   const resourceLinks = collectResourceLinks(template, sourceTemplatePath);
+  const assessmentSummary = summarizeLectureAssessments(template);
   return {
     slug,
     title: template.metadata.title,
@@ -775,7 +784,8 @@ function buildLectureRecord(
     renderedOutputPath,
     sectionCount: template.sections.length,
     componentCounts: collectComponentCounts(template),
-    assessmentSummary: summarizeLectureAssessments(template),
+    assessmentSummary,
+    objectiveDiagnostics: assessmentSummary.objectiveDiagnostics,
     resourceLinks,
     instructorNoteCount: countComponents(template, "instructor_note")
   };

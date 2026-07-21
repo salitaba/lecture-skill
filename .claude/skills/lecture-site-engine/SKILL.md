@@ -144,6 +144,8 @@ duration: "3 hours"
 
 Raw sources are review evidence, not learner-facing render inputs.
 
+When source-grounded outcomes support stable identifiers, use the optional `- [objective-id] Learner-facing objective` syntax and connect supported assessments with `objective_refs`. Do not invent objectives or references. Legacy unmarked objectives stay valid but their generated IDs are display-only. Learner evidence and local review records are browser-local, non-grading signals; never write them into source files, validation output, or review packages.
+
 - Single lecture raw source: `content/raw-lecture.txt`.
 - Single lecture generated template: `content/lecture.template.md`.
 - Collection per-lecture raw source: `lectures/<slug>/raw-lecture.txt`.

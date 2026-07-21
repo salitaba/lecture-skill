@@ -8,7 +8,7 @@ export interface ResumeTarget {
 
 export function calculateResumeTarget(
   progress: CollectionProgress,
-  lectures: ProgressLecture[],
+  lectures: readonly ProgressLecture[],
   collectionTitle?: string
 ): ResumeTarget {
   const fallbackHref = lectures.length > 0 ? `/lectures/${lectures[0].slug}` : "/";

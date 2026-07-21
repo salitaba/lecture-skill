@@ -1,0 +1,386 @@
+Feature: Learning Loop — Dashboard, Objective Evidence, and Spaced Review
+
+Authors: product manager and senior UI/UX designer.
+
+Relationship to prior work: this feature builds on `spec/012-progress-tracking.txt`,
+`spec/019-close-the-feedback-loop.txt`, `spec/021-sitewide-learner-experience-improvements.txt`,
+and `spec/024-unified-interaction-assessment-engine.txt`. Those features provide
+section completion, resume behavior, persisted objective-assessment attempts,
+answer review, annotations, stable assessment IDs, and assessment objective
+references. Spec 024 explicitly defers mastery and spaced repetition; this spec
+introduces those learning-loop capabilities without reopening the earlier
+interaction or visual design decisions.
+
+## Product Summary
+
+The Lecture Site Engine is already good at presenting authored material and
+remembering local interaction state. It does not yet help a learner decide what
+to do next, connect practice to a learning objective, or return to material at a
+useful time. Section completion is a navigation signal, not evidence that a
+learner can use the knowledge. Persisted answer state tells a learner what they
+last selected, but it does not produce a review plan.
+
+This feature adds a small, explainable learning loop:
+
+1. The learner sees the next useful action on the collection landing page.
+2. Learning objectives are stable, addressable records rather than anonymous
+   bullet text.
+3. Assessments reference objectives and contribute observable evidence.
+4. The learner can review due items using existing quizzes, question sets,
+   flashcards, and self-assessment activities.
+5. The learner controls the review judgment; the engine does not claim to grade,
+   certify, or prove mastery.
+
+The first implementation remains local-first, static-export friendly, private,
+and useful without an account or network service.
+
+## Product Outcome
+
+- A returning learner can open a collection and immediately understand whether
+  to continue the course or review something first.
+- A learner can see which objectives have no evidence, are being practiced, or
+  should be reviewed, without seeing a misleading course score.
+- A learner can review an assessment from the place it was authored, preserve
+  the review decision locally, and receive a later due reminder in the same
+  browser.
+- An educator can author stable objective IDs and connect existing assessments
+  to them without creating a new assessment component or backend contract.
+- Existing lectures, anchors, answer attempts, annotations, static exports, and
+  no-JavaScript reading remain valid.
+
+## Users And Jobs
+
+Primary users:
+
+- Learners studying one lecture or a multi-lecture collection over several
+  sessions.
+- Educators and agents authoring source-grounded lectures with measurable
+  objectives and practice moments.
+- Reviewers verifying that learner-facing state is separate from authored and
+  reviewer output.
+
+Jobs to be done:
+
+- As a learner, I want one clear next action when I return to a course.
+- As a learner, I want to know which objective I should revisit without
+  interpreting a raw list of completed sections.
+- As a learner, I want a short review queue instead of rereading an entire
+  lecture.
+- As a learner, I want to tell the system whether an item felt understood or
+  needs review, without being assigned a grade.
+- As an educator, I want assessment coverage to be visible when I validate a
+  lecture, so an objective is not presented without any opportunity to practice.
+- As a reviewer, I want learner state excluded from static review packages and
+  deterministic validation output.
+
+## Goals
+
+### G1 — Stable learning objectives
+
+- Extend the normalized lecture model so every objective has a learner-facing
+  `text` and a stable lowercase `id`.
+- Preserve the existing Markdown `## Learning Objectives` list shape.
+- Add an explicit, backward-compatible authoring convention for IDs. An item
+  may use the form `- [objective-id] Learner-facing objective text`; the
+  rendered objective omits the ID marker. Existing unmarked items remain valid
+  and receive deterministic display-only IDs, but assessment references and
+  review persistence must use explicit IDs.
+- Include per-item source locations for objective IDs and text in validation
+  diagnostics, not only the location of the whole objectives list.
+
+### G2 — Learner dashboard and next action
+
+- Add a compact learner summary to collection mode containing:
+  - Continue/resume action.
+  - Overall section progress.
+  - Count of due review items.
+  - Count of objectives with review recommendations.
+  - A clear empty state for a new learner.
+- Keep the existing course map as the detailed navigation surface.
+- In single-lecture mode, expose the same objective and review summary near the
+  lecture assessment index without turning the lecture into a dashboard.
+- The dashboard must not reorder authored lectures or hide invalid lecture
+  diagnostics from reviewers.
+
+### G3 — Objective evidence, not grading
+
+- Resolve `objective_refs` against objectives in the same lecture.
+- Expose a pure objective-evidence model with these statuses:
+  - `not_started`: no linked learner activity.
+  - `practicing`: at least one linked activity has been attempted or revealed.
+  - `review_recommended`: a linked activity was incorrect or marked as needing
+    review.
+  - `demonstrated`: all currently recorded linked activities are correct or
+    explicitly marked understood, with the label clearly presented as recent
+    evidence rather than permanent mastery.
+  - `not_assessed`: the objective has no linked assessment, which is an author
+    quality signal rather than a learner failure.
+- Show objective text, evidence status, and links to the related authored
+  assessment or section.
+- Do not show a percentage score, rank, grade, pass/fail state, certificate, or
+  mandatory completion gate.
+
+### G4 — Local-first spaced review
+
+- Add a namespaced review-state record keyed by stable assessment ID.
+- A review record stores only learner state needed to schedule the next review:
+  `status`, `repetitions`, `intervalDays`, `dueAt`, and `lastReviewedAt`.
+- Support learner-controlled review ratings:
+  - `again`: review immediately and reset the interval.
+  - `hard`: review soon with a small interval increase.
+  - `good`: advance to the next interval.
+  - `easy`: advance more quickly, capped by the configured maximum.
+- Use a deterministic bounded scheduler. The initial default intervals are
+  0, 1, 3, 7, 14, and 30 days; exact interval calculation must live in a pure
+  function with unit tests and be documented in the plan implementation.
+- Incorrect objective-choice attempts and `needs_review` self-assessments must
+  make an item immediately eligible for review. A correct or understood item
+  may be scheduled by the learner through the review controls.
+- Do not auto-create review records for a learner who has never interacted with
+  the assessment.
+
+### G5 — Review queue and retry flow
+
+- Add a `ReviewQueue` surface that lists due items in authored order, grouped by
+  lecture when shown at collection scope.
+- Each queue item shows assessment title, lecture/section context, objective
+  labels, due state, and a link to the original assessment anchor.
+- The source assessment exposes review controls after a learner has interacted
+  with it. Controls are consistent across choice, reveal, self-assessment, and
+  rubric activities where the evaluation mode permits them.
+- A learner can retry an objective choice assessment after reviewing it. Retry
+  updates the existing latest-attempt state and the review schedule; it does
+  not create an attempt history in this feature.
+- An empty queue explains that no review is due and provides a link back to the
+  next authored learning action.
+
+### G6 — Author and reviewer diagnostics
+
+- Validation and review-package summaries must report:
+  - Objective count and explicit-ID coverage.
+  - Assessments with unresolved `objective_refs`.
+  - Objectives with no linked assessment.
+  - Assessment counts by evaluation mode and objective coverage.
+  - A statement that learner review state is excluded.
+- These diagnostics are authoring quality signals. They must not prevent a
+  valid lecture from rendering unless the authored objective syntax itself is
+  malformed or an explicit `objective_refs` value is unresolved under the new
+  contract. Objectives with no linked assessment remain advisory.
+
+## Non-Goals
+
+- No grading, certification, pass/fail, rank, leaderboard, streak, or points.
+- No claim that the engine can prove permanent mastery or learning transfer.
+- No accounts, authentication, cloud sync, server-side storage, analytics, or
+  instructor dashboard.
+- No export/import of learner review state in this feature.
+- No new assessment component type. Existing `quiz`, `question_set`,
+  `free_response`, `practice_task`, and `flashcard` components are reused.
+- No full-text search, command palette, discussion, peer review, or cohort
+  workflows.
+- No AI tutor or runtime URL fetching.
+- No adaptive course branching or content gating.
+- No automatic scheduling for unattempted content.
+- No changes to raw-source ownership or source-fidelity rules.
+- No new runtime dependency or hosted service.
+- No redesign of the existing quiet-reading visual system, assessment shells,
+  accessible controls, static export, print fallback, or no-JavaScript output.
+
+## Product Decisions
+
+### Objective identity
+
+Objective IDs are authored in the Markdown list using the optional bracket
+prefix. The exact marker is anchored to the entire item prefix:
+
+`^\[([a-z0-9]+(?:-[a-z0-9]+)*)\]\s+(.+?)\s*$`
+
+The implementation must reuse `isAnchorSafeAssessmentId()` for the captured
+identifier. A malformed bracket-prefixed item, an empty ID, an invalid ID, or a
+marker with no objective text is a validation error; an ordinary objective that
+does not begin with a valid marker remains a legacy unmarked objective. The
+text is the learner-facing content. Explicit IDs are required for assessment
+references and review evidence. Legacy unmarked objectives remain renderable
+and receive deterministic, collision-safe, display-only IDs based on their
+ordered position and slugified text. Generated IDs are never referenceable and
+are marked `isExplicit: false` in the normalized model.
+
+Every normalized objective carries its text locator and, when present, its ID
+locator. Duplicate explicit IDs are errors. Duplicate or reordered legacy text
+must not collide with an explicit ID and must not become a stable learner-state
+key.
+
+IDs are lecture-local in this release. Collection-level views aggregate lecture
+objective records but do not silently merge two objectives with similar text.
+A future course-level objective catalog may introduce a separate migration.
+
+### Evidence language
+
+The UI uses “evidence,” “practiced,” “review recommended,” and “demonstrated
+recently.” It must not use “mastered” as a definitive learner claim. Any
+product-level use of “mastery” refers to the view or model, not a grade.
+
+For an objective with multiple linked schedulable activities, evidence is
+derived using these rules:
+
+- `not_assessed` applies when no activity is linked.
+- `review_recommended` wins if any linked activity is incorrect, marked
+  `needs_review`, or is currently due.
+- `practicing` applies when no item needs review but at least one linked
+  activity is unattempted, revealed without a judgment, or otherwise incomplete.
+- `demonstrated` applies only when every linked activity has a current positive
+  signal: objectively correct or explicitly marked understood.
+- A due item counts as `review_recommended` even if its previous rating was
+  positive; due means the scheduled review action is now recommended.
+
+For `question_set`, the component remains one authored assessment entry, but
+each question response is an independent schedulable review item keyed by the
+stable assessment ID plus its response index. Mixed question results are
+aggregated using the same precedence rules.
+
+### State ownership
+
+Authored content remains the source of truth for objective and assessment
+definitions. Learner state remains browser-local and namespaced by lecture ID.
+Review state is separate from section-completion and answer-attempt records so
+existing persisted data can be validated and migrated independently.
+
+Suggested key:
+
+`lecture-progress:{lectureId}:reviews`
+
+Each review record uses `status: learning | review`; due state is derived from
+whether `dueAt` is less than or equal to the injected/current clock. The record
+also carries the stable activity key, learner rating, repetition count,
+interval, due time, and last-reviewed time. For a question set, the activity
+key is `${assessmentId}:${questionIndex}`; all other assessment types use their
+stable assessment ID.
+
+Unknown assessment IDs, malformed records, stale objective references, and
+invalid dates are discarded safely and do not break rendering. Review state is
+never written into templates, raw sources, validation JSON, or review packages.
+When localStorage is unavailable, review actions remain in-memory for the
+current session and the UI says that they will not persist. The existing
+section `resetProgress()` operation does not clear answer attempts, annotations,
+or review state; review state has its own explicit reset action.
+
+### Scheduling defaults
+
+The scheduler is intentionally understandable rather than optimized for a
+particular learning-science algorithm. Learner ratings control the direction;
+the engine only applies bounded defaults. Dates are stored as ISO strings and
+compared using a single documented clock policy. The first implementation uses
+the browser's current time and must handle clock changes without throwing.
+
+The scheduler receives `now` as an explicit valid ISO input; it never calls
+`Date.now()` internally. For a new item, transitions are:
+
+| Rating | Repetitions | Interval | Due date |
+| --- | ---: | ---: | --- |
+| Again | 0 | 0 days | now |
+| Hard | 1 | 1 day | now + 1 day |
+| Good | 1 | 1 day | now + 1 day |
+| Easy | 1 | 3 days | now + 3 days |
+
+For an existing item, `again` resets repetitions and interval to zero; `hard`
+uses `ceil(previousInterval * 1.5)` with a minimum of one day; `good` advances
+to the next interval in `[1, 3, 7, 14, 30]`; and `easy` advances one additional
+step in that sequence. All intervals cap at 30 days. The persisted rating,
+repetition count, interval, last-reviewed time, and due time are updated as one
+record. Invalid `now` input is rejected by the pure function; invalid persisted
+records are discarded before scheduling. If the system clock moves backwards,
+the due predicate remains false until the stored due time, and the next
+transition uses the later of `now` and the previous `lastReviewedAt`.
+
+Choice retry order is explicit: retry clears only the mounted interaction lock;
+check replaces the existing latest answer attempt; the learner then chooses a
+review rating. A retry alone does not create history or mutate the schedule.
+An abandoned retry leaves the prior schedule unchanged. A checked incorrect or
+correct retry remains due or scheduled according to the learner's next rating.
+
+### Static and no-JavaScript behavior
+
+Static output continues to render the lecture, objectives, assessment index,
+and authored answers exactly as before. Dashboard and review controls are
+progressive enhancements. If JavaScript or localStorage is unavailable, the
+engine renders an honest no-state message or omits learner-specific summaries;
+it never invents a completed or due state.
+
+The executable fallback contract is that authored objectives and assessment
+content remain visible before hydration, dashboard counts are neutral until
+local state loads, and review controls do not create unexplained print regions.
+Due-state summaries refresh on mount, window focus, `visibilitychange`, and a
+bounded interval while the queue is mounted.
+
+## UX Requirements
+
+- The collection landing page has one primary action: `Continue course` or
+  `Start course`. `Review due items` is secondary unless due items exist and
+  are the most useful next action.
+- A new learner sees a calm empty state, not zero-valued analytics or a blank
+  dashboard.
+- Review cards preserve the authored lecture context and provide a direct
+  return path after the learner acts.
+- Review rating labels explain their effect: `Again — review now`,
+  `Hard — review sooner`, `Good — continue schedule`, `Easy — review later`.
+- Objective status uses text and iconography in addition to color.
+- All review actions have visible focus, keyboard operation, live-region
+  feedback, and touch targets of at least 44px.
+- Review actions are interruptible and use the existing motion tokens. Reduced
+  motion continues to disable non-essential transitions.
+- Long objective text wraps rather than truncates. Desktop objective lists keep
+  a readable measure and mobile layouts avoid horizontal scrolling.
+- The queue never hides the authored course map or validation/reviewer status.
+
+## Compatibility And Migration
+
+- Existing templates with plain objective bullets remain valid and render the
+  same visible text.
+- Existing assessment IDs, anchors, answer attempts, section progress,
+  annotations, and collection navigation remain readable.
+- The personal answer-review surface from spec 019 and the latest-answer
+  semantics from spec 024 remain unchanged. This feature persists scheduler
+  metadata only; it does not persist free-response text, drafts, or the full
+  mounted lifecycle state of non-choice activities.
+- Existing learner state is not retroactively scored or scheduled. Review state
+  begins when a learner interacts after this feature is available.
+- Collection summaries ignore invalid lectures in the same way the current
+  collection landing page does, while preserving the existing review status
+  surface.
+- Static review packages continue to omit learner-local data and remain
+  portable without Node.js, a server, or a browser session.
+
+## Success Metrics
+
+- Returning learners use the primary next-action control instead of manually
+  scanning the course map.
+- Due review items are opened and completed rather than ignored.
+- Learners improve on a retried objective-choice activity after reviewing it.
+- Newly authored or deliberately migrated fixtures have explicit objective-ID
+  coverage and no unresolved assessment references; existing unmarked lectures
+  remain supported until an explicit migration is approved.
+- Authors can identify objectives without practice from validation output.
+- No regressions occur in validation, static export, print, accessibility,
+  backward compatibility, or local-state corruption recovery.
+
+## Protected Raw-Source Paths
+
+Implementation and fixture work must not create, edit, summarize, replace, or
+overwrite any of these evidence paths:
+
+- `content/raw-lecture.txt`
+- `lectures/*/raw-lecture.txt`
+- `lectures/raw-course.txt`
+- raw-source fixtures under `examples/`
+
+New non-raw fixtures must live under clearly named test or example-template
+paths. Existing authored lecture templates may be migrated only as a separate,
+explicitly approved content change with source-review verification.
+
+## Open Questions For Later Releases
+
+- Should review state eventually support export/import before cloud sync?
+- Should objective IDs become course-global in a future collection graph?
+- Should educators receive aggregate analytics only after a consent and privacy
+  model is defined?
+- Should authored content declare recommended review eligibility per assessment?

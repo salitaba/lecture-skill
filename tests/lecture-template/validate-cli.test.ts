@@ -95,7 +95,12 @@ describe("validation CLI", () => {
       total: 5,
       byType: { flashcard: 1, free_response: 1, practice_task: 1, question_set: 1, quiz: 1 },
       answerKeyCount: 2,
-      learnerStateIncluded: false
+      learnerStateIncluded: false,
+      objectiveDiagnostics: {
+        totalObjectives: 3,
+        explicitIdCount: 2,
+        learnerStateIncluded: false
+      }
     });
     expect(JSON.stringify(json.assessmentSummary)).not.toContain("npm run validate");
   });

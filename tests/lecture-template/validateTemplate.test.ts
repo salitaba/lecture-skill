@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { summarizeLectureAssessments } from "../../src/lib/lecture-template/assessments";
 import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
 import { errorCodes, fixture, validationErrors } from "./testUtils";
 
@@ -42,6 +43,22 @@ describe("validateTemplateSource", () => {
 
   it("accepts the component demo fixture", () => {
     expect(validateTemplateSource(fixture("examples/component-demo.template.md")).valid).toBe(true);
+  });
+
+  it("detects unresolved references in objective diagnostics when summarized directly", () => {
+    const result = validateTemplateSource(fixture("tests/fixtures/learning-loop/objectives-explicit.template.md"));
+    expect(result.valid).toBe(true);
+    if (result.valid) {
+      const sections = result.template.sections.map((section, sectionIndex) => ({
+        ...section,
+        blocks: section.blocks.map((block, blockIndex) => {
+          if (sectionIndex !== 0 || blockIndex !== 1 || block.kind !== "component" || block.component.type !== "quiz") return block;
+          return { ...block, component: { ...block.component, objectiveRefs: ["missing-objective"] } };
+        })
+      }));
+      const summary = summarizeLectureAssessments({ ...result.template, sections });
+      expect(summary.objectiveDiagnostics.unresolvedReferences).toEqual(["missing-objective"]);
+    }
   });
 
   it("normalizes assessment metadata without changing generated anchors", () => {
@@ -464,7 +481,13 @@ Section content.
 
     expect(result.valid).toBe(true);
     if (result.valid) {
-      expect(result.template.objectives).toEqual(["Explain how wrapped objective text remains complete."]);
+      expect(result.template.objectives).toMatchObject([
+        {
+          id: "legacy-explain-how-wrapped-objective-text-r-1",
+          text: "Explain how wrapped objective text remains complete.",
+          isExplicit: false
+        }
+      ]);
       expect(result.template.takeaways).toEqual(["Remember that wrapped takeaway text remains complete."]);
     }
   });
@@ -612,7 +635,7 @@ This lecture tests assessment metadata.
 
 ## Learning Objectives
 
-- Explain the model.
+- [objective-1] Explain the model.
 
 ## Section: Practice
 

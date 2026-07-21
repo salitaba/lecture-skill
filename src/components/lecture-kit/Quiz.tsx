@@ -4,16 +4,18 @@ import { useId } from "react";
 import type { QuizComponent } from "@/lib/lecture-template/types";
 import { Button, RadioOptionGroup } from "@/components/component-kit";
 import { AssessmentFeedback, AssessmentShell, useChoiceAssessmentAttempt, useHydrated } from "./assessment/AssessmentShell";
+import { AssessmentReviewControls } from "./AssessmentReviewControls";
 
-export function Quiz({ component }: { component: QuizComponent }) {
+export function Quiz({ component, assessmentId = component.id ?? component.anchor }: { component: QuizComponent; assessmentId?: string }) {
   const baseId = useId();
   const answerRegionId = `${baseId}-answer`;
   const answerLabelId = `${answerRegionId}-label`;
   const revealStatusId = `${baseId}-reveal-status`;
   const hydrated = useHydrated();
-  const { selected, setSelected, revealed, toggleReveal, isCorrect, hasSelection } = useChoiceAssessmentAttempt({
+  const { selected, setSelected, revealed, toggleReveal, isCorrect, hasSelection, retry } = useChoiceAssessmentAttempt({
     key: component.anchor,
-    answer: component.answer
+    answer: component.answer,
+    activityKey: assessmentId
   });
 
   return (
@@ -60,6 +62,7 @@ export function Quiz({ component }: { component: QuizComponent }) {
         <p className="quiz-answer-value">{component.answer}</p>
         {component.explanation ? <p className="quiz-explanation">{component.explanation}</p> : null}
       </div>
+      <AssessmentReviewControls activityKey={assessmentId} evaluated={revealed && hasSelection} canRetry={revealed} onRetry={retry} mode="choice" />
     </AssessmentShell>
   );
 }

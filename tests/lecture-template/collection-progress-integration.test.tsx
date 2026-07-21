@@ -6,6 +6,7 @@ import { ProgressProvider } from "../../src/components/lecture-kit/progress/Prog
 import { LectureProgressBar } from "../../src/components/lecture-kit/progress/LectureProgressBar";
 import { ProgressLiveRegion } from "../../src/components/lecture-kit/progress/ProgressLiveRegion";
 import { SectionCompletionToggle } from "../../src/components/lecture-kit/progress/SectionCompletionToggle";
+import { singleLectureReviewsKey } from "../../src/lib/lecture-template/progress";
 
 const sections = [
   { anchor: "first-topic", title: "First Topic" },
@@ -29,6 +30,15 @@ afterEach(() => {
 });
 
 describe("ProgressProvider collection integration", () => {
+  it("keeps review storage separate from section progress", async () => {
+    window.localStorage.setItem(singleLectureReviewsKey("test-lecture"), JSON.stringify({ "quiz-a": { status: "review", repetitions: 1, intervalDays: 1, dueAt: "2026-07-22T12:00:00.000Z", lastReviewedAt: "2026-07-21T12:00:00.000Z" } }));
+    render(<ProgressProvider storageKey={lectureStorageKey} sections={sections}><SectionCompletionToggle anchor="first-topic" title="First Topic" /></ProgressProvider>);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Mark First Topic complete" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Mark First Topic complete" }));
+    await waitFor(() => expect(window.localStorage.getItem(lectureStorageKey)).toBeTruthy());
+    expect(window.localStorage.getItem(singleLectureReviewsKey("test-lecture"))).toContain("quiz-a");
+    expect(window.localStorage.getItem(lectureStorageKey)).not.toContain("quiz-a");
+  });
   it("writes lecture progress to both lecture and collection storage keys on toggle", async () => {
     render(
       <ProgressProvider

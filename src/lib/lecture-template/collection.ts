@@ -4,7 +4,8 @@ import { LECTURES_DIR as SHARED_LECTURES_DIR, readLectureEntry as readLectureTem
 import { readCourseMetadata } from "./courseMetadata";
 import { parseLectureTemplate } from "./parseTemplate";
 import { validateTemplateSource } from "./validateTemplate";
-import { collectLectureAssessments } from "./assessments";
+import { collectLectureAssessments, type AssessmentSummary } from "./assessments";
+import { progressIdFromTemplatePath } from "./progress";
 import type {
   CollectionValidationResult,
   LectureCollection,
@@ -13,6 +14,36 @@ import type {
   LectureTemplate,
   LectureValidationResult
 } from "./types";
+
+export interface CollectionReviewRegistryEntry {
+  slug: string;
+  lectureId: string;
+  order: number;
+  title: string;
+  objectives: NonNullable<LectureTemplate>["objectives"];
+  assessments: AssessmentSummary[];
+  sections: Array<{ anchor: string; title: string }>;
+}
+
+export function buildCollectionReviewRegistry(validation: CollectionValidationResult): CollectionReviewRegistryEntry[] {
+  return validation.results
+    .filter((result): result is LectureValidationResult & { template: LectureTemplate } => result.valid && Boolean(result.template))
+    .map((result, index) => ({
+      slug: result.slug,
+      lectureId: progressIdFromTemplatePath(result.templatePath, result.template.metadata.title),
+      order: collectionOrder(result.slug, index),
+      title: result.template.metadata.title,
+      objectives: result.template.objectives,
+      assessments: collectLectureAssessments(result.template, result.slug),
+      sections: result.template.sections.map((section) => ({ anchor: section.anchor, title: section.title }))
+    }))
+    .sort((left, right) => left.order - right.order || left.slug.localeCompare(right.slug));
+}
+
+function collectionOrder(slug: string, fallback: number): number {
+  const match = slug.match(/^(\d+)/);
+  return match ? Number.parseInt(match[1] ?? "", 10) : fallback;
+}
 
 export const LECTURES_DIR = SHARED_LECTURES_DIR;
 

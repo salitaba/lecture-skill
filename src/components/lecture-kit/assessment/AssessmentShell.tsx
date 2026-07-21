@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Card } from "@/components/component-kit";
 import { useProgressOptional } from "../progress/ProgressProvider";
+import { useReviewOptional } from "../progress/ReviewProvider";
 
 export interface AssessmentShellProps {
   id?: string;
@@ -15,7 +16,7 @@ export interface AssessmentShellProps {
 
 export function AssessmentShell({ id, label, title, className, children, noScriptFallback }: AssessmentShellProps) {
   return (
-    <Card id={id} altitude="emphasis" label={label} title={title} className={`assessment-card ${className}`}>
+    <Card id={id} tabIndex={id ? -1 : undefined} altitude="emphasis" label={label} title={title} className={`assessment-card ${className}`}>
       {children}
       {noScriptFallback ? <noscript className="assessment-noscript">{noScriptFallback}</noscript> : null}
     </Card>
@@ -34,6 +35,7 @@ export interface ChoiceAssessmentAttemptOptions {
   key: string;
   answer: string;
   lockAfterReveal?: boolean;
+  activityKey?: string;
 }
 
 export interface ChoiceAssessmentAttempt {
@@ -43,10 +45,12 @@ export interface ChoiceAssessmentAttempt {
   toggleReveal: () => void;
   isCorrect: boolean;
   hasSelection: boolean;
+  retry: () => void;
 }
 
-export function useChoiceAssessmentAttempt({ key, answer, lockAfterReveal = true }: ChoiceAssessmentAttemptOptions): ChoiceAssessmentAttempt {
+export function useChoiceAssessmentAttempt({ key, answer, lockAfterReveal = true, activityKey = key }: ChoiceAssessmentAttemptOptions): ChoiceAssessmentAttempt {
   const progressContext = useProgressOptional();
+  const reviewContext = useReviewOptional();
   const [state, setState] = useState<{ selected: string | null; revealed: boolean }>({ selected: null, revealed: false });
   const hydratedRef = useRef(false);
 
@@ -70,11 +74,19 @@ export function useChoiceAssessmentAttempt({ key, answer, lockAfterReveal = true
 
   const toggleReveal = () => {
     const nextRevealed = !state.revealed;
-    if (nextRevealed && state.selected !== null) {
-      progressContext?.recordAnswer(key, state.selected, state.selected === answer);
+    if (nextRevealed) {
+      const selected = state.selected;
+      const attempted = selected !== null;
+      if (attempted) {
+        progressContext?.recordAnswer(key, selected, selected === answer);
+        if (selected !== answer) reviewContext?.markReviewRecommended(activityKey);
+      }
+      reviewContext?.recordActivity(activityKey, { attempted, revealed: true });
     }
     setState((current) => ({ ...current, revealed: nextRevealed }));
   };
+
+  const retry = () => setState({ selected: null, revealed: false });
 
   return {
     selected: state.selected,
@@ -82,7 +94,8 @@ export function useChoiceAssessmentAttempt({ key, answer, lockAfterReveal = true
     revealed: state.revealed,
     toggleReveal,
     isCorrect: state.selected === answer,
-    hasSelection: state.selected !== null
+    hasSelection: state.selected !== null,
+    retry
   };
 }
 

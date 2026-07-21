@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { validateTemplateSource } from "../../src/lib/lecture-template/validateTemplate";
-import { fixture } from "./testUtils";
+import { errorCodes, fixture } from "./testUtils";
 
 describe("validation fixtures", () => {
   it("valid example templates pass", () => {
@@ -26,5 +26,27 @@ describe("validation fixtures", () => {
     for (const file of invalidFiles) {
       expect(validateTemplateSource(fixture(`examples/invalid/${file}`)), file).toMatchObject({ valid: false });
     }
+  });
+
+  it("registers learning-loop contract fixtures without touching authored source evidence", () => {
+    const validFiles = [
+      "tests/fixtures/learning-loop/objectives-explicit.template.md",
+      "tests/fixtures/learning-loop/objectives-legacy.template.md",
+      "tests/fixtures/learning-loop/collection/01-first/lecture.template.md",
+      "tests/fixtures/learning-loop/collection/02-second/lecture.template.md"
+    ];
+    for (const filePath of validFiles) {
+      expect(validateTemplateSource(fixture(filePath)), filePath).toMatchObject({ valid: true });
+    }
+
+    for (const filePath of [
+      "tests/fixtures/learning-loop/objectives-invalid-markers.template.md",
+      "tests/fixtures/learning-loop/objectives-duplicate-ids.template.md",
+      "tests/fixtures/learning-loop/assessment-coverage.template.md",
+      "tests/fixtures/learning-loop/collection/03-invalid/lecture.template.md"
+    ]) {
+      expect(validateTemplateSource(fixture(filePath)), filePath).toMatchObject({ valid: false });
+    }
+    expect(errorCodes("tests/fixtures/learning-loop/objectives-invalid-markers.template.md")).toContain("INVALID_OBJECTIVE_MARKER");
   });
 });

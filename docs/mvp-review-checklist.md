@@ -10,6 +10,9 @@ Use this checklist for each launch-counted generated golden lecture. Mark every 
 | The description summarizes the lecture briefly. | [ ] Pass / [ ] Fail | |
 | Learning objectives are measurable. | [ ] Pass / [ ] Fail | |
 | Learning objectives are reflected by the rendered sections. | [ ] Pass / [ ] Fail | |
+| Explicit objective IDs are stable, source-grounded, and unique when used. | [ ] Pass / [ ] Fail | |
+| Assessment `objective_refs` resolve only to explicit objective IDs. | [ ] Pass / [ ] Fail | |
+| Objective coverage diagnostics distinguish linked, unlinked, and legacy objectives without learner grades. | [ ] Pass / [ ] Fail | |
 | The lecture has 3-6 coherent ordered sections unless the source is clearly shorter. | [ ] Pass / [ ] Fail | |
 | Every major claim in the generated lecture is supported by `examples/raw-lecture.txt`. | [ ] Pass / [ ] Fail | |
 | Important source examples, terminology, caveats, and practical steps are preserved unless omitted for clear concision. | [ ] Pass / [ ] Fail | |
