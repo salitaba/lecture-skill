@@ -78,14 +78,6 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
           <div className="lecture-layout">
             <SectionNavigation sections={lecture.sections} />
             <article className="lecture-content">
-              <AssessmentIndexDisclosure assessments={assessments} linkMode="single" id="lecture-assessment-index" />
-              <LearnerDashboardSummary objectives={lecture.objectives} assessments={assessments} firstActionHref={`#${lecture.sections[0]?.anchor ?? lectureNavigationTargets.overview.id}`} />
-              <ReviewQueue
-                objectives={lecture.objectives}
-                assessments={assessments}
-                emptyStateHref="#learning-path"
-                emptyStateLabel="Browse learning path"
-              />
               <section className="overview-section lecture-panel quiet-reading-surface" aria-labelledby={lectureNavigationTargets.overview.id}>
                 <p className="section-kicker">Start Here</p>
                 <h2 id={lectureNavigationTargets.overview.id}>{lectureNavigationTargets.overview.label}</h2>
@@ -122,6 +114,23 @@ export function LecturePage({ lecture, templatePath, collectionNavigation, colle
                     ))}
                   </ul>
                 </div>
+              </section>
+
+              <section className="lecture-study-tools" aria-labelledby="lecture-study-tools-title">
+                <header className="lecture-study-tools-header">
+                  <p className="section-kicker">After the lesson</p>
+                  <h2 id="lecture-study-tools-title">Study tools</h2>
+                  <p>Review your progress, revisit activities, or find an assessment when you need it.</p>
+                </header>
+                <LearnerDashboardSummary objectives={lecture.objectives} assessments={assessments} firstActionHref={`#${lecture.sections[0]?.anchor ?? lectureNavigationTargets.overview.id}`} />
+                <ReviewQueue
+                  objectives={lecture.objectives}
+                  assessments={assessments}
+                  emptyStateHref="#learning-path"
+                  emptyStateLabel="Browse learning path"
+                  compactEmpty
+                />
+                <AssessmentIndexDisclosure assessments={assessments} linkMode="single" id="lecture-assessment-index" />
               </section>
 
               <GlossaryIndex entries={glossaryEntries} id="lecture-glossary-index" />

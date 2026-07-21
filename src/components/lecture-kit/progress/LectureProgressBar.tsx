@@ -20,7 +20,6 @@ export function LectureProgressBar() {
     <section className="lecture-progress" aria-labelledby="lecture-progress-title">
       <div className="lecture-progress-header">
         <div>
-          <p className="section-kicker">Progress</p>
           <h2 id="lecture-progress-title">Lecture progress</h2>
           <p className="lecture-progress-summary">
             {progressSummary}
@@ -31,16 +30,16 @@ export function LectureProgressBar() {
 
       <ProgressMeter value={loaded ? percentComplete : undefined} label="Lecture progress" />
 
-      <div className="lecture-progress-footer">
-        {hasWork ? (
+      {hasWork ? (
+        <div className="lecture-progress-footer">
           <span className="progress-reset-row">
             <Button variant="ghost" tone="muted" className="progress-reset-button" onClick={onReset} aria-keyshortcuts="Alt+R">
               Reset progress
             </Button>
             <span className="progress-reset-shortcut-hint">Alt+R</span>
           </span>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
 }

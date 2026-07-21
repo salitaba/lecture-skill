@@ -77,4 +77,22 @@ describe("LecturePage layout order", () => {
     expect(progressIndex).toBeGreaterThan(headerIndex);
     expect(layoutIndex).toBeGreaterThan(progressIndex);
   });
+
+  it("puts teaching content before secondary study tools", () => {
+    const result = validateTemplateSource(fixture("content/lecture.template.md"));
+    if (!result.valid) throw new Error("fixture should be valid");
+
+    const html = renderToStaticMarkup(<LecturePage lecture={result.template} templatePath="content/lecture.template.md" />);
+    const overviewIndex = html.indexOf('id="overview-heading"');
+    const firstSectionIndex = html.indexOf(`id="${result.template.sections[0]?.anchor}"`);
+    const takeawaysIndex = html.indexOf('id="takeaways-heading"');
+    const studyToolsIndex = html.indexOf('id="lecture-study-tools-title"');
+    const dashboardIndex = html.indexOf('id="learner-dashboard"');
+
+    expect(overviewIndex).toBeGreaterThan(-1);
+    expect(firstSectionIndex).toBeGreaterThan(overviewIndex);
+    expect(takeawaysIndex).toBeGreaterThan(firstSectionIndex);
+    expect(studyToolsIndex).toBeGreaterThan(takeawaysIndex);
+    expect(dashboardIndex).toBeGreaterThan(studyToolsIndex);
+  });
 });

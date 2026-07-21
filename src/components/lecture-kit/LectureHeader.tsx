@@ -28,20 +28,18 @@ export function LectureHeader({
       <FactsList
         aria-label="Lecture metadata"
         className="metadata-grid"
+        variant="compact"
         items={[
-          { label: "Audience", value: metadata.audience },
           { label: "Estimated study time", value: metadata.duration },
           ...(readingMinutes ? [{ label: "Reading time", value: `~${readingMinutes} min read` }] : []),
+          { label: "Sections", value: `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}` },
           { label: "Level", value: metadata.level },
-          { label: "Sections", value: `${sectionCount} ${sectionCount === 1 ? "section" : "sections"}` }
+          { label: "Audience", value: metadata.audience }
         ]}
       />
       <div className="lecture-header-actions">
         <a className="header-action-primary" href="#overview-heading">
           Start reading <Icon name="arrow-next" />
-        </a>
-        <a className="header-action-secondary" href="#learning-path">
-          View learning path
         </a>
       </div>
     </header>

@@ -289,6 +289,28 @@ select:focus-visible {
   pointer-events: none;
 }
 
+.lecture-header {
+  padding: 34px 36px 30px;
+  margin-bottom: 16px;
+}
+
+.lecture-header .description {
+  max-width: 62ch;
+}
+
+.lecture-header .facts-list.metadata-grid {
+  grid-template-columns: repeat(5, minmax(0, auto));
+  justify-content: start;
+  gap: 10px 26px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.lecture-header .facts-list.metadata-grid .facts-list-item:last-child {
+  max-width: 28ch;
+}
+
 .eyebrow,
 .component-label,
 .section-number,
@@ -420,7 +442,7 @@ dd {
   grid-template-columns: minmax(220px, 252px) minmax(0, 820px);
   gap: 36px;
   align-items: start;
-  padding-top: 28px;
+  padding-top: 24px;
   justify-content: space-between;
 }
 
@@ -817,6 +839,15 @@ details[open] > summary .learning-path-chevron {
   box-shadow: none;
 }
 
+.lecture-progress {
+  grid-template-columns: minmax(210px, auto) minmax(180px, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
 .lecture-progress-header {
   display: flex;
   gap: 16px;
@@ -828,6 +859,15 @@ details[open] > summary .learning-path-chevron {
 .collection-progress h2 {
   margin-bottom: 6px;
   font-size: 1.2rem;
+}
+
+.lecture-progress h2 {
+  margin: 0 0 2px;
+  font-size: 1rem;
+}
+
+.lecture-progress .progress-meter-track {
+  height: 10px;
 }
 
 .lecture-progress-summary,
@@ -862,6 +902,16 @@ details[open] > summary .learning-path-chevron {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+}
+
+.lecture-progress .lecture-progress-footer {
+  display: block;
+}
+
+.lecture-progress .btn-ghost-muted {
+  min-height: 40px;
+  padding: 7px 11px;
+  background: transparent;
 }
 
 .progress-reset-row {
@@ -1090,6 +1140,10 @@ details[open] > summary .learning-path-chevron {
   background: var(--highlight-bg);
   border: 1px solid var(--highlight-border);
   border-radius: var(--radius-md);
+}
+
+.resume-prompt + .lecture-progress {
+  margin-top: 10px;
 }
 
 .resume-prompt p {
@@ -3190,6 +3244,14 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .lecture-header .facts-list.metadata-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .lecture-progress {
+    grid-template-columns: minmax(200px, 0.75fr) minmax(180px, 1.25fr) auto;
+  }
+
   .section-nav {
     position: static;
   }
@@ -3280,6 +3342,16 @@ td {
     border-radius: var(--radius-md);
   }
 
+  .lecture-header .facts-list.metadata-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+  }
+
+  .lecture-header .facts-list.metadata-grid .facts-list-item:last-child {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+
   .lecture-header-actions {
     align-items: stretch;
     flex-direction: column;
@@ -3312,8 +3384,17 @@ td {
   }
 
   .lecture-progress {
+    grid-template-columns: 1fr;
     padding: 12px;
     gap: 10px;
+  }
+
+  .lecture-progress .lecture-progress-footer {
+    width: 100%;
+  }
+
+  .lecture-progress .progress-reset-row {
+    justify-content: flex-start;
   }
 
   .lecture-progress h2,
@@ -3664,6 +3745,36 @@ td {
   background: var(--surface-soft);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+}
+
+.lecture-study-tools {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  margin-top: 12px;
+  padding-top: 30px;
+  border-top: 1px solid var(--border);
+}
+
+.lecture-study-tools-header {
+  max-width: var(--prose-measure);
+}
+
+.lecture-study-tools-header h2 {
+  margin-bottom: 6px;
+}
+
+.lecture-study-tools-header p:last-child {
+  margin: 0;
+  color: var(--muted);
+}
+
+.lecture-study-tools .learner-dashboard-summary {
+  box-shadow: none;
+}
+
+.lecture-study-tools .assessment-index-disclosure {
+  margin-top: 0;
 }
 
 .learner-dashboard-summary {
